@@ -1,4 +1,5 @@
 pub mod codex_config;
+pub mod control_layer;
 pub mod monitor;
 pub mod preflight;
 pub mod routing;
