@@ -11,6 +11,10 @@ permissions = [
   "allow-request-codex-restart",
   "allow-begin-routing-preflight",
   "allow-set-root-routing-enabled",
+  "allow-get-theme-snapshot",
+  "allow-start-theme-session",
+  "allow-apply-theme",
+  "allow-restore-theme",
 ]
 
 [[permission]]
@@ -62,3 +66,23 @@ commands.allow = ["begin_routing_preflight"]
 identifier = "allow-set-root-routing-enabled"
 description = "Enable or disable Smart Routing for one visible root task"
 commands.allow = ["set_root_routing_enabled"]
+
+[[permission]]
+identifier = "allow-get-theme-snapshot"
+description = "Read the rights-audited declarative theme catalog and current theme state"
+commands.allow = ["get_theme_snapshot"]
+
+[[permission]]
+identifier = "allow-start-theme-session"
+description = "Start one verified Codex theme control session"
+commands.allow = ["start_theme_session"]
+
+[[permission]]
+identifier = "allow-apply-theme"
+description = "Apply one bundled rights-audited theme by identifier"
+commands.allow = ["apply_theme"]
+
+[[permission]]
+identifier = "allow-restore-theme"
+description = "Remove Codex Assistant theme styles and restore the official appearance"
+commands.allow = ["restore_theme"]

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "themes": [
+    {
+      "id": "aurora-grid",
+      "category": "abstract",
+      "assets": [
+        {
+          "path": "public/themes/aurora-grid.svg",
+          "sha256": "9dc8d804a21411fabe368d52aae8beb276897126a3893bbe839c70643294c8fa"
+        }
+      ],
+      "rights": {
+        "source": "Original abstract SVG authored for Codex Assistant",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-18",
+        "status": "verified"
+      }
+    },
+    {
+      "id": "observatory-muse",
+      "category": "original-character",
+      "assets": [
+        {
+          "path": "resources/themes/original-observatory-muse.jpg",
+          "sha256": "a486add3d4c8efb5c8f9b28c453291c0ed2192d415565f0bec1dc6f9bdc78c3a"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional character generated for Codex Assistant on 2026-07-18",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-18",
+        "status": "verified"
+      }
+    }
+  ]
+}

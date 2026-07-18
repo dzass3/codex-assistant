@@ -159,22 +159,36 @@ pub fn reconcile_attempt(input: PreflightInput<'_>) -> PreflightOutcome {
         };
     }
 
-    let candidates = input
+    let observed_candidates = input
         .observations
         .iter()
         .filter(|observation| {
             observation.started_at_ms >= input.attempt.started_at_ms
                 && observation.requested_model.as_deref()
                     == Some(input.attempt.key.requested_model.as_str())
-                && observation.parent_thread_id == Some(input.attempt.expected_parent_id)
+        })
+        .collect::<Vec<_>>();
+    let exact_candidates = observed_candidates
+        .iter()
+        .copied()
+        .filter(|observation| {
+            observation.parent_thread_id == Some(input.attempt.expected_parent_id)
                 && observation.depth == input.attempt.key.depth
         })
         .collect::<Vec<_>>();
-    if candidates.len() > 1 {
+    if exact_candidates.len() > 1 {
         return terminal(PreflightReason::LineageAmbiguous, None);
     }
-    let Some(candidate) = candidates.first().copied() else {
-        return waiting_or_timeout(input.now_ms, input.attempt.deadline_at_ms);
+    let candidate = if let Some(candidate) = exact_candidates.first().copied() {
+        candidate
+    } else {
+        if observed_candidates.len() > 1 {
+            return terminal(PreflightReason::LineageAmbiguous, None);
+        }
+        let Some(candidate) = observed_candidates.first().copied() else {
+            return waiting_or_timeout(input.now_ms, input.attempt.deadline_at_ms);
+        };
+        candidate
     };
     let child_id = Some(candidate.thread_id);
     let Some(parent_id) = candidate.parent_thread_id else {

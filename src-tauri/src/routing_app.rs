@@ -26,6 +26,7 @@ use crate::{
     monitor::model::MonitorSnapshot,
     preflight::{EligibilityKey, PreflightCoordinator, PreflightPhase, PreflightSignal},
     routing::{state::RoutingStateStore, RouteKind, RoutingRuntime, RoutingSnapshot},
+    theme::{apply_theme_on_pages, bundled_theme_packs, restore_theme_on_pages, ThemePack},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -57,6 +58,14 @@ pub enum RoutingPreflightStatus {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RoutingCdpStatus {
+    Inactive,
+    Ready,
+    Degraded,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ThemeSessionStatus {
     Inactive,
     Ready,
     Degraded,
@@ -120,6 +129,14 @@ pub struct RoutingUiSnapshot {
     pub routing: RoutingSnapshot,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ThemeUiSnapshot {
+    pub contract_version: u32,
+    pub session_status: ThemeSessionStatus,
+    pub active_theme_id: Option<String>,
+    pub packs: Vec<ThemePack>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum OperationStatus {
@@ -158,6 +175,8 @@ pub struct RoutingApplication {
     control_binding: Mutex<Option<VisibleControlBinding>>,
     control_ready: Mutex<bool>,
     control_synced_enabled: Mutex<Option<bool>>,
+    theme_status: Mutex<ThemeSessionStatus>,
+    active_theme_id: Mutex<Option<String>>,
 }
 
 impl RoutingApplication {
@@ -205,6 +224,8 @@ impl RoutingApplication {
             control_binding: Mutex::new(None),
             control_ready: Mutex::new(false),
             control_synced_enabled: Mutex::new(None),
+            theme_status: Mutex::new(ThemeSessionStatus::Inactive),
+            active_theme_id: Mutex::new(None),
         })
     }
 
@@ -261,6 +282,182 @@ impl RoutingApplication {
                 reason_codes,
             },
             routing: self.routing.snapshot(),
+        }
+    }
+
+    pub fn theme_snapshot(&self) -> ThemeUiSnapshot {
+        ThemeUiSnapshot {
+            contract_version: 1,
+            session_status: *lock(&self.theme_status),
+            active_theme_id: lock(&self.active_theme_id).clone(),
+            packs: bundled_theme_packs(),
+        }
+    }
+
+    pub fn start_theme_session(&self, active_native_children: usize) -> OperationReceipt {
+        self.start_theme_session_with(active_native_children, restart_verified_host)
+    }
+
+    pub fn start_theme_session_with<F>(
+        &self,
+        active_native_children: usize,
+        restart: F,
+    ) -> OperationReceipt
+    where
+        F: FnOnce() -> Result<OwnedSessionRecord, RoutingSetupReasonCode>,
+    {
+        let operation_id = Uuid::new_v4().to_string();
+        if lock(&self.control_session).is_some() {
+            *lock(&self.theme_status) = ThemeSessionStatus::Ready;
+            return OperationReceipt {
+                operation_id,
+                status: OperationStatus::Noop,
+                reason_codes: Vec::new(),
+                restart_required: false,
+            };
+        }
+        if active_native_children != 0 {
+            return blocked_receipt(operation_id, RoutingSetupReasonCode::ActiveChild, false);
+        }
+        match restart() {
+            Ok(record) if self.session_store.save(&record).is_ok() => {
+                *lock(&self.control_session) = Some(record);
+                *lock(&self.cdp_status) = RoutingCdpStatus::Ready;
+                *lock(&self.theme_status) = ThemeSessionStatus::Ready;
+                OperationReceipt {
+                    operation_id,
+                    status: OperationStatus::Applied,
+                    reason_codes: Vec::new(),
+                    restart_required: false,
+                }
+            }
+            Ok(_) => {
+                *lock(&self.theme_status) = ThemeSessionStatus::Degraded;
+                OperationReceipt {
+                    operation_id,
+                    status: OperationStatus::Failed,
+                    reason_codes: vec![RoutingSetupReasonCode::RoutingRuntimeUnavailable],
+                    restart_required: false,
+                }
+            }
+            Err(reason) => {
+                *lock(&self.theme_status) = ThemeSessionStatus::Degraded;
+                OperationReceipt {
+                    operation_id,
+                    status: OperationStatus::Failed,
+                    reason_codes: vec![reason],
+                    restart_required: false,
+                }
+            }
+        }
+    }
+
+    pub fn apply_theme(&self, theme_id: &str) -> OperationReceipt {
+        self.apply_theme_with(theme_id, |pack| {
+            let session = lock(&self.control_session)
+                .clone()
+                .ok_or(RoutingSetupReasonCode::CdpUnavailable)?;
+            let endpoint = verified_control_endpoint(&session)?;
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)?;
+            runtime
+                .block_on(apply_theme_on_pages(&endpoint, pack, 2_000))
+                .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)
+        })
+    }
+
+    pub fn apply_theme_with<F>(&self, theme_id: &str, apply: F) -> OperationReceipt
+    where
+        F: FnOnce(&ThemePack) -> Result<usize, RoutingSetupReasonCode>,
+    {
+        let operation_id = Uuid::new_v4().to_string();
+        if *lock(&self.theme_status) != ThemeSessionStatus::Ready {
+            return blocked_receipt(operation_id, RoutingSetupReasonCode::CdpUnavailable, false);
+        }
+        let Some(pack) = bundled_theme_packs()
+            .into_iter()
+            .find(|pack| pack.id == theme_id)
+        else {
+            return blocked_receipt(operation_id, RoutingSetupReasonCode::UnsupportedHost, false);
+        };
+        match apply(&pack) {
+            Ok(count) if count != 0 => {
+                *lock(&self.active_theme_id) = Some(pack.id);
+                OperationReceipt {
+                    operation_id,
+                    status: OperationStatus::Applied,
+                    reason_codes: Vec::new(),
+                    restart_required: false,
+                }
+            }
+            Ok(_) => OperationReceipt {
+                operation_id,
+                status: OperationStatus::Failed,
+                reason_codes: vec![RoutingSetupReasonCode::UnsupportedHost],
+                restart_required: false,
+            },
+            Err(reason) => OperationReceipt {
+                operation_id,
+                status: OperationStatus::Failed,
+                reason_codes: vec![reason],
+                restart_required: false,
+            },
+        }
+    }
+
+    pub fn restore_theme(&self) -> OperationReceipt {
+        self.restore_theme_with(|| {
+            let session = lock(&self.control_session)
+                .clone()
+                .ok_or(RoutingSetupReasonCode::CdpUnavailable)?;
+            let endpoint = verified_control_endpoint(&session)?;
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)?;
+            runtime
+                .block_on(restore_theme_on_pages(&endpoint, 2_000))
+                .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)
+        })
+    }
+
+    pub fn restore_theme_with<F>(&self, restore: F) -> OperationReceipt
+    where
+        F: FnOnce() -> Result<usize, RoutingSetupReasonCode>,
+    {
+        let operation_id = Uuid::new_v4().to_string();
+        if lock(&self.active_theme_id).is_none() {
+            return OperationReceipt {
+                operation_id,
+                status: OperationStatus::Noop,
+                reason_codes: Vec::new(),
+                restart_required: false,
+            };
+        }
+        match restore() {
+            Ok(count) if count != 0 => {
+                *lock(&self.active_theme_id) = None;
+                OperationReceipt {
+                    operation_id,
+                    status: OperationStatus::Applied,
+                    reason_codes: Vec::new(),
+                    restart_required: false,
+                }
+            }
+            Ok(_) => OperationReceipt {
+                operation_id,
+                status: OperationStatus::Failed,
+                reason_codes: vec![RoutingSetupReasonCode::UnsupportedHost],
+                restart_required: false,
+            },
+            Err(reason) => OperationReceipt {
+                operation_id,
+                status: OperationStatus::Failed,
+                reason_codes: vec![reason],
+                restart_required: false,
+            },
         }
     }
 

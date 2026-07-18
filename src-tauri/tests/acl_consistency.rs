@@ -14,6 +14,7 @@ const LIB_RS: &str = include_str!("../src/lib.rs");
 const DEFAULT_TOML: &str = include_str!("../permissions/default.toml");
 const CAPABILITY_JSON: &str = include_str!("../capabilities/default.json");
 const ROUTING_API: &str = include_str!("../../src/lib/routingApi.ts");
+const THEME_API: &str = include_str!("../../src/lib/themeApi.ts");
 
 /// Contents of every double-quoted string in `s`.
 fn quoted_strings(s: &str) -> BTreeSet<String> {
@@ -180,5 +181,48 @@ fn smart_routing_exposes_only_the_six_narrow_commands_end_to_end() {
         assert!(!granted.contains(forbidden));
         assert!(!handler.contains(forbidden));
         assert!(!ROUTING_API.contains(&format!("invoke(\"{forbidden}\"")));
+    }
+}
+
+#[test]
+fn themes_expose_only_four_narrow_commands_end_to_end() {
+    let expected = BTreeSet::from([
+        "get_theme_snapshot".to_owned(),
+        "start_theme_session".to_owned(),
+        "apply_theme".to_owned(),
+        "restore_theme".to_owned(),
+    ]);
+    let granted = acl_granted_commands();
+    let handler = handler_commands();
+    let frontend = [
+        "get_theme_snapshot",
+        "start_theme_session",
+        "apply_theme",
+        "restore_theme",
+    ]
+    .into_iter()
+    .filter(|command| THEME_API.contains(&format!("invoke(\"{command}\"")))
+    .map(str::to_owned)
+    .collect::<BTreeSet<_>>();
+
+    assert_eq!(frontend, expected, "frontend theme command surface changed");
+    assert!(
+        expected.is_subset(&granted),
+        "theme ACL mismatch: {granted:?}"
+    );
+    assert!(
+        expected.is_subset(&handler),
+        "theme handler mismatch: {handler:?}"
+    );
+    for forbidden in [
+        "open_file",
+        "import_remote_theme",
+        "evaluate_script",
+        "send_cdp",
+        "install_extension",
+    ] {
+        assert!(!granted.contains(forbidden));
+        assert!(!handler.contains(forbidden));
+        assert!(!THEME_API.contains(&format!("invoke(\"{forbidden}\"")));
     }
 }

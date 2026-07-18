@@ -48,6 +48,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 tauri-plugin-single-instance = "2"
 toml_edit = "=0.22.27"
 sha2 = "=0.10.9"
+base64 = "=0.22.1"
 fs2 = "=0.4.3"
 
 [target.'cfg(windows)'.dependencies]

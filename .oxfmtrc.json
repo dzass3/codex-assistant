@@ -6,5 +6,5 @@
   "semi": true,
   "singleQuote": false,
   "trailingComma": "all",
-  "ignorePatterns": ["dist/", "src-tauri/gen/", "src-tauri/target/"]
+  "ignorePatterns": ["dist/", "src-tauri/gen/", "src-tauri/target/", "website/"]
 }

@@ -5,11 +5,12 @@ pub mod preflight;
 pub mod routing;
 pub mod routing_app;
 pub mod routing_mcp;
+pub mod theme;
 
 use std::sync::Arc;
 
 use monitor::{runtime::MonitorRuntime, MonitorSnapshot};
-use routing_app::{OperationReceipt, RoutingApplication, RoutingUiSnapshot};
+use routing_app::{OperationReceipt, RoutingApplication, RoutingUiSnapshot, ThemeUiSnapshot};
 use tauri::{Emitter, Manager};
 
 const MONITOR_EVENT: &str = "monitor://snapshot";
@@ -47,6 +48,10 @@ pub fn run() {
             request_codex_restart,
             begin_routing_preflight,
             set_root_routing_enabled,
+            get_theme_snapshot,
+            start_theme_session,
+            apply_theme,
+            restore_theme,
         ])
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -246,4 +251,63 @@ fn set_root_routing_enabled(
         root_is_observed,
         active_native_children,
     )
+}
+
+#[tauri::command]
+fn get_theme_snapshot(runtime: tauri::State<'_, Arc<RoutingApplication>>) -> ThemeUiSnapshot {
+    runtime.theme_snapshot()
+}
+
+#[tauri::command]
+async fn start_theme_session(
+    runtime: tauri::State<'_, Arc<RoutingApplication>>,
+    monitor: tauri::State<'_, Arc<MonitorRuntime>>,
+) -> Result<OperationReceipt, String> {
+    let active_native_children = monitor
+        .snapshot()
+        .agents
+        .iter()
+        .filter(|agent| {
+            agent.is_subagent
+                && matches!(
+                    agent.status,
+                    monitor::model::AgentStatus::Starting | monitor::model::AgentStatus::Running
+                )
+        })
+        .count();
+    let worker = Arc::clone(runtime.inner());
+    let fallback = Arc::clone(&worker);
+    match tauri::async_runtime::spawn_blocking(move || {
+        worker.start_theme_session(active_native_children)
+    })
+    .await
+    {
+        Ok(receipt) => Ok(receipt),
+        Err(_) => Ok(fallback.unavailable_operation()),
+    }
+}
+
+#[tauri::command]
+async fn apply_theme(
+    theme_id: String,
+    runtime: tauri::State<'_, Arc<RoutingApplication>>,
+) -> Result<OperationReceipt, String> {
+    let worker = Arc::clone(runtime.inner());
+    let fallback = Arc::clone(&worker);
+    match tauri::async_runtime::spawn_blocking(move || worker.apply_theme(&theme_id)).await {
+        Ok(receipt) => Ok(receipt),
+        Err(_) => Ok(fallback.unavailable_operation()),
+    }
+}
+
+#[tauri::command]
+async fn restore_theme(
+    runtime: tauri::State<'_, Arc<RoutingApplication>>,
+) -> Result<OperationReceipt, String> {
+    let worker = Arc::clone(runtime.inner());
+    let fallback = Arc::clone(&worker);
+    match tauri::async_runtime::spawn_blocking(move || worker.restore_theme()).await {
+        Ok(receipt) => Ok(receipt),
+        Err(_) => Ok(fallback.unavailable_operation()),
+    }
 }

@@ -5,6 +5,7 @@ import { FilterBar, type MonitorFilters } from "./components/FilterBar";
 import { HealthStrip } from "./components/HealthStrip";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SmartRoutingPage } from "./components/SmartRoutingPage";
+import { ThemesPage } from "./components/ThemesPage";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "./config";
 import { useMonitor } from "./hooks/useMonitor";
 
@@ -124,8 +125,10 @@ export function App() {
             <span>{monitor.settings?.codex_home_label ?? "Codex Home: 检测中"}</span>
           </footer>
         </>
-      ) : (
+      ) : page === "routing" ? (
         <SmartRoutingPage roots={routingRoots} />
+      ) : (
+        <ThemesPage />
       )}
 
       <SettingsDialog

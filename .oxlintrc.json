@@ -50,7 +50,7 @@
     "browser": true
   },
   "globals": {},
-  "ignorePatterns": ["dist", "src-tauri/gen", "src-tauri/target"],
+  "ignorePatterns": ["dist", "src-tauri/gen", "src-tauri/target", "website"],
   "overrides": [
     {
       "files": ["src/lib/monitorApi.ts"],

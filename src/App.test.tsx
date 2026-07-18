@@ -34,6 +34,23 @@ vi.mock("./hooks/useRouting", () => ({
   }),
 }));
 
+vi.mock("./hooks/useTheme", () => ({
+  useTheme: () => ({
+    snapshot: { contract_version: 1, session_status: "inactive", active_theme_id: null, packs: [] },
+    loading: false,
+    refreshing: false,
+    degraded: false,
+    error: null,
+    connected: true,
+    operation: null,
+    receipt: null,
+    refresh: vi.fn(),
+    startSession: vi.fn(),
+    apply: vi.fn(),
+    restore: vi.fn(),
+  }),
+}));
+
 describe("App", () => {
   it("renders the Codex Assistant product identity", () => {
     render(<App />);
@@ -48,6 +65,15 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Smart Routing" }));
 
     expect(screen.getByRole("heading", { name: "Smart Routing" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "当前任务与子代理" })).not.toBeInTheDocument();
+  });
+
+  it("opens theme management in the same application window", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "主题管理" }));
+
+    expect(screen.getByRole("heading", { name: "主题管理" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "当前任务与子代理" })).not.toBeInTheDocument();
   });
 });

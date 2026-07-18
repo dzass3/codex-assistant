@@ -1,4 +1,4 @@
-export type AppPage = "live" | "routing";
+export type AppPage = "live" | "routing" | "themes";
 
 export function AppNavigation({
   active,
@@ -26,6 +26,15 @@ export function AppNavigation({
         onClick={() => onChange("routing")}
       >
         Smart Routing
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === "themes"}
+        className={active === "themes" ? "is-active" : undefined}
+        onClick={() => onChange("themes")}
+      >
+        主题管理
       </button>
     </nav>
   );
