@@ -1,274 +1,146 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import type { ViewState, CodexSessionInfo, CodexToolCall } from "../shared/types";
-import { useSession } from "./hooks/useSession";
-import { usePicker, resolveSessionsDir } from "./hooks/usePicker";
-import { useToggleSet } from "./hooks/useToggleSet";
-import { useKeyboard } from "./hooks/useKeyboard";
-import { SidebarTree } from "./components/SidebarTree";
-import { SessionPicker } from "./components/SessionPicker";
-import { TurnList } from "./components/TurnList";
-import { TurnDetail } from "./components/TurnDetail";
-import { WorkerPanel } from "./components/WorkerPanel";
-import { InfoBar } from "./components/InfoBar";
-import { KeybindBar } from "./components/KeybindBar";
-import { ViewToolbar } from "./components/ViewToolbar";
-import { ResizeHandle } from "./components/ResizeHandle";
-import { SettingsModal } from "./components/SettingsModal";
+import { useMemo, useState } from "react";
+import { AgentTree } from "./components/AgentTree";
+import { FilterBar, type MonitorFilters } from "./components/FilterBar";
+import { HealthStrip } from "./components/HealthStrip";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { useMonitor } from "./hooks/useMonitor";
 
-function findToolByCallId(tools: CodexToolCall[], callId: string): CodexToolCall | null {
-  for (const tool of tools) {
-    if (tool.call_id === callId) return tool;
-    const childTurns = tool.worker_session?.turns ?? [];
-    for (const turn of childTurns) {
-      const found = findToolByCallId(turn.tool_calls, callId);
-      if (found) return found;
-    }
-  }
-  return null;
-}
+const DEFAULT_FILTERS: MonitorFilters = {
+  query: "",
+  model: "all",
+  project: "all",
+  activeOnly: true,
+};
 
 export function App() {
-  const [view, setView] = useState<ViewState>("picker");
-  const [selectedTurn, setSelectedTurn] = useState(0);
-  const [pickerSelected, setPickerSelected] = useState(0);
-  const [showKeybinds, setShowKeybinds] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(200);
-  const [showSettings, setShowSettings] = useState(false);
-  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
-  const [workerPanelWidth, setWorkerPanelWidth] = useState(380);
-  const [workerPanelCallId, setWorkerPanelCallId] = useState<string | null>(null);
+  const monitor = useMonitor();
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const session = useSession();
-  const picker = usePicker();
-  const {
-    set: expandedTools,
-    toggle: toggleTool,
-    clear: clearTools,
-    addAll: addAllTools,
-  } = useToggleSet();
+  const options = useMemo(() => {
+    const agents = monitor.snapshot?.agents ?? [];
+    return {
+      models: [
+        ...new Set(agents.map((agent) => agent.effective_model).filter(Boolean) as string[]),
+      ].sort(),
+      projects: [
+        ...new Set(agents.map((agent) => agent.project).filter(Boolean) as string[]),
+      ].sort(),
+    };
+  }, [monitor.snapshot]);
 
-  const { loadSession } = session;
-  const { discoverSessions, updateSessionOngoing } = picker;
-
-  // Auto-discover sessions on mount
-  const discoveredRef = useRef(false);
-  useEffect(() => {
-    if (discoveredRef.current) return;
-    discoveredRef.current = true;
-    resolveSessionsDir()
-      .then((dir) => {
-        if (dir) discoverSessions(dir);
+  const counts = monitor.snapshot?.counts;
+  const lastUpdated = monitor.snapshot
+    ? new Date(monitor.snapshot.generated_at_ms).toLocaleTimeString("zh-CN", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
       })
-      .catch(() => setShowSettings(true));
-  }, [discoverSessions]);
-
-  // Sync session watcher ongoing status into picker
-  useEffect(() => {
-    if (session.sessionPath) {
-      updateSessionOngoing(session.sessionPath, session.session?.is_ongoing ?? false);
-    }
-  }, [session.sessionPath, session.session?.is_ongoing, updateSessionOngoing]);
-
-  const handleSelectSession = useCallback(
-    (info: CodexSessionInfo) => {
-      loadSession(info.path);
-      setView("list");
-      setSelectedTurn(0);
-      clearTools();
-    },
-    [loadSession, clearTools],
-  );
-
-  const handleOpenDetail = useCallback((index: number) => {
-    setSelectedTurn(index);
-    setView("detail");
-  }, []);
-
-  const handleToggleDate = useCallback((dateGroup: string) => {
-    setCollapsedDates((prev) => {
-      const next = new Set(prev);
-      if (next.has(dateGroup)) next.delete(dateGroup);
-      else next.add(dateGroup);
-      return next;
-    });
-  }, []);
-
-  const turns = session.session?.turns ?? [];
-  const selectedTurnData = turns[selectedTurn];
-  const workerPanelTool = useMemo(() => {
-    if (!workerPanelCallId || !selectedTurnData) return null;
-    return findToolByCallId(selectedTurnData.tool_calls, workerPanelCallId);
-  }, [selectedTurnData, workerPanelCallId]);
-
-  const expandAll = useCallback(() => {
-    if (view === "detail") {
-      const currentTurns = session.session?.turns ?? [];
-      if (currentTurns[selectedTurn]) {
-        addAllTools(currentTurns[selectedTurn].tool_calls.map((_, i) => i));
-      }
-    }
-  }, [view, session.session, selectedTurn, addAllTools]);
-
-  const collapseAll = useCallback(() => clearTools(), [clearTools]);
-
-  const goToSessions = useCallback(() => setView("picker"), []);
-
-  const closeWorkerPanel = useCallback(() => setWorkerPanelCallId(null), []);
-
-  const handleOpenWorkerPanel = useCallback((tool: CodexToolCall) => {
-    if (!tool.worker_session) return;
-    setWorkerPanelCallId((current) => (current === tool.call_id ? null : tool.call_id));
-  }, []);
-
-  useEffect(() => {
-    if (view !== "detail") {
-      closeWorkerPanel();
-      return;
-    }
-    if (workerPanelCallId && !workerPanelTool?.worker_session) {
-      closeWorkerPanel();
-    }
-  }, [view, workerPanelCallId, workerPanelTool?.worker_session, closeWorkerPanel]);
-
-  // Keyboard navigation
-  useKeyboard({
-    j: () => {
-      if (view === "list") setSelectedTurn((i) => Math.min(i + 1, turns.length - 1));
-      if (view === "picker") setPickerSelected((i) => Math.min(i + 1, picker.sessions.length - 1));
-    },
-    k: () => {
-      if (view === "list") setSelectedTurn((i) => Math.max(i - 1, 0));
-      if (view === "picker") setPickerSelected((i) => Math.max(i - 1, 0));
-    },
-    Enter: () => {
-      if (view === "list" && turns.length > 0) handleOpenDetail(selectedTurn);
-      if (view === "picker" && picker.sessions.length > 0)
-        handleSelectSession(picker.sessions[pickerSelected]);
-    },
-    Escape: () => {
-      if (workerPanelCallId) {
-        closeWorkerPanel();
-        return;
-      }
-      if (view === "detail") setView("list");
-      else if (view === "list") setView("picker");
-    },
-    q: () => {
-      if (workerPanelCallId) {
-        closeWorkerPanel();
-        return;
-      }
-      if (view === "detail") setView("list");
-      else if (view === "list") setView("picker");
-    },
-    ",": () => setShowSettings(true),
-    "?": () => setShowKeybinds((p) => !p),
-  });
+    : "--:--:--";
 
   return (
-    <div className="app">
-      {/* Info bar — only when session loaded and not in picker */}
-      {session.sessionPath && view !== "picker" && session.session && (
-        <InfoBar session={session.session} />
-      )}
-
-      {/* View toolbar */}
-      <ViewToolbar
-        view={view}
-        hasSession={!!session.sessionPath}
-        onGoToSessions={goToSessions}
-        onExpandAll={expandAll}
-        onCollapseAll={collapseAll}
-        onOpenSettings={() => setShowSettings(true)}
-      />
-
-      <div className="app-body">
-        {/* Left sidebar */}
-        <div className="app__sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
-          <div className="app__sidebar-header">
-            <span className="app__sidebar-title">SESSIONS</span>
+    <main className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <div>
+            <h1>Codex Agent Monitor</h1>
+            <p>子代理模型实时观察器</p>
           </div>
-          <SidebarTree
-            sessions={picker.allSessions}
-            selectedPath={session.sessionPath || null}
-            collapsedDates={collapsedDates}
-            onSelectSession={handleSelectSession}
-            onToggleDate={handleToggleDate}
-          />
         </div>
-
-        <ResizeHandle onResize={setSidebarWidth} />
-
-        {/* Main content */}
-        <div className="main-content">
-          {view === "picker" && (
-            <SessionPicker
-              sessions={picker.sessions}
-              loading={picker.loading}
-              searchQuery={picker.searchQuery}
-              selectedIndex={pickerSelected}
-              onSelectSession={handleSelectSession}
-              onSearchChange={picker.setSearchQuery}
-            />
-          )}
-
-          {view === "list" && session.loading && (
-            <div className="app__loading">Loading session…</div>
-          )}
-
-          {view === "list" && !session.loading && session.session && (
-            <TurnList
-              turns={turns}
-              selectedIndex={selectedTurn}
-              onSelectTurn={(i) => {
-                setSelectedTurn(i);
-                setView("detail");
-              }}
-            />
-          )}
-
-          {view === "detail" && turns[selectedTurn] && (
-            <TurnDetail
-              turn={turns[selectedTurn]}
-              expanded={expandedTools}
-              onToggle={toggleTool}
-              onBack={() => setView("list")}
-              openWorkerCallId={workerPanelCallId}
-              onOpenWorkerPanel={handleOpenWorkerPanel}
-            />
-          )}
+        <div className="topbar-actions">
+          <span className="last-updated">
+            <i className={monitor.connected ? "pulse-dot" : "pulse-dot pulse-dot--off"} />
+            {monitor.connected ? `已连接 · ${lastUpdated}` : "正在连接"}
+          </span>
+          <button className="icon-button" onClick={monitor.refresh} disabled={monitor.refreshing}>
+            {monitor.refreshing ? "刷新中" : "立即刷新"}
+          </button>
+          <button className="icon-button" onClick={() => setSettingsOpen(true)}>
+            设置
+          </button>
         </div>
+      </header>
 
-        {view === "detail" && workerPanelTool?.worker_session && (
-          <>
-            <ResizeHandle onResize={setWorkerPanelWidth} side="right" />
-            <WorkerPanel
-              session={workerPanelTool.worker_session}
-              sourceTool={workerPanelTool}
-              activeWorkerCallId={workerPanelCallId}
-              style={{ flex: `0 0 ${workerPanelWidth}px`, maxWidth: workerPanelWidth }}
-              onClose={closeWorkerPanel}
-              onOpenWorker={handleOpenWorkerPanel}
-            />
-          </>
-        )}
-      </div>
-
-      {/* Bottom keybind bar */}
-      <KeybindBar
-        view={view}
-        showHints={showKeybinds}
-        onToggle={() => setShowKeybinds((p) => !p)}
-      />
-
-      {showSettings && (
-        <SettingsModal
-          onClose={() => setShowSettings(false)}
-          onSaved={(dir) => {
-            discoverSessions(dir);
-          }}
+      <section className="summary-grid" aria-label="监控摘要">
+        <SummaryCard label="根任务" value={counts?.roots ?? 0} tone="neutral" />
+        <SummaryCard label="子代理" value={counts?.subagents ?? 0} tone="blue" />
+        <SummaryCard
+          label="正在运行"
+          value={(counts?.running ?? 0) + (counts?.starting ?? 0)}
+          tone="green"
         />
-      )}
+        <SummaryCard label="可继续调用" value={counts?.idle ?? 0} tone="amber" />
+        <SummaryCard label="模型漂移" value={counts?.model_drifts ?? 0} tone="violet" />
+      </section>
+
+      {monitor.snapshot && <HealthStrip health={monitor.snapshot.health} />}
+      {monitor.error && <div className="global-error">{monitor.error}</div>}
+
+      <section className="workspace">
+        <FilterBar
+          filters={filters}
+          models={options.models}
+          projects={options.projects}
+          onChange={setFilters}
+        />
+        <div className="workspace-heading">
+          <div>
+            <span className="eyebrow">AGENT TREE</span>
+            <h2>当前任务与子代理</h2>
+          </div>
+          <span className="privacy-note">只读元数据 · 不采集对话内容</span>
+        </div>
+        {monitor.loading ? (
+          <LoadingState />
+        ) : (
+          <AgentTree agents={monitor.snapshot?.agents ?? []} filters={filters} />
+        )}
+      </section>
+
+      <footer>
+        <span>数据源：Codex 本地状态库与 rollout 元数据</span>
+        <span>{monitor.settings?.codex_home_label ?? "Codex Home: 检测中"}</span>
+      </footer>
+
+      <SettingsDialog
+        open={settingsOpen}
+        settings={monitor.settings}
+        onClose={() => setSettingsOpen(false)}
+        onSave={monitor.setCodexHome}
+      />
+    </main>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "neutral" | "blue" | "green" | "amber" | "violet";
+}) {
+  return (
+    <article className={`summary-card summary-card--${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="empty-state">
+      <span className="loading-ring" />
+      <h3>正在建立只读观察</h3>
+      <p>正在读取代理关系和有效模型元数据…</p>
     </div>
   );
 }
