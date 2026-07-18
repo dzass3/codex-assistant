@@ -40,6 +40,7 @@
 ### Task 1: Lock the cross-file product identity
 
 **Files:**
+
 - Create: `src-tauri/tests/product_identity.rs`
 - Modify: `src/config.test.ts`
 - Modify: `src/config.ts`
@@ -52,6 +53,7 @@
 - Modify: `package-lock.json`
 
 **Interfaces:**
+
 - Produces frontend constants `PRODUCT_NAME`, `PRODUCT_TAGLINE`, `MONITOR_EVENT`, and `DEFAULT_REFRESH_MS` from `src/config.ts`.
 - Produces Rust library crate `codex_assistant_lib` and binary `codex-assistant`.
 - Preserves Tauri application identifier `com.codexagentmonitor.desktop` and monitor event `monitor://snapshot` for later tasks.
@@ -62,12 +64,7 @@ Replace `src/config.test.ts` with:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_REFRESH_MS,
-  MONITOR_EVENT,
-  PRODUCT_NAME,
-  PRODUCT_TAGLINE,
-} from "./config";
+import { DEFAULT_REFRESH_MS, MONITOR_EVENT, PRODUCT_NAME, PRODUCT_TAGLINE } from "./config";
 
 describe("product configuration", () => {
   it("uses the Codex Assistant identity and stable monitor event", () => {
@@ -195,6 +192,7 @@ git commit -m "refactor: rename application to Codex Assistant"
 ### Task 2: Render and document the new product identity
 
 **Files:**
+
 - Create: `src/App.test.tsx`
 - Modify: `src/App.tsx`
 - Modify: `index.html`
@@ -203,6 +201,7 @@ git commit -m "refactor: rename application to Codex Assistant"
 - Modify: `CHANGELOG.md`
 
 **Interfaces:**
+
 - Consumes `PRODUCT_NAME` and `PRODUCT_TAGLINE` from `src/config.ts`.
 - Preserves the existing `useMonitor()` contract and all Observer UI behavior.
 - Produces the visible Codex Assistant brand copy consumed by release packaging and the later public-site plan.

@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_REFRESH_MS,
-  MONITOR_EVENT,
-  PRODUCT_NAME,
-  PRODUCT_TAGLINE,
-} from "./config";
+import { DEFAULT_REFRESH_MS, MONITOR_EVENT, PRODUCT_NAME, PRODUCT_TAGLINE } from "./config";
 
 describe("product configuration", () => {
   it("uses the Codex Assistant identity and monitor event contract", () => {

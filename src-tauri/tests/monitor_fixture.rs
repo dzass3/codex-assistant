@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use codex_agent_model_monitor_lib::monitor::runtime::MonitorRuntime;
+use codex_assistant_lib::monitor::runtime::MonitorRuntime;
 use rusqlite::{params, Connection};
 use serde_json::json;
 use tempfile::tempdir;

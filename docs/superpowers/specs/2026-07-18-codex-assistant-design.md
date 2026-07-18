@@ -145,12 +145,12 @@ If the control layer cannot identify the visible root unambiguously, the button 
 
 ### Routing tiers
 
-| Tier | Default model profile | Work boundary | Examples |
-|---|---|---|---|
-| 1 | Spark | Fully specified, mechanical, low-risk, narrow context | Exact lookup, deterministic transformation, complete-spec single-file change, focused test addition |
-| 2 | Luna | Clear, bounded, low-risk implementation or analysis | One-to-two-file implementation, routine refactor, focused test repair, documentation synthesis |
-| 3 | Terra | Cross-file integration or meaningful judgment | Multi-file change, backend integration, non-trivial debugging, broad read-heavy review |
-| 4 | Sol | Ambiguous, architectural, security-sensitive, destructive, or final integrative judgment | Architecture, migrations, security review, unclear failures, final whole-task acceptance |
+| Tier | Default model profile | Work boundary                                                                            | Examples                                                                                            |
+| ---- | --------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1    | Spark                 | Fully specified, mechanical, low-risk, narrow context                                    | Exact lookup, deterministic transformation, complete-spec single-file change, focused test addition |
+| 2    | Luna                  | Clear, bounded, low-risk implementation or analysis                                      | One-to-two-file implementation, routine refactor, focused test repair, documentation synthesis      |
+| 3    | Terra                 | Cross-file integration or meaningful judgment                                            | Multi-file change, backend integration, non-trivial debugging, broad read-heavy review              |
+| 4    | Sol                   | Ambiguous, architectural, security-sensitive, destructive, or final integrative judgment | Architecture, migrations, security review, unclear failures, final whole-task acceptance            |
 
 Routing is a constrained optimization:
 
