@@ -1,7 +1,7 @@
 {
-  "productName": "Codex Trace",
+  "productName": "Codex Agent Monitor",
   "version": "0.4.0",
-  "identifier": "com.codextrace.desktop",
+  "identifier": "com.codexagentmonitor.desktop",
   "build": {
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist",
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "Codex Trace",
+        "title": "Codex Agent Monitor",
         "width": 1200,
         "height": 800,
         "minWidth": 600,

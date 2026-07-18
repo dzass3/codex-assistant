@@ -1,9 +1,9 @@
 {
-  "name": "codex-trace",
+  "name": "codex-agent-model-monitor",
   "version": "0.4.0",
   "private": true,
   "bin": {
-    "codex-trace": "./bin/codex-trace.mjs"
+    "codex-agent-model-monitor": "./bin/codex-trace.mjs"
   },
   "type": "module",
   "scripts": {

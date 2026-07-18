@@ -1,16 +1,9 @@
 {
   "identifier": "default",
-  "description": "Default permissions for codex-trace",
+  "description": "Minimal permissions for Codex Agent Monitor",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "fs:default",
-    "fs:allow-read-file",
-    "fs:allow-exists",
-    "fs:allow-read-dir",
-    "fs:allow-stat",
-    "core:event:default",
-    "opener:default",
-    "default"
+    "core:event:default"
   ]
 }

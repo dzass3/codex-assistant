@@ -9,5 +9,5 @@ fn main() {
         }
     }));
 
-    codex_trace_lib::run()
+    codex_agent_model_monitor_lib::run()
 }
