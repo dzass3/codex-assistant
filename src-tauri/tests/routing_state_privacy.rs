@@ -36,7 +36,7 @@ fn representative_state() -> RoutingStateEnvelope {
             route_kind: RouteKind::Direct,
             phase: RoutePhase::Implementing,
             is_reviewer: false,
-            reviewer_parent: false,
+            parent_thread_id: conversation_id,
             escalation_count: 0,
             selected_tier: ModelTier::Terra,
             requested_tier: Some(ModelTier::Terra),
@@ -195,7 +195,7 @@ fn state_rejects_invalid_ids_timestamps_and_full_envelope_budgets() {
     assert!(store.save(&state).is_err());
 
     let mut state = representative_state();
-    state.activity[0].reviewer_parent = true;
+    state.activity[0].parent_thread_id = Uuid::new_v4();
     assert!(store.save(&state).is_err());
 
     let mut state = representative_state();
@@ -203,6 +203,7 @@ fn state_rejects_invalid_ids_timestamps_and_full_envelope_budgets() {
     state.activity.extend([base.clone(), base.clone()]);
     for (index, entry) in state.activity.iter_mut().enumerate() {
         entry.child_thread_id = Uuid::new_v4();
+        entry.subtask_id = Uuid::new_v4();
         entry.started_at_ms += index as i64;
         entry.updated_at_ms += index as i64;
     }
@@ -212,6 +213,7 @@ fn state_rejects_invalid_ids_timestamps_and_full_envelope_budgets() {
     );
     state.activity.push(RouteActivity {
         child_thread_id: Uuid::new_v4(),
+        subtask_id: Uuid::new_v4(),
         started_at_ms: 10,
         updated_at_ms: 10,
         ..base.clone()
@@ -222,17 +224,199 @@ fn state_rejects_invalid_ids_timestamps_and_full_envelope_budgets() {
     );
 
     let mut nested = representative_state();
-    nested.activity[0].route_kind = RouteKind::Nested;
+    let nested_parent = nested.activity[0].child_thread_id;
     nested.activity.push(RouteActivity {
         child_thread_id: Uuid::new_v4(),
+        parent_thread_id: nested_parent,
+        subtask_id: Uuid::new_v4(),
         route_kind: RouteKind::Nested,
         started_at_ms: 4,
         updated_at_ms: 4,
+        ..base.clone()
+    });
+    nested.activity.push(RouteActivity {
+        child_thread_id: Uuid::new_v4(),
+        parent_thread_id: nested_parent,
+        subtask_id: Uuid::new_v4(),
+        route_kind: RouteKind::Nested,
+        started_at_ms: 5,
+        updated_at_ms: 5,
         ..base
     });
     assert!(
         store.save(&nested).is_err(),
         "second nested child is invalid"
+    );
+}
+
+#[test]
+fn state_requires_exact_profile_and_verified_parent_lineage() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    for version in ["cm91dGluZy12MQ", "routing_v1", "routingv1"] {
+        let mut state = representative_state();
+        state.profile_version = version.to_owned();
+        assert!(store.save(&state).is_err());
+        let mut state = representative_state();
+        state.eligibility[0].profile_version = version.to_owned();
+        assert!(store.save(&state).is_err());
+    }
+
+    let mut nested = representative_state();
+    nested.activity.push(RouteActivity {
+        child_thread_id: Uuid::new_v4(),
+        parent_thread_id: nested.activity[0].child_thread_id,
+        subtask_id: Uuid::new_v4(),
+        route_kind: RouteKind::Nested,
+        started_at_ms: 4,
+        updated_at_ms: 4,
+        ..nested.activity[0].clone()
+    });
+    assert!(
+        store.save(&nested).is_ok(),
+        "direct implementation can parent one nested child"
+    );
+
+    nested.activity[0].is_reviewer = true;
+    assert!(
+        store.save(&nested).is_err(),
+        "reviewer cannot parent nested work"
+    );
+}
+
+#[test]
+fn state_requires_contiguous_implementation_escalations() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let mut state = representative_state();
+    let base = state.activity[0].clone();
+    for escalation_count in [1, 2] {
+        state.activity.push(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            escalation_count,
+            started_at_ms: 10 + escalation_count as i64,
+            updated_at_ms: 10 + escalation_count as i64,
+            ..base.clone()
+        });
+    }
+    assert!(store.save(&state).is_ok(), "attempts 0, 1, and 2 are valid");
+    state.activity.push(RouteActivity {
+        child_thread_id: Uuid::new_v4(),
+        is_reviewer: true,
+        escalation_count: 0,
+        phase: RoutePhase::Completed,
+        started_at_ms: 20,
+        updated_at_ms: 20,
+        ..base.clone()
+    });
+    assert!(
+        store.save(&state).is_ok(),
+        "a historical reviewer remains attached to the implementation it reviewed"
+    );
+    state.activity[2].escalation_count = 1;
+    assert!(
+        store.save(&state).is_err(),
+        "escalation counts cannot reset or duplicate"
+    );
+}
+
+#[test]
+fn runtime_derives_precise_budget_reason_codes_from_locked_state() {
+    let state = representative_state();
+    let base = state.activity[0].clone();
+
+    let directory = tempdir().expect("active limit directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store).expect("runtime");
+    runtime.replace(state.clone()).expect("seed state");
+    for subtask_id in [Uuid::new_v4(), Uuid::new_v4()] {
+        runtime
+            .try_start_activity(RouteActivity {
+                child_thread_id: Uuid::new_v4(),
+                subtask_id,
+                ..base.clone()
+            })
+            .expect("within active fan-out limit");
+    }
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            subtask_id: Uuid::new_v4(),
+            ..base.clone()
+        }),
+        Err(codex_assistant_lib::routing::RouteReasonCode::ActiveChildLimitReached)
+    );
+
+    let directory = tempdir().expect("nested limit directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store).expect("runtime");
+    runtime.replace(state.clone()).expect("seed state");
+    runtime
+        .try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            subtask_id: Uuid::new_v4(),
+            route_kind: RouteKind::Nested,
+            parent_thread_id: base.child_thread_id,
+            ..base.clone()
+        })
+        .expect("first nested child");
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            subtask_id: Uuid::new_v4(),
+            route_kind: RouteKind::Nested,
+            parent_thread_id: base.child_thread_id,
+            ..base.clone()
+        }),
+        Err(codex_assistant_lib::routing::RouteReasonCode::NestedChildLimitReached)
+    );
+
+    let directory = tempdir().expect("escalation limit directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store).expect("runtime");
+    let mut completed = state.clone();
+    completed.activity[0].phase = RoutePhase::Completed;
+    runtime.replace(completed).expect("seed state");
+    for _ in 0..2 {
+        runtime
+            .try_start_activity(RouteActivity {
+                child_thread_id: Uuid::new_v4(),
+                phase: RoutePhase::Completed,
+                ..base.clone()
+            })
+            .expect("permitted escalation");
+    }
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            phase: RoutePhase::Completed,
+            ..base.clone()
+        }),
+        Err(codex_assistant_lib::routing::RouteReasonCode::EscalationLimitReached)
+    );
+
+    let directory = tempdir().expect("reviewer lineage directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store).expect("runtime");
+    runtime.replace(state).expect("seed state");
+    let reviewer_id = Uuid::new_v4();
+    runtime
+        .try_start_activity(RouteActivity {
+            child_thread_id: reviewer_id,
+            is_reviewer: true,
+            phase: RoutePhase::Completed,
+            ..base.clone()
+        })
+        .expect("reviewer uses current implementation escalation");
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            subtask_id: Uuid::new_v4(),
+            route_kind: RouteKind::Nested,
+            parent_thread_id: reviewer_id,
+            ..base
+        }),
+        Err(codex_assistant_lib::routing::RouteReasonCode::ReviewerRecursionForbidden)
     );
 }
 

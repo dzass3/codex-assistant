@@ -11,6 +11,7 @@ import type {
 } from "../../shared/routing-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROFILE_VERSION = "routing-v1";
 const FORBIDDEN_FIELD = /prompt|response|reasoning|command|patch|path|token|cookie|secret/i;
 const TIERS = new Set<ModelTier>(["spark", "luna", "terra", "sol"]);
 const KINDS = new Set<RouteKind>(["direct", "nested"]);
@@ -69,7 +70,7 @@ function string(value: unknown): string | null {
 
 function version(value: unknown): string | null {
   const candidate = string(value);
-  return candidate !== null && /^[A-Za-z0-9._-]{1,128}$/.test(candidate) ? candidate : null;
+  return candidate === PROFILE_VERSION ? candidate : null;
 }
 
 function uuid(value: unknown): string | null {
@@ -171,7 +172,7 @@ function activity(value: unknown): RouteActivitySnapshot | null {
       "route_kind",
       "phase",
       "is_reviewer",
-      "reviewer_parent",
+      "parent_thread_id",
       "escalation_count",
       "selected_tier",
       "requested_tier",
@@ -188,6 +189,7 @@ function activity(value: unknown): RouteActivitySnapshot | null {
   const subtaskId = uuid(raw.subtask_id);
   const routeKind = string(raw.route_kind);
   const phase = string(raw.phase);
+  const parentThreadId = uuid(raw.parent_thread_id);
   const escalationCount = integer(raw.escalation_count);
   const selectedTier = string(raw.selected_tier);
   const requestedTier = raw.requested_tier === null ? null : string(raw.requested_tier);
@@ -206,8 +208,7 @@ function activity(value: unknown): RouteActivitySnapshot | null {
     startedAtMs === null ||
     updatedAtMs === null ||
     typeof raw.is_reviewer !== "boolean" ||
-    typeof raw.reviewer_parent !== "boolean" ||
-    raw.reviewer_parent ||
+    parentThreadId === null ||
     selectedTier === null ||
     !TIERS.has(selectedTier as ModelTier) ||
     (requestedTier !== null && !TIERS.has(requestedTier as ModelTier)) ||
@@ -227,7 +228,7 @@ function activity(value: unknown): RouteActivitySnapshot | null {
     route_kind: routeKind as RouteKind,
     phase: phase as RoutePhase,
     is_reviewer: raw.is_reviewer,
-    reviewer_parent: raw.reviewer_parent,
+    parent_thread_id: parentThreadId,
     escalation_count: escalationCount,
     selected_tier: selectedTier as ModelTier,
     requested_tier: requestedTier as ModelTier | null,
@@ -266,13 +267,88 @@ export function toRoutingSnapshot(value: unknown): RoutingSnapshot | null {
   ) {
     return null;
   }
-  return {
+  const snapshot = {
     schema_version: schemaVersion,
     profile_version: profileVersion,
     routes,
     eligibility: eligibilityRecords,
     activity: activityRecords,
   };
+  return validRelationships(snapshot) ? snapshot : null;
+}
+
+function validRelationships(snapshot: RoutingSnapshot): boolean {
+  const routes = new Map<string, RootRouteSnapshot>();
+  const conversations = new Set<string>();
+  for (const rootRecord of snapshot.routes) {
+    if (routes.has(rootRecord.route_key) || conversations.has(rootRecord.conversation_id)) {
+      return false;
+    }
+    routes.set(rootRecord.route_key, rootRecord);
+    conversations.add(rootRecord.conversation_id);
+  }
+  const children = new Map<string, RouteActivitySnapshot>();
+  for (const activityRecord of snapshot.activity) {
+    if (children.has(activityRecord.child_thread_id) || !routes.has(activityRecord.route_key)) {
+      return false;
+    }
+    children.set(activityRecord.child_thread_id, activityRecord);
+  }
+  const activeByRoute = new Map<string, RouteActivitySnapshot[]>();
+  const implementations = new Map<string, RouteActivitySnapshot[]>();
+  for (const activityRecord of snapshot.activity) {
+    const rootRecord = routes.get(activityRecord.route_key);
+    if (!rootRecord) return false;
+    if (activityRecord.route_kind === "direct") {
+      if (activityRecord.parent_thread_id !== rootRecord.conversation_id) return false;
+    } else {
+      const parent = children.get(activityRecord.parent_thread_id);
+      if (
+        !parent ||
+        parent.route_key !== activityRecord.route_key ||
+        parent.route_kind !== "direct" ||
+        parent.is_reviewer
+      ) {
+        return false;
+      }
+    }
+    if (
+      activityRecord.phase === "classifying" ||
+      activityRecord.phase === "implementing" ||
+      activityRecord.phase === "reviewing"
+    ) {
+      const active = activeByRoute.get(activityRecord.route_key) ?? [];
+      active.push(activityRecord);
+      activeByRoute.set(activityRecord.route_key, active);
+    }
+    const key = `${activityRecord.route_key}:${activityRecord.subtask_id}`;
+    if (!activityRecord.is_reviewer) {
+      const attempts = implementations.get(key) ?? [];
+      attempts.push(activityRecord);
+      implementations.set(key, attempts);
+    }
+  }
+  for (const active of activeByRoute.values()) {
+    if (
+      active.length > 3 ||
+      active.filter((activeRecord) => activeRecord.route_kind === "nested").length > 1
+    )
+      return false;
+  }
+  for (const [key, attempts] of implementations) {
+    const counts = attempts
+      .map((attempt) => attempt.escalation_count)
+      .toSorted((left, right) => left - right);
+    if (counts.length > 3 || counts.some((count, index) => count !== index)) return false;
+    const reviewers = snapshot.activity.filter(
+      (reviewRecord) =>
+        reviewRecord.is_reviewer && `${reviewRecord.route_key}:${reviewRecord.subtask_id}` === key,
+    );
+    if (reviewers.some((reviewer) => !counts.includes(reviewer.escalation_count))) return false;
+  }
+  return snapshot.activity
+    .filter((reviewRecord) => reviewRecord.is_reviewer)
+    .every((reviewer) => implementations.has(`${reviewer.route_key}:${reviewer.subtask_id}`));
 }
 
 export const routingApi = { toSnapshot: toRoutingSnapshot };

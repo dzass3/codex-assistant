@@ -51,7 +51,7 @@ export interface RouteActivitySnapshot {
   route_kind: RouteKind;
   phase: RoutePhase;
   is_reviewer: boolean;
-  reviewer_parent: boolean;
+  parent_thread_id: string;
   escalation_count: number;
   selected_tier: ModelTier;
   requested_tier: ModelTier | null;

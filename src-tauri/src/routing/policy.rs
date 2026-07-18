@@ -11,7 +11,6 @@ pub struct RouteBudget {
     pub active_nested_children: u8,
     pub automatic_escalations: u8,
     pub route_kind: RouteKind,
-    pub reviewer_parent: bool,
 }
 
 pub fn decide_route(input: RoutePolicyInput) -> RouteDecision {
@@ -76,9 +75,6 @@ pub fn decide_route(input: RoutePolicyInput) -> RouteDecision {
 }
 
 pub fn evaluate_budget(budget: &RouteBudget) -> Result<(), RouteReasonCode> {
-    if budget.reviewer_parent {
-        return Err(RouteReasonCode::ReviewerRecursionForbidden);
-    }
     if budget.active_routed_children >= 3 {
         return Err(RouteReasonCode::ActiveChildLimitReached);
     }

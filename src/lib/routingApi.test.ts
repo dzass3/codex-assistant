@@ -31,7 +31,7 @@ const snapshot = {
       route_kind: "direct",
       phase: "implementing",
       is_reviewer: false,
-      reviewer_parent: false,
+      parent_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab0",
       escalation_count: 0,
       selected_tier: "terra",
       requested_tier: "terra",
@@ -46,6 +46,24 @@ const snapshot = {
 describe("routing snapshot boundary", () => {
   it("accepts only the explicit sanitized contract", () => {
     expect(toRoutingSnapshot(snapshot)).toEqual(snapshot);
+  });
+
+  it("keeps a historical reviewer attached to the implementation attempt it reviewed", () => {
+    const escalated = {
+      ...snapshot.activity[0],
+      child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab3",
+      escalation_count: 1,
+      phase: "completed",
+    };
+    const reviewer = {
+      ...snapshot.activity[0],
+      child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab4",
+      is_reviewer: true,
+      escalation_count: 0,
+      phase: "completed",
+    };
+    const value = { ...snapshot, activity: [...snapshot.activity, escalated, reviewer] };
+    expect(toRoutingSnapshot(value)).toEqual(value);
   });
 
   it.each([
@@ -67,10 +85,49 @@ describe("routing snapshot boundary", () => {
       routes: [{ ...snapshot.routes[0], created_at_ms: Number.MAX_SAFE_INTEGER + 1 }],
     },
     { ...snapshot, profile_version: "version with task content" },
+    { ...snapshot, profile_version: "cm91dGluZy12MQ" },
+    { ...snapshot, profile_version: "routing_v1" },
     { ...snapshot, prompt: "CANARY_PRIVATE_PROMPT" },
     { ...snapshot, routes: [{ ...snapshot.routes[0], secret: "CANARY" }] },
     { ...snapshot, activity: [{ ...snapshot.activity[0], reason_codes: ["unknown-code"] }] },
-    { ...snapshot, activity: [{ ...snapshot.activity[0], reviewer_parent: true }] },
+    {
+      ...snapshot,
+      activity: [
+        { ...snapshot.activity[0], parent_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab9" },
+      ],
+    },
+    {
+      ...snapshot,
+      activity: [
+        ...snapshot.activity,
+        {
+          ...snapshot.activity[0],
+          child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab3",
+          is_reviewer: true,
+          phase: "completed",
+        },
+        {
+          ...snapshot.activity[0],
+          child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab4",
+          subtask_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab5",
+          route_kind: "nested",
+          parent_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab3",
+        },
+      ],
+    },
+    {
+      ...snapshot,
+      activity: [
+        ...snapshot.activity,
+        {
+          ...snapshot.activity[0],
+          child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab9",
+          route_kind: "nested",
+          parent_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab1",
+          escalation_count: 2,
+        },
+      ],
+    },
   ])("fails closed for malformed or content-bearing payloads", (value) => {
     expect(toRoutingSnapshot(value)).toBeNull();
   });

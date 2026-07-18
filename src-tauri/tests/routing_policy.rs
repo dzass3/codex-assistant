@@ -161,7 +161,6 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 0,
             automatic_escalations: 0,
             route_kind: RouteKind::Direct,
-            reviewer_parent: false,
         }),
         Err(RouteReasonCode::ActiveChildLimitReached)
     );
@@ -171,7 +170,6 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 1,
             automatic_escalations: 0,
             route_kind: RouteKind::Nested,
-            reviewer_parent: false,
         }),
         Err(RouteReasonCode::NestedChildLimitReached)
     );
@@ -181,7 +179,6 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 0,
             automatic_escalations: 2,
             route_kind: RouteKind::Direct,
-            reviewer_parent: false,
         }),
         Ok(())
     );
@@ -191,18 +188,7 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 0,
             automatic_escalations: 3,
             route_kind: RouteKind::Direct,
-            reviewer_parent: false,
         }),
         Err(RouteReasonCode::EscalationLimitReached)
-    );
-    assert_eq!(
-        evaluate_budget(&RouteBudget {
-            active_routed_children: 0,
-            active_nested_children: 0,
-            automatic_escalations: 0,
-            route_kind: RouteKind::Nested,
-            reviewer_parent: true,
-        }),
-        Err(RouteReasonCode::ReviewerRecursionForbidden)
     );
 }

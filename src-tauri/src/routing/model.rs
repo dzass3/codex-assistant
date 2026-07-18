@@ -153,7 +153,7 @@ pub struct RouteActivity {
     pub route_kind: RouteKind,
     pub phase: RoutePhase,
     pub is_reviewer: bool,
-    pub reviewer_parent: bool,
+    pub parent_thread_id: Uuid,
     pub escalation_count: u8,
     pub selected_tier: ModelTier,
     pub requested_tier: Option<ModelTier>,
