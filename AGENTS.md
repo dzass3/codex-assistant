@@ -1,4 +1,4 @@
-# Codex Agent Monitor contributor guide
+# Codex Assistant contributor guide
 
 ## Commands
 

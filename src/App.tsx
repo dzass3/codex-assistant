@@ -3,6 +3,7 @@ import { AgentTree } from "./components/AgentTree";
 import { FilterBar, type MonitorFilters } from "./components/FilterBar";
 import { HealthStrip } from "./components/HealthStrip";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from "./config";
 import { useMonitor } from "./hooks/useMonitor";
 
 const DEFAULT_FILTERS: MonitorFilters = {
@@ -49,8 +50,8 @@ export function App() {
             <i />
           </span>
           <div>
-            <h1>Codex Agent Monitor</h1>
-            <p>子代理模型实时观察器</p>
+            <h1>{PRODUCT_NAME}</h1>
+            <p>{PRODUCT_TAGLINE}</p>
           </div>
         </div>
         <div className="topbar-actions">

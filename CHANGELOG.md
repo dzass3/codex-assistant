@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — 2026-07-18
+
+- 产品更名为 Codex Assistant。
+- 保留既有升级标识与设置目录，兼容现有安装和本地配置。
+- Live Agents Observer 仍保持只读的元数据观察能力。
+
 ## 0.4.0 — 2026-07-18
 
 - 首个 Codex Agent Monitor 版本。

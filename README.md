@@ -1,6 +1,8 @@
-# Codex Agent Monitor
+# Codex Assistant
 
-一个 Windows 独立窗口工具，用于实时查看 Codex 根任务与子代理实际使用的模型、推理强度、运行状态和模型漂移。
+一个 Windows 独立窗口工具。已实现的 Live Agents Observer 是 Codex Assistant 的基础能力：它实时查看 Codex 根任务与子代理实际使用的模型、推理强度、运行状态和模型漂移。
+
+智能路由和主题管理是分别设有准入门槛的规划模块，当前版本尚未实现这些能力。
 
 ## 隐私边界
 
