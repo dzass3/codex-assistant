@@ -9,6 +9,23 @@ export type RoutePhase =
   | "reviewing"
   | "completed"
   | "degraded";
+export type RouteReasonCode =
+  | "mechanical-work"
+  | "bounded-work"
+  | "cross-layer-work"
+  | "architectural-work"
+  | "high-risk-work"
+  | "restricted-risk-work"
+  | "sol-floor-required"
+  | "spawn-overhead-too-high"
+  | "do-not-delegate"
+  | "override-below-floor"
+  | "no-eligible-tier"
+  | "active-child-limit-reached"
+  | "nested-child-limit-reached"
+  | "escalation-limit-reached"
+  | "reviewer-recursion-forbidden"
+  | "state-persistence-failed";
 
 export interface RootRouteSnapshot {
   route_key: string;
@@ -34,7 +51,12 @@ export interface RouteActivitySnapshot {
   route_kind: RouteKind;
   phase: RoutePhase;
   is_reviewer: boolean;
+  reviewer_parent: boolean;
   escalation_count: number;
+  selected_tier: ModelTier;
+  requested_tier: ModelTier | null;
+  effective_tier: ModelTier | null;
+  reason_codes: RouteReasonCode[];
   started_at_ms: number;
   updated_at_ms: number;
 }

@@ -31,7 +31,12 @@ const snapshot = {
       route_kind: "direct",
       phase: "implementing",
       is_reviewer: false,
+      reviewer_parent: false,
       escalation_count: 0,
+      selected_tier: "terra",
+      requested_tier: "terra",
+      effective_tier: "terra",
+      reason_codes: ["cross-layer-work"],
       started_at_ms: 2,
       updated_at_ms: 3,
     },
@@ -52,9 +57,20 @@ describe("routing snapshot boundary", () => {
     { ...snapshot, routes: [{ ...snapshot.routes[0], phase: "mystery" }] },
     { ...snapshot, eligibility: [{ ...snapshot.eligibility[0], status: "mystery" }] },
     { ...snapshot, routes: [{ ...snapshot.routes[0], route_key: "not-a-uuid" }] },
+    {
+      ...snapshot,
+      routes: [{ ...snapshot.routes[0], route_key: "00000000-0000-0000-0000-000000000000" }],
+    },
+    { ...snapshot, routes: [{ ...snapshot.routes[0], created_at_ms: -1 }] },
+    {
+      ...snapshot,
+      routes: [{ ...snapshot.routes[0], created_at_ms: Number.MAX_SAFE_INTEGER + 1 }],
+    },
     { ...snapshot, profile_version: "version with task content" },
     { ...snapshot, prompt: "CANARY_PRIVATE_PROMPT" },
     { ...snapshot, routes: [{ ...snapshot.routes[0], secret: "CANARY" }] },
+    { ...snapshot, activity: [{ ...snapshot.activity[0], reason_codes: ["unknown-code"] }] },
+    { ...snapshot, activity: [{ ...snapshot.activity[0], reviewer_parent: true }] },
   ])("fails closed for malformed or content-bearing payloads", (value) => {
     expect(toRoutingSnapshot(value)).toBeNull();
   });

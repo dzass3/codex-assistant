@@ -6,6 +6,7 @@ import type {
   RouteActivitySnapshot,
   RouteKind,
   RoutePhase,
+  RouteReasonCode,
   RoutingSnapshot,
 } from "../../shared/routing-types";
 
@@ -28,6 +29,24 @@ const PHASES = new Set<RoutePhase>([
   "reviewing",
   "completed",
   "degraded",
+]);
+const REASONS = new Set<RouteReasonCode>([
+  "mechanical-work",
+  "bounded-work",
+  "cross-layer-work",
+  "architectural-work",
+  "high-risk-work",
+  "restricted-risk-work",
+  "sol-floor-required",
+  "spawn-overhead-too-high",
+  "do-not-delegate",
+  "override-below-floor",
+  "no-eligible-tier",
+  "active-child-limit-reached",
+  "nested-child-limit-reached",
+  "escalation-limit-reached",
+  "reviewer-recursion-forbidden",
+  "state-persistence-failed",
 ]);
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -55,7 +74,11 @@ function version(value: unknown): string | null {
 
 function uuid(value: unknown): string | null {
   const candidate = string(value);
-  return candidate !== null && UUID.test(candidate) ? candidate : null;
+  return candidate !== null &&
+    UUID.test(candidate) &&
+    !/^0{8}-0{4}-0{4}-0{4}-0{12}$/i.test(candidate)
+    ? candidate
+    : null;
 }
 
 function integer(value: unknown): number | null {
@@ -148,7 +171,12 @@ function activity(value: unknown): RouteActivitySnapshot | null {
       "route_kind",
       "phase",
       "is_reviewer",
+      "reviewer_parent",
       "escalation_count",
+      "selected_tier",
+      "requested_tier",
+      "effective_tier",
+      "reason_codes",
       "started_at_ms",
       "updated_at_ms",
     ])
@@ -161,6 +189,10 @@ function activity(value: unknown): RouteActivitySnapshot | null {
   const routeKind = string(raw.route_kind);
   const phase = string(raw.phase);
   const escalationCount = integer(raw.escalation_count);
+  const selectedTier = string(raw.selected_tier);
+  const requestedTier = raw.requested_tier === null ? null : string(raw.requested_tier);
+  const effectiveTier = raw.effective_tier === null ? null : string(raw.effective_tier);
+  const reasonCodes = Array.isArray(raw.reason_codes) ? raw.reason_codes.map(string) : null;
   const startedAtMs = integer(raw.started_at_ms);
   const updatedAtMs = integer(raw.updated_at_ms);
   if (
@@ -174,6 +206,15 @@ function activity(value: unknown): RouteActivitySnapshot | null {
     startedAtMs === null ||
     updatedAtMs === null ||
     typeof raw.is_reviewer !== "boolean" ||
+    typeof raw.reviewer_parent !== "boolean" ||
+    raw.reviewer_parent ||
+    selectedTier === null ||
+    !TIERS.has(selectedTier as ModelTier) ||
+    (requestedTier !== null && !TIERS.has(requestedTier as ModelTier)) ||
+    (effectiveTier !== null && !TIERS.has(effectiveTier as ModelTier)) ||
+    reasonCodes === null ||
+    reasonCodes.length === 0 ||
+    reasonCodes.some((reason) => reason === null || !REASONS.has(reason as RouteReasonCode)) ||
     !KINDS.has(routeKind as RouteKind) ||
     !PHASES.has(phase as RoutePhase)
   ) {
@@ -186,7 +227,12 @@ function activity(value: unknown): RouteActivitySnapshot | null {
     route_kind: routeKind as RouteKind,
     phase: phase as RoutePhase,
     is_reviewer: raw.is_reviewer,
+    reviewer_parent: raw.reviewer_parent,
     escalation_count: escalationCount,
+    selected_tier: selectedTier as ModelTier,
+    requested_tier: requestedTier as ModelTier | null,
+    effective_tier: effectiveTier as ModelTier | null,
+    reason_codes: reasonCodes as RouteReasonCode[],
     started_at_ms: startedAtMs,
     updated_at_ms: updatedAtMs,
   };

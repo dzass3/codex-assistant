@@ -89,7 +89,23 @@ fn high_risk_and_restricted_capabilities_stay_with_sol_or_root() {
         RiskBand::High,
         vec![ModelTier::Sol],
     ));
-    assert_eq!(delegated_tier(decision), ModelTier::Sol);
+    assert_eq!(delegated_tier(decision.clone()), ModelTier::Sol);
+    assert!(decision
+        .reason_codes
+        .contains(&RouteReasonCode::ArchitecturalWork));
+    assert!(decision
+        .reason_codes
+        .contains(&RouteReasonCode::HighRiskWork));
+
+    let decision = decide_route(input(
+        ComplexityBand::Mechanical,
+        RiskBand::Restricted,
+        vec![ModelTier::Sol],
+    ));
+    assert_eq!(delegated_tier(decision.clone()), ModelTier::Sol);
+    assert!(decision
+        .reason_codes
+        .contains(&RouteReasonCode::RestrictedRiskWork));
 }
 
 #[test]
@@ -145,7 +161,7 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 0,
             automatic_escalations: 0,
             route_kind: RouteKind::Direct,
-            reviewer_is_delegating: false,
+            reviewer_parent: false,
         }),
         Err(RouteReasonCode::ActiveChildLimitReached)
     );
@@ -155,7 +171,7 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 1,
             automatic_escalations: 0,
             route_kind: RouteKind::Nested,
-            reviewer_is_delegating: false,
+            reviewer_parent: false,
         }),
         Err(RouteReasonCode::NestedChildLimitReached)
     );
@@ -165,7 +181,17 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 0,
             automatic_escalations: 2,
             route_kind: RouteKind::Direct,
-            reviewer_is_delegating: false,
+            reviewer_parent: false,
+        }),
+        Ok(())
+    );
+    assert_eq!(
+        evaluate_budget(&RouteBudget {
+            active_routed_children: 0,
+            active_nested_children: 0,
+            automatic_escalations: 3,
+            route_kind: RouteKind::Direct,
+            reviewer_parent: false,
         }),
         Err(RouteReasonCode::EscalationLimitReached)
     );
@@ -175,7 +201,7 @@ fn budget_limits_bound_fan_out_escalation_and_reviewer_recursion() {
             active_nested_children: 0,
             automatic_escalations: 0,
             route_kind: RouteKind::Nested,
-            reviewer_is_delegating: true,
+            reviewer_parent: true,
         }),
         Err(RouteReasonCode::ReviewerRecursionForbidden)
     );

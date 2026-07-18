@@ -90,6 +90,9 @@ pub enum RouteReasonCode {
     MechanicalWork,
     BoundedWork,
     CrossLayerWork,
+    ArchitecturalWork,
+    HighRiskWork,
+    RestrictedRiskWork,
     SolFloorRequired,
     SpawnOverheadTooHigh,
     DoNotDelegate,
@@ -99,6 +102,7 @@ pub enum RouteReasonCode {
     NestedChildLimitReached,
     EscalationLimitReached,
     ReviewerRecursionForbidden,
+    StatePersistenceFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,7 +153,12 @@ pub struct RouteActivity {
     pub route_kind: RouteKind,
     pub phase: RoutePhase,
     pub is_reviewer: bool,
+    pub reviewer_parent: bool,
     pub escalation_count: u8,
+    pub selected_tier: ModelTier,
+    pub requested_tier: Option<ModelTier>,
+    pub effective_tier: Option<ModelTier>,
+    pub reason_codes: Vec<RouteReasonCode>,
     pub started_at_ms: i64,
     pub updated_at_ms: i64,
 }

@@ -1,7 +1,7 @@
-use std::fs;
+use std::{fs, sync::Arc, thread};
 
 use codex_assistant_lib::routing::{
-    state::{RoutingStateStore, STATE_SCHEMA_VERSION},
+    state::{RoutingRuntime, RoutingStateStore, STATE_SCHEMA_VERSION},
     EligibilityRecord, EligibilityStatus, ModelTier, RootRouteState, RouteActivity, RouteKind,
     RoutePhase, RoutingStateEnvelope,
 };
@@ -36,11 +36,47 @@ fn representative_state() -> RoutingStateEnvelope {
             route_kind: RouteKind::Direct,
             phase: RoutePhase::Implementing,
             is_reviewer: false,
+            reviewer_parent: false,
             escalation_count: 0,
+            selected_tier: ModelTier::Terra,
+            requested_tier: Some(ModelTier::Terra),
+            effective_tier: Some(ModelTier::Terra),
+            reason_codes: vec![codex_assistant_lib::routing::RouteReasonCode::CrossLayerWork],
             started_at_ms: 2,
             updated_at_ms: 3,
         }],
     }
+}
+
+#[test]
+fn state_rejects_all_content_and_unknown_fields_at_every_level() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let mut state = serde_json::to_value(representative_state()).expect("state JSON");
+    let slots = ["/profile_version", "/eligibility/0/profile_version"];
+    for slot in slots {
+        let mut candidate = state.clone();
+        *candidate.pointer_mut(slot).expect("string slot") =
+            serde_json::Value::String("CANARY PRIVATE PROMPT".to_owned());
+        let parsed = serde_json::from_value::<RoutingStateEnvelope>(candidate).expect("shape");
+        assert!(store.save(&parsed).is_err());
+    }
+    for pointer in ["", "/routes/0", "/eligibility/0", "/activity/0"] {
+        let mut candidate = state.clone();
+        let object = candidate
+            .pointer_mut(pointer)
+            .expect("object")
+            .as_object_mut()
+            .expect("map");
+        object.insert(
+            "secret".to_owned(),
+            serde_json::Value::String("CANARY".to_owned()),
+        );
+        assert!(serde_json::from_value::<RoutingStateEnvelope>(candidate).is_err());
+    }
+    state["routes"][0]["created_at_ms"] = serde_json::json!(-1);
+    let parsed = serde_json::from_value::<RoutingStateEnvelope>(state).expect("shape");
+    assert!(store.save(&parsed).is_err());
 }
 
 #[test]
@@ -101,6 +137,18 @@ fn corrupt_state_is_quarantined_and_recovered_without_destroying_evidence() {
 }
 
 #[test]
+fn second_save_replaces_existing_state_without_losing_valid_data() {
+    let directory = tempdir().expect("state directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let first = representative_state();
+    store.save(&first).expect("first save");
+    let mut second = representative_state();
+    second.routes[0].updated_at_ms = 77;
+    store.save(&second).expect("second save");
+    assert_eq!(store.load().expect("state"), second);
+}
+
+#[test]
 fn state_with_unknown_content_field_is_quarantined() {
     let directory = tempdir().expect("state directory");
     let state_file = directory.path().join("routing-state.json");
@@ -119,4 +167,119 @@ fn state_with_unknown_content_field_is_quarantined() {
             .file_name()
             .to_string_lossy()
             .starts_with("routing-state.corrupt-")));
+}
+
+#[test]
+fn malformed_state_is_quarantined_but_read_errors_are_returned() {
+    let directory = tempdir().expect("state directory");
+    let state_file = directory.path().join("routing-state.json");
+    fs::create_dir(&state_file).expect("unreadable state fixture");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    assert!(store.load().is_err());
+    assert!(
+        state_file.is_dir(),
+        "read failure must not quarantine evidence"
+    );
+}
+
+#[test]
+fn state_rejects_invalid_ids_timestamps_and_full_envelope_budgets() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let mut state = representative_state();
+    state.routes[0].route_key = Uuid::nil();
+    assert!(store.save(&state).is_err());
+
+    let mut state = representative_state();
+    state.routes[0].created_at_ms = 9_007_199_254_740_992;
+    assert!(store.save(&state).is_err());
+
+    let mut state = representative_state();
+    state.activity[0].reviewer_parent = true;
+    assert!(store.save(&state).is_err());
+
+    let mut state = representative_state();
+    let base = state.activity[0].clone();
+    state.activity.extend([base.clone(), base.clone()]);
+    for (index, entry) in state.activity.iter_mut().enumerate() {
+        entry.child_thread_id = Uuid::new_v4();
+        entry.started_at_ms += index as i64;
+        entry.updated_at_ms += index as i64;
+    }
+    assert!(
+        store.save(&state).is_ok(),
+        "three active children are valid"
+    );
+    state.activity.push(RouteActivity {
+        child_thread_id: Uuid::new_v4(),
+        started_at_ms: 10,
+        updated_at_ms: 10,
+        ..base.clone()
+    });
+    assert!(
+        store.save(&state).is_err(),
+        "four active children are invalid"
+    );
+
+    let mut nested = representative_state();
+    nested.activity[0].route_kind = RouteKind::Nested;
+    nested.activity.push(RouteActivity {
+        child_thread_id: Uuid::new_v4(),
+        route_kind: RouteKind::Nested,
+        started_at_ms: 4,
+        updated_at_ms: 4,
+        ..base
+    });
+    assert!(
+        store.save(&nested).is_err(),
+        "second nested child is invalid"
+    );
+}
+
+#[test]
+fn runtime_replaces_state_as_one_validated_transaction_under_concurrency() {
+    let directory = tempdir().expect("state directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = Arc::new(RoutingRuntime::load(store.clone()).expect("runtime"));
+    let first = representative_state();
+    let mut second = representative_state();
+    second.routes[0].updated_at_ms = 99;
+    let one = Arc::clone(&runtime);
+    let two = Arc::clone(&runtime);
+    let first_thread = thread::spawn(move || one.replace(first));
+    let second_thread = thread::spawn(move || two.replace(second));
+    first_thread.join().expect("thread").expect("replace");
+    second_thread.join().expect("thread").expect("replace");
+    let memory = runtime.snapshot();
+    let disk = store.load().expect("disk state").snapshot();
+    assert_eq!(memory, disk);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_state_artifacts_have_current_user_only_dacls() {
+    let directory = tempdir().expect("state directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    store.save(&representative_state()).expect("state save");
+    assert!(store
+        .has_current_user_only_acl(directory.path())
+        .expect("directory ACL"));
+    assert!(store
+        .has_current_user_only_acl(&directory.path().join("routing-state.json"))
+        .expect("state ACL"));
+    fs::write(directory.path().join("routing-state.json"), b"{ invalid").expect("corrupt fixture");
+    store.load().expect("recovery");
+    let evidence = fs::read_dir(directory.path())
+        .expect("directory")
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("routing-state.corrupt-")
+        })
+        .expect("quarantine evidence");
+    assert!(store
+        .has_current_user_only_acl(&evidence.path())
+        .expect("evidence ACL"));
 }

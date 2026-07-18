@@ -11,7 +11,7 @@ pub struct RouteBudget {
     pub active_nested_children: u8,
     pub automatic_escalations: u8,
     pub route_kind: RouteKind,
-    pub reviewer_is_delegating: bool,
+    pub reviewer_parent: bool,
 }
 
 pub fn decide_route(input: RoutePolicyInput) -> RouteDecision {
@@ -21,6 +21,11 @@ pub fn decide_route(input: RoutePolicyInput) -> RouteDecision {
 
     let floor = required_floor(input.complexity, input.risk, &input.required_capabilities);
     let mut reasons = vec![complexity_reason(input.complexity)];
+    match input.risk {
+        RiskBand::High => reasons.push(RouteReasonCode::HighRiskWork),
+        RiskBand::Restricted => reasons.push(RouteReasonCode::RestrictedRiskWork),
+        RiskBand::Low | RiskBand::Meaningful => {}
+    }
     if floor == ModelTier::Sol {
         reasons.push(RouteReasonCode::SolFloorRequired);
     }
@@ -71,7 +76,7 @@ pub fn decide_route(input: RoutePolicyInput) -> RouteDecision {
 }
 
 pub fn evaluate_budget(budget: &RouteBudget) -> Result<(), RouteReasonCode> {
-    if budget.reviewer_is_delegating {
+    if budget.reviewer_parent {
         return Err(RouteReasonCode::ReviewerRecursionForbidden);
     }
     if budget.active_routed_children >= 3 {
@@ -80,7 +85,7 @@ pub fn evaluate_budget(budget: &RouteBudget) -> Result<(), RouteReasonCode> {
     if budget.route_kind == RouteKind::Nested && budget.active_nested_children >= 1 {
         return Err(RouteReasonCode::NestedChildLimitReached);
     }
-    if budget.automatic_escalations >= 2 {
+    if budget.automatic_escalations > 2 {
         return Err(RouteReasonCode::EscalationLimitReached);
     }
     Ok(())
@@ -154,8 +159,7 @@ fn complexity_reason(complexity: ComplexityBand) -> RouteReasonCode {
     match complexity {
         ComplexityBand::Mechanical => RouteReasonCode::MechanicalWork,
         ComplexityBand::Bounded => RouteReasonCode::BoundedWork,
-        ComplexityBand::CrossLayer | ComplexityBand::Architectural => {
-            RouteReasonCode::CrossLayerWork
-        }
+        ComplexityBand::CrossLayer => RouteReasonCode::CrossLayerWork,
+        ComplexityBand::Architectural => RouteReasonCode::ArchitecturalWork,
     }
 }
