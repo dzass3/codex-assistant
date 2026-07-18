@@ -54,7 +54,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Codex Agent Monitor");
+        .expect("error while running Codex Assistant");
 }
 
 #[tauri::command]

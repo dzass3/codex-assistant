@@ -471,8 +471,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "codex-agent-model-monitor"
-version = "0.4.0"
+name = "codex-assistant"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "dirs",
