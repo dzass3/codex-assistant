@@ -1,3 +1,6 @@
+import { invoke } from "./invoke";
+import { listen } from "./listen";
+import { ROUTING_EVENT } from "../config";
 import type {
   EligibilitySnapshot,
   EligibilityReasonCode,
@@ -11,6 +14,16 @@ import type {
   RoutePhase,
   RouteReasonCode,
   RoutingSnapshot,
+  RoutingUiSnapshot,
+  RoutingSetupSnapshot,
+  RoutingInstallationStatus,
+  RoutingRestartStatus,
+  RoutingPreflightStatus,
+  RoutingCdpStatus,
+  RoutingConfigChange,
+  RoutingSetupReasonCode,
+  RoutingOperationReceipt,
+  RoutingOperationStatus,
 } from "../../shared/routing-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -79,6 +92,47 @@ const REASONS = new Set<RouteReasonCode>([
   "escalation-count-mismatch",
   "retry-limit-reached",
   "state-persistence-failed",
+]);
+const INSTALLATION_STATUSES = new Set<RoutingInstallationStatus>([
+  "uninstalled",
+  "installed",
+  "restart-required",
+  "conflict",
+]);
+const RESTART_STATUSES = new Set<RoutingRestartStatus>([
+  "not-required",
+  "required",
+  "blocked-active-child",
+]);
+const PREFLIGHT_STATUSES = new Set<RoutingPreflightStatus>([
+  "not-started",
+  "running",
+  "complete",
+  "degraded",
+]);
+const CDP_STATUSES = new Set<RoutingCdpStatus>(["inactive", "ready", "degraded"]);
+const CONFIG_CHANGES = new Set<RoutingConfigChange>([
+  "agents.max_depth",
+  "agents.codex_assistant_spark",
+  "agents.codex_assistant_luna",
+  "agents.codex_assistant_terra",
+  "agents.codex_assistant_sol",
+  "mcp_servers.codex_assistant_routing",
+  "skill.codex-assistant-routing",
+]);
+const SETUP_REASONS = new Set<RoutingSetupReasonCode>([
+  "active-child",
+  "config-conflict",
+  "preflight-required",
+  "unsupported-host",
+  "cdp-unavailable",
+  "routing-runtime-unavailable",
+]);
+const OPERATION_STATUSES = new Set<RoutingOperationStatus>([
+  "applied",
+  "noop",
+  "blocked",
+  "failed",
 ]);
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -424,6 +478,111 @@ export function toRoutingSnapshot(value: unknown): RoutingSnapshot | null {
   return validRelationships(snapshot) ? snapshot : null;
 }
 
+function routingSetup(value: unknown): RoutingSetupSnapshot | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, [
+      "installation_status",
+      "restart_status",
+      "preflight_status",
+      "cdp_status",
+      "backup_label",
+      "config_changes",
+      "reason_codes",
+    ])
+  ) {
+    return null;
+  }
+  const installationStatus = string(raw.installation_status);
+  const restartStatus = string(raw.restart_status);
+  const preflightStatus = string(raw.preflight_status);
+  const cdpStatus = string(raw.cdp_status);
+  const backupLabel = raw.backup_label === null ? null : string(raw.backup_label);
+  const configChanges = Array.isArray(raw.config_changes) ? raw.config_changes.map(string) : null;
+  const reasonCodes = Array.isArray(raw.reason_codes) ? raw.reason_codes.map(string) : null;
+  if (
+    installationStatus === null ||
+    !INSTALLATION_STATUSES.has(installationStatus as RoutingInstallationStatus) ||
+    restartStatus === null ||
+    !RESTART_STATUSES.has(restartStatus as RoutingRestartStatus) ||
+    preflightStatus === null ||
+    !PREFLIGHT_STATUSES.has(preflightStatus as RoutingPreflightStatus) ||
+    cdpStatus === null ||
+    !CDP_STATUSES.has(cdpStatus as RoutingCdpStatus) ||
+    (backupLabel !== null && !/^routing-backup-[0-9]{8}$/.test(backupLabel)) ||
+    configChanges === null ||
+    new Set(configChanges).size !== configChanges.length ||
+    configChanges.some(
+      (change) => change === null || !CONFIG_CHANGES.has(change as RoutingConfigChange),
+    ) ||
+    reasonCodes === null ||
+    new Set(reasonCodes).size !== reasonCodes.length ||
+    reasonCodes.some(
+      (reason) => reason === null || !SETUP_REASONS.has(reason as RoutingSetupReasonCode),
+    )
+  ) {
+    return null;
+  }
+  return {
+    installation_status: installationStatus as RoutingInstallationStatus,
+    restart_status: restartStatus as RoutingRestartStatus,
+    preflight_status: preflightStatus as RoutingPreflightStatus,
+    cdp_status: cdpStatus as RoutingCdpStatus,
+    backup_label: backupLabel,
+    config_changes: configChanges as RoutingConfigChange[],
+    reason_codes: reasonCodes as RoutingSetupReasonCode[],
+  };
+}
+
+export function toRoutingUiSnapshot(value: unknown): RoutingUiSnapshot | null {
+  const raw = record(value);
+  if (raw === null || !exactKeys(raw, ["contract_version", "setup", "routing"])) return null;
+  const setup = routingSetup(raw.setup);
+  const routing = toRoutingSnapshot(raw.routing);
+  return raw.contract_version === 1 && setup !== null && routing !== null
+    ? { contract_version: 1, setup, routing }
+    : null;
+}
+
+export function toRoutingOperationReceipt(value: unknown): RoutingOperationReceipt | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, ["operation_id", "status", "reason_codes", "restart_required"])
+  ) {
+    return null;
+  }
+  const operationId = uuid(raw.operation_id);
+  const status = string(raw.status);
+  const reasonCodes = Array.isArray(raw.reason_codes) ? raw.reason_codes.map(string) : null;
+  if (
+    operationId === null ||
+    status === null ||
+    !OPERATION_STATUSES.has(status as RoutingOperationStatus) ||
+    reasonCodes === null ||
+    new Set(reasonCodes).size !== reasonCodes.length ||
+    reasonCodes.some(
+      (reason) => reason === null || !SETUP_REASONS.has(reason as RoutingSetupReasonCode),
+    ) ||
+    typeof raw.restart_required !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    operation_id: operationId,
+    status: status as RoutingOperationStatus,
+    reason_codes: reasonCodes as RoutingSetupReasonCode[],
+    restart_required: raw.restart_required,
+  };
+}
+
+async function mutation(result: Promise<unknown>): Promise<RoutingOperationReceipt> {
+  const receipt = toRoutingOperationReceipt(await result);
+  if (receipt === null) throw new Error("Smart Routing returned a malformed operation receipt");
+  return receipt;
+}
+
 function validRelationships(snapshot: RoutingSnapshot): boolean {
   const eligibilityKeys = new Set<string>();
   for (const eligibilityRecord of snapshot.eligibility) {
@@ -542,4 +701,20 @@ function validRelationships(snapshot: RoutingSnapshot): boolean {
     .every((reviewer) => implementations.has(`${reviewer.route_key}:${reviewer.subtask_id}`));
 }
 
-export const routingApi = { toSnapshot: toRoutingSnapshot };
+export const routingApi = {
+  toSnapshot: toRoutingSnapshot,
+  toUiSnapshot: toRoutingUiSnapshot,
+  async getSnapshot(): Promise<RoutingUiSnapshot | null> {
+    return toRoutingUiSnapshot(await invoke("get_routing_snapshot"));
+  },
+  async subscribe(handler: (snapshot: RoutingUiSnapshot | null) => void): Promise<() => void> {
+    return listen<unknown>(ROUTING_EVENT, (event) => handler(toRoutingUiSnapshot(event.payload)));
+  },
+  install: () => mutation(invoke("install_routing")),
+  restore: () => mutation(invoke("restore_routing")),
+  requestCodexRestart: () => mutation(invoke("request_codex_restart")),
+  beginPreflight: (rootConversationId: string) =>
+    mutation(invoke("begin_routing_preflight", { rootConversationId })),
+  setRootEnabled: (rootConversationId: string, enabled: boolean) =>
+    mutation(invoke("set_root_routing_enabled", { rootConversationId, enabled })),
+};

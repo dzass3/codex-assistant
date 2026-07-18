@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { AgentTree } from "./components/AgentTree";
+import { AppNavigation, type AppPage } from "./components/AppNavigation";
 import { FilterBar, type MonitorFilters } from "./components/FilterBar";
 import { HealthStrip } from "./components/HealthStrip";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { SmartRoutingPage } from "./components/SmartRoutingPage";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "./config";
 import { useMonitor } from "./hooks/useMonitor";
 
@@ -17,6 +19,7 @@ export function App() {
   const monitor = useMonitor();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [page, setPage] = useState<AppPage>("live");
 
   const options = useMemo(() => {
     const agents = monitor.snapshot?.agents ?? [];
@@ -29,6 +32,14 @@ export function App() {
       ].toSorted(),
     };
   }, [monitor.snapshot]);
+
+  const routingRoots = useMemo(
+    () =>
+      (monitor.snapshot?.agents ?? [])
+        .filter((agent) => !agent.is_subagent)
+        .map((agent) => ({ conversationId: agent.thread_id, label: agent.display_name })),
+    [monitor.snapshot],
+  );
 
   const counts = monitor.snapshot?.counts;
   const lastUpdated = monitor.snapshot
@@ -68,46 +79,54 @@ export function App() {
         </div>
       </header>
 
-      <section className="summary-grid" aria-label="监控摘要">
-        <SummaryCard label="根任务" value={counts?.roots ?? 0} tone="neutral" />
-        <SummaryCard label="子代理" value={counts?.subagents ?? 0} tone="blue" />
-        <SummaryCard
-          label="正在运行"
-          value={(counts?.running ?? 0) + (counts?.starting ?? 0)}
-          tone="green"
-        />
-        <SummaryCard label="可继续调用" value={counts?.idle ?? 0} tone="amber" />
-        <SummaryCard label="模型漂移" value={counts?.model_drifts ?? 0} tone="violet" />
-      </section>
+      <AppNavigation active={page} onChange={setPage} />
 
-      {monitor.snapshot && <HealthStrip health={monitor.snapshot.health} />}
-      {monitor.error && <div className="global-error">{monitor.error}</div>}
+      {page === "live" ? (
+        <>
+          <section className="summary-grid" aria-label="监控摘要">
+            <SummaryCard label="根任务" value={counts?.roots ?? 0} tone="neutral" />
+            <SummaryCard label="子代理" value={counts?.subagents ?? 0} tone="blue" />
+            <SummaryCard
+              label="正在运行"
+              value={(counts?.running ?? 0) + (counts?.starting ?? 0)}
+              tone="green"
+            />
+            <SummaryCard label="可继续调用" value={counts?.idle ?? 0} tone="amber" />
+            <SummaryCard label="模型漂移" value={counts?.model_drifts ?? 0} tone="violet" />
+          </section>
 
-      <section className="workspace">
-        <FilterBar
-          filters={filters}
-          models={options.models}
-          projects={options.projects}
-          onChange={setFilters}
-        />
-        <div className="workspace-heading">
-          <div>
-            <span className="eyebrow">AGENT TREE</span>
-            <h2>当前任务与子代理</h2>
-          </div>
-          <span className="privacy-note">只读元数据 · 不采集对话内容</span>
-        </div>
-        {monitor.loading ? (
-          <LoadingState />
-        ) : (
-          <AgentTree agents={monitor.snapshot?.agents ?? []} filters={filters} />
-        )}
-      </section>
+          {monitor.snapshot && <HealthStrip health={monitor.snapshot.health} />}
+          {monitor.error && <div className="global-error">{monitor.error}</div>}
 
-      <footer>
-        <span>数据源：Codex 本地状态库与 rollout 元数据</span>
-        <span>{monitor.settings?.codex_home_label ?? "Codex Home: 检测中"}</span>
-      </footer>
+          <section className="workspace">
+            <FilterBar
+              filters={filters}
+              models={options.models}
+              projects={options.projects}
+              onChange={setFilters}
+            />
+            <div className="workspace-heading">
+              <div>
+                <span className="eyebrow">AGENT TREE</span>
+                <h2>当前任务与子代理</h2>
+              </div>
+              <span className="privacy-note">只读元数据 · 不采集对话内容</span>
+            </div>
+            {monitor.loading ? (
+              <LoadingState />
+            ) : (
+              <AgentTree agents={monitor.snapshot?.agents ?? []} filters={filters} />
+            )}
+          </section>
+
+          <footer>
+            <span>数据源：Codex 本地状态库与 rollout 元数据</span>
+            <span>{monitor.settings?.codex_home_label ?? "Codex Home: 检测中"}</span>
+          </footer>
+        </>
+      ) : (
+        <SmartRoutingPage roots={routingRoots} />
+      )}
 
       <SettingsDialog
         open={settingsOpen}

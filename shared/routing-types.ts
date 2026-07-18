@@ -110,3 +110,52 @@ export interface RoutingSnapshot {
   activity: RouteActivitySnapshot[];
   quality: QualitySnapshot[];
 }
+
+export type RoutingInstallationStatus =
+  | "uninstalled"
+  | "installed"
+  | "restart-required"
+  | "conflict";
+export type RoutingRestartStatus = "not-required" | "required" | "blocked-active-child";
+export type RoutingPreflightStatus = "not-started" | "running" | "complete" | "degraded";
+export type RoutingCdpStatus = "inactive" | "ready" | "degraded";
+export type RoutingSetupReasonCode =
+  | "active-child"
+  | "config-conflict"
+  | "preflight-required"
+  | "unsupported-host"
+  | "cdp-unavailable"
+  | "routing-runtime-unavailable";
+export type RoutingConfigChange =
+  | "agents.max_depth"
+  | "agents.codex_assistant_spark"
+  | "agents.codex_assistant_luna"
+  | "agents.codex_assistant_terra"
+  | "agents.codex_assistant_sol"
+  | "mcp_servers.codex_assistant_routing"
+  | "skill.codex-assistant-routing";
+
+export interface RoutingSetupSnapshot {
+  installation_status: RoutingInstallationStatus;
+  restart_status: RoutingRestartStatus;
+  preflight_status: RoutingPreflightStatus;
+  cdp_status: RoutingCdpStatus;
+  backup_label: string | null;
+  config_changes: RoutingConfigChange[];
+  reason_codes: RoutingSetupReasonCode[];
+}
+
+export interface RoutingUiSnapshot {
+  contract_version: 1;
+  setup: RoutingSetupSnapshot;
+  routing: RoutingSnapshot;
+}
+
+export type RoutingOperationStatus = "applied" | "noop" | "blocked" | "failed";
+
+export interface RoutingOperationReceipt {
+  operation_id: string;
+  status: RoutingOperationStatus;
+  reason_codes: RoutingSetupReasonCode[];
+  restart_required: boolean;
+}

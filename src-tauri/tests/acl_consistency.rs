@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 const LIB_RS: &str = include_str!("../src/lib.rs");
 const DEFAULT_TOML: &str = include_str!("../permissions/default.toml");
 const CAPABILITY_JSON: &str = include_str!("../capabilities/default.json");
+const ROUTING_API: &str = include_str!("../../src/lib/routingApi.ts");
 
 /// Contents of every double-quoted string in `s`.
 fn quoted_strings(s: &str) -> BTreeSet<String> {
@@ -128,5 +129,56 @@ fn monitor_commands_are_acl_granted() {
         "set_codex_home",
     ] {
         assert!(granted.contains(cmd), "{cmd} must be ACL-granted");
+    }
+}
+
+#[test]
+fn smart_routing_exposes_only_the_six_narrow_commands_end_to_end() {
+    let expected = BTreeSet::from([
+        "get_routing_snapshot".to_owned(),
+        "install_routing".to_owned(),
+        "restore_routing".to_owned(),
+        "request_codex_restart".to_owned(),
+        "begin_routing_preflight".to_owned(),
+        "set_root_routing_enabled".to_owned(),
+    ]);
+    let granted = acl_granted_commands();
+    let handler = handler_commands();
+    let frontend = [
+        "get_routing_snapshot",
+        "install_routing",
+        "restore_routing",
+        "request_codex_restart",
+        "begin_routing_preflight",
+        "set_root_routing_enabled",
+    ]
+    .into_iter()
+    .filter(|command| ROUTING_API.contains(&format!("invoke(\"{command}\"")))
+    .map(str::to_owned)
+    .collect::<BTreeSet<_>>();
+
+    assert!(
+        expected.is_subset(&granted),
+        "routing ACL mismatch: {granted:?}"
+    );
+    assert!(
+        expected.is_subset(&handler),
+        "routing handler mismatch: {handler:?}"
+    );
+    assert_eq!(
+        frontend, expected,
+        "frontend routing command surface changed"
+    );
+    for forbidden in [
+        "run_command",
+        "execute_process",
+        "read_file",
+        "write_file",
+        "evaluate_script",
+        "send_cdp",
+    ] {
+        assert!(!granted.contains(forbidden));
+        assert!(!handler.contains(forbidden));
+        assert!(!ROUTING_API.contains(&format!("invoke(\"{forbidden}\"")));
     }
 }

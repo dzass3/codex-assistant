@@ -5,6 +5,12 @@ permissions = [
   "allow-refresh-monitor",
   "allow-get-monitor-settings",
   "allow-set-codex-home",
+  "allow-get-routing-snapshot",
+  "allow-install-routing",
+  "allow-restore-routing",
+  "allow-request-codex-restart",
+  "allow-begin-routing-preflight",
+  "allow-set-root-routing-enabled",
 ]
 
 [[permission]]
@@ -26,3 +32,33 @@ commands.allow = ["get_monitor_settings"]
 identifier = "allow-set-codex-home"
 description = "Choose the local Codex metadata directory"
 commands.allow = ["set_codex_home"]
+
+[[permission]]
+identifier = "allow-get-routing-snapshot"
+description = "Read the sanitized Smart Routing status"
+commands.allow = ["get_routing_snapshot"]
+
+[[permission]]
+identifier = "allow-install-routing"
+description = "Install the owned Smart Routing configuration"
+commands.allow = ["install_routing"]
+
+[[permission]]
+identifier = "allow-restore-routing"
+description = "Restore the owned Smart Routing configuration"
+commands.allow = ["restore_routing"]
+
+[[permission]]
+identifier = "allow-request-codex-restart"
+description = "Request the verified one-time Codex restart"
+commands.allow = ["request_codex_restart"]
+
+[[permission]]
+identifier = "allow-begin-routing-preflight"
+description = "Begin native capability verification for one visible root task"
+commands.allow = ["begin_routing_preflight"]
+
+[[permission]]
+identifier = "allow-set-root-routing-enabled"
+description = "Enable or disable Smart Routing for one visible root task"
+commands.allow = ["set_root_routing_enabled"]

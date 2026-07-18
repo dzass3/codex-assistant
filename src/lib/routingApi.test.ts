@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toRoutingSnapshot } from "./routingApi";
+import { toRoutingOperationReceipt, toRoutingSnapshot, toRoutingUiSnapshot } from "./routingApi";
 
 const snapshot = {
   schema_version: 1,
@@ -213,5 +213,57 @@ describe("routing snapshot boundary", () => {
     },
   ])("fails closed for malformed or content-bearing payloads", (value) => {
     expect(toRoutingSnapshot(value)).toBeNull();
+  });
+});
+
+describe("Smart Routing status boundary", () => {
+  it("accepts the exact metadata-only setup envelope", () => {
+    const value = {
+      contract_version: 1,
+      setup: {
+        installation_status: "restart-required",
+        restart_status: "required",
+        preflight_status: "not-started",
+        cdp_status: "inactive",
+        backup_label: "routing-backup-20260718",
+        config_changes: ["agents.max_depth", "agents.codex_assistant_luna"],
+        reason_codes: [],
+      },
+      routing: snapshot,
+    };
+
+    expect(toRoutingUiSnapshot(value)).toEqual(value);
+  });
+
+  it("rejects duplicate setup metadata", () => {
+    expect(
+      toRoutingUiSnapshot({
+        contract_version: 1,
+        setup: {
+          installation_status: "uninstalled",
+          restart_status: "not-required",
+          preflight_status: "not-started",
+          cdp_status: "inactive",
+          backup_label: null,
+          config_changes: ["agents.max_depth", "agents.max_depth"],
+          reason_codes: [],
+        },
+        routing: { ...snapshot, routes: [], activity: [] },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("Smart Routing operation boundary", () => {
+  it("accepts only the sanitized mutation receipt", () => {
+    const value = {
+      operation_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab0",
+      status: "applied",
+      reason_codes: [],
+      restart_required: true,
+    };
+
+    expect(toRoutingOperationReceipt(value)).toEqual(value);
+    expect(toRoutingOperationReceipt({ ...value, output: "CANARY_PRIVATE_OUTPUT" })).toBeNull();
   });
 });

@@ -505,7 +505,7 @@ fn visible_top_level_process_ids() -> Result<Vec<u32>, IdentityError> {
 }
 
 #[cfg(windows)]
-fn discover_verified_ui_processes(
+pub fn discover_verified_ui_processes(
     package: &VerifiedPackage,
     current_user_sid: &str,
 ) -> Result<Vec<VerifiedProcess>, IdentityError> {
