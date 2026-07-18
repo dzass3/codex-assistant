@@ -1,6 +1,6 @@
 # ADR 0001: External metadata-only observer
 
-- Status: Accepted
+- Status: Accepted for the Observer subsystem
 - Date: 2026-07-18
 
 ## Context
