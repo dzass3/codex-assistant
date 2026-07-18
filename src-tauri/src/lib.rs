@@ -2,6 +2,7 @@
 
 mod commands;
 mod http_api;
+pub mod monitor;
 mod parser;
 mod settings;
 mod state;
