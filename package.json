@@ -2,16 +2,12 @@
   "name": "codex-agent-model-monitor",
   "version": "0.4.0",
   "private": true,
-  "bin": {
-    "codex-agent-model-monitor": "./bin/codex-trace.mjs"
-  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "dev:web": "tauri dev -- -- --web",
     "lint": "oxlint && cargo clippy --manifest-path src-tauri/Cargo.toml",
     "fmt": "oxfmt && cargo fmt --manifest-path src-tauri/Cargo.toml",
     "fmt:check": "oxfmt --check && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
@@ -21,15 +17,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-fs": "^2",
-    "@tauri-apps/plugin-opener": "^2.5.4",
-    "@thesvg/react": "^3.0.19",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-icons": "^5.7.0",
-    "react-markdown": "^10.1.0",
-    "react-syntax-highlighter": "^16.1.1",
-    "remark-gfm": "^4.0.1"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
@@ -38,12 +27,12 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.0.0",
-    "@types/react-syntax-highlighter": "^15.5.0",
     "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.73.0",
     "typescript": "^7.0.2",
+    "undici": "^7.28.0",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
   }

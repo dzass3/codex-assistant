@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type { AgentObservation, AgentStatus } from "../../shared/monitor-types";
 import type { MonitorFilters } from "./FilterBar";
 
@@ -19,18 +19,18 @@ export function AgentTree({
 }) {
   const visibleAgents = useMemo(() => filterWithAncestors(agents, filters), [agents, filters]);
   const visibleIds = new Set(visibleAgents.map((agent) => agent.thread_id));
-  const children = new Map<string | null, AgentObservation[]>();
+  const childMap = new Map<string | null, AgentObservation[]>();
 
   for (const agent of visibleAgents) {
     const parent =
       agent.parent_thread_id && visibleIds.has(agent.parent_thread_id)
         ? agent.parent_thread_id
         : null;
-    const siblings = children.get(parent) ?? [];
+    const siblings = childMap.get(parent) ?? [];
     siblings.push(agent);
-    children.set(parent, siblings);
+    childMap.set(parent, siblings);
   }
-  for (const siblings of children.values()) {
+  for (const siblings of childMap.values()) {
     siblings.sort((left, right) => (right.updated_at_ms ?? 0) - (left.updated_at_ms ?? 0));
   }
 
@@ -50,8 +50,8 @@ export function AgentTree({
 
   return (
     <div className="agent-tree">
-      {(children.get(null) ?? []).map((agent) => (
-        <AgentBranch key={agent.thread_id} agent={agent} children={children} ancestry={new Set()} />
+      {(childMap.get(null) ?? []).map((agent) => (
+        <AgentBranch key={agent.thread_id} agent={agent} childMap={childMap} ancestry={new Set()} />
       ))}
     </div>
   );
@@ -59,18 +59,18 @@ export function AgentTree({
 
 function AgentBranch({
   agent,
-  children,
+  childMap,
   ancestry,
 }: {
   agent: AgentObservation;
-  children: Map<string | null, AgentObservation[]>;
+  childMap: Map<string | null, AgentObservation[]>;
   ancestry: Set<string>;
 }) {
   if (ancestry.has(agent.thread_id)) return null;
   const nextAncestry = new Set(ancestry).add(agent.thread_id);
-  const descendants = children.get(agent.thread_id) ?? [];
+  const descendants = childMap.get(agent.thread_id) ?? [];
   return (
-    <div className="agent-branch" style={{ "--depth": agent.depth } as React.CSSProperties}>
+    <div className="agent-branch" style={{ "--depth": agent.depth } as CSSProperties}>
       <AgentRow agent={agent} childCount={descendants.length} />
       {descendants.length > 0 && (
         <div className="agent-children">
@@ -78,7 +78,7 @@ function AgentBranch({
             <AgentBranch
               key={child.thread_id}
               agent={child}
-              children={children}
+              childMap={childMap}
               ancestry={nextAncestry}
             />
           ))}

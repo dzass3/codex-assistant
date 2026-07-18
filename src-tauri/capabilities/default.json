@@ -2,8 +2,5 @@
   "identifier": "default",
   "description": "Minimal permissions for Codex Agent Monitor",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "core:event:default"
-  ]
+  "permissions": ["core:default", "core:event:default", "default"]
 }

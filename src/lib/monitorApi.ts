@@ -41,9 +41,7 @@ function number(value: unknown): number | null {
 
 function health(value: unknown): HealthEntry {
   const raw = record(value);
-  const level = HEALTH_LEVELS.has(raw.level as HealthLevel)
-    ? (raw.level as HealthLevel)
-    : "error";
+  const level = HEALTH_LEVELS.has(raw.level as HealthLevel) ? (raw.level as HealthLevel) : "error";
   return {
     level,
     message: text(raw.message) ?? "Source status unavailable",

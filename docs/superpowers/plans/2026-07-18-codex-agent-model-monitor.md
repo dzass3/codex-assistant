@@ -59,6 +59,7 @@
 ### Task 1: Rebrand and lock down the desktop surface
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `src-tauri/Cargo.toml`
 - Modify: `src-tauri/tauri.conf.json`
@@ -67,6 +68,7 @@
 - Create: `THIRD_PARTY_NOTICES.md`
 
 **Interfaces:**
+
 - Produces: a single-instance native app named `Codex Agent Monitor` with no frontend filesystem permission.
 
 - [ ] **Step 1: Add a configuration test**
@@ -116,12 +118,14 @@ git commit -m "chore: establish Codex Agent Monitor product"
 ### Task 2: Define observations and deterministic reconciliation
 
 **Files:**
+
 - Create: `src-tauri/src/monitor/mod.rs`
 - Create: `src-tauri/src/monitor/model.rs`
 - Create: `src-tauri/src/monitor/reconcile.rs`
 - Modify: `src-tauri/src/lib.rs`
 
 **Interfaces:**
+
 - Consumes: `DbThreadFact`, `SpawnFact`, and `RolloutFact` metadata structures.
 - Produces: `reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot`.
 
@@ -194,10 +198,12 @@ git commit -m "feat: model agent observations and reconciliation"
 ### Task 3: Read Codex state through a read-only projection
 
 **Files:**
+
 - Modify: `src-tauri/Cargo.toml`
 - Create: `src-tauri/src/monitor/sqlite_source.rs`
 
 **Interfaces:**
+
 - Produces: `read_state_db(codex_home: &Path) -> SourceResult<StateFacts>`.
 - `StateFacts` contains safe display facts plus internal rollout paths consumed only by the backend.
 
@@ -243,9 +249,11 @@ git commit -m "feat: project Codex state in read-only mode"
 ### Task 4: Extract only whitelisted rollout metadata
 
 **Files:**
+
 - Create: `src-tauri/src/monitor/rollout_source.rs`
 
 **Interfaces:**
+
 - Produces: `RolloutIndex::refresh(&mut self, facts: &StateFacts) -> SourceResult<Vec<RolloutFact>>`.
 - Guarantees: public facts contain no raw line, prompt, arguments, output, or path.
 
@@ -287,6 +295,7 @@ git commit -m "feat: observe rollout metadata through a strict whitelist"
 ### Task 5: Add the live runtime and Tauri contract
 
 **Files:**
+
 - Create: `src-tauri/src/monitor/runtime.rs`
 - Modify: `src-tauri/src/lib.rs`
 - Create: `shared/monitor-types.ts`
@@ -294,6 +303,7 @@ git commit -m "feat: observe rollout metadata through a strict whitelist"
 - Create: `src/lib/monitorApi.test.ts`
 
 **Interfaces:**
+
 - Produces Tauri commands `get_monitor_snapshot`, `refresh_monitor`, `get_monitor_settings`, and `set_codex_home`.
 - Emits `monitor://snapshot` with `MonitorSnapshot` every time a reconciled snapshot materially changes.
 
@@ -343,6 +353,7 @@ git commit -m "feat: stream sanitized monitor snapshots"
 ### Task 6: Build the metadata-only agent window
 
 **Files:**
+
 - Create: `src/hooks/useMonitor.ts`
 - Create: `src/components/AgentTree.tsx`
 - Create: `src/components/AgentRow.tsx`
@@ -355,6 +366,7 @@ git commit -m "feat: stream sanitized monitor snapshots"
 - Replace: `src/styles/global.css`
 
 **Interfaces:**
+
 - Consumes: `MonitorApi` and `MonitorSnapshot`.
 - Produces: accessible root/child presentation and settings actions with no transcript route.
 
@@ -403,12 +415,14 @@ git commit -m "feat: present live subagent model hierarchy"
 ### Task 7: Enforce privacy with integration fixtures
 
 **Files:**
+
 - Create: `src-tauri/tests/monitor_fixture.rs`
 - Create: `src-tauri/tests/fixtures/rollout-root.jsonl`
 - Create: `src-tauri/tests/fixtures/rollout-child.jsonl`
 - Modify: `src-tauri/src/monitor/runtime.rs`
 
 **Interfaces:**
+
 - Consumes: public `monitor::snapshot_for_home(&Path)` test entry point.
 - Produces: an end-to-end sanitized `MonitorSnapshot` from a synthetic Codex home.
 
@@ -446,12 +460,14 @@ git commit -m "test: verify metadata-only monitoring end to end"
 ### Task 8: Document, package, and smoke-test Windows delivery
 
 **Files:**
+
 - Replace: `README.md`
 - Modify: `src-tauri/tauri.conf.json`
 - Modify: `package-lock.json`
 - Remove from dependencies: Markdown, syntax-highlighter, frontend filesystem plugin, HTTP server packages no longer used.
 
 **Interfaces:**
+
 - Produces: Windows NSIS installer and release executable under `src-tauri/target/release/bundle/` and `src-tauri/target/release/`.
 
 - [ ] **Step 1: Update documentation**
@@ -488,6 +504,7 @@ git commit -m "release: package Codex Agent Monitor for Windows"
 ### Task 9: Build and deploy the Sites download page
 
 **Files:**
+
 - Create through Sites initializer: `site/.openai/hosting.json`
 - Modify after initialization: `site/app/page.tsx`
 - Modify after initialization: `site/app/layout.tsx`
@@ -495,6 +512,7 @@ git commit -m "release: package Codex Agent Monitor for Windows"
 - Copy validated artifact: `site/public/downloads/Codex-Agent-Monitor-Setup.exe`
 
 **Interfaces:**
+
 - Consumes: validated installer, version, privacy contract, and installation copy.
 - Produces: deployed private Sites URL with a working installer link.
 
@@ -530,6 +548,7 @@ git commit -m "deploy: publish Codex Agent Monitor download site"
 ### Task 10: Final acceptance and work record
 
 **Files:**
+
 - Update: `D:\Work_plan\README.md`
 
 - [ ] **Step 1: Re-run immutable-source checks**

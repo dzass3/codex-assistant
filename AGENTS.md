@@ -1,67 +1,22 @@
-# CLAUDE.md
+# Codex Agent Monitor contributor guide
 
 ## Commands
 
-```bash
-# Dev
-npm run dev              # Vite dev server
-npm run tauri dev        # Full Tauri desktop app
-npm run dev:web          # Web mode (opens browser)
-
-# Lint
-npx oxlint              # JS/TS lint
-cargo clippy --manifest-path src-tauri/Cargo.toml  # Rust lint
-
-# Format
-npx oxfmt               # JS/TS format
-cargo fmt --manifest-path src-tauri/Cargo.toml     # Rust format
-
-# Test
-npx vitest run           # Frontend tests
-cargo test --manifest-path src-tauri/Cargo.toml    # Rust tests
-
-# Type check
-npx tsc --noEmit
-
-# All at once
-npm run check            # tsc + oxlint + oxfmt --check + clippy + cargo fmt --check + vitest + cargo test
+```powershell
+npm run tauri dev
+npm run check
+npm run tauri build -- --bundles nsis
 ```
 
-## Rule
+After code or configuration changes, add proportionate tests and run `npm run check` before committing.
 
-After every code change (src, tests, config that affects build), always add enough tests for the changes, then run lint, format, and test before committing:
+## Architecture and privacy invariants
 
-```bash
-npx oxfmt && npx oxlint && npx tsc --noEmit && cargo fmt --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-## Architecture
-
-- **Backend:** Rust + Tauri v2 + axum HTTP server (port 11424)
-- **Frontend:** React 19 + TypeScript + Vite
-- **Sessions:** `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
-
-### Key files
-
-- `src-tauri/src/parser/` — JSONL parsing pipeline
-  - `entry.rs` — raw line parsing, format detection
-  - `discover.rs` — session discovery + metadata scan
-  - `session.rs` — full session parse
-  - `turn.rs` — turn boundary detection (new + old format)
-  - `toolcall.rs` — tool call classification by end event
-- `src-tauri/src/http_api.rs` — axum routes (port 11424)
-- `src/App.tsx` — 3-view state machine (picker → list → detail)
-- `src/components/SidebarTree.tsx` — CRITICAL: date-grouped JSONL folder structure
-- `shared/types.ts` — TypeScript types (must match Rust structs)
-
-### JSONL format
-
-Three `session_meta` variants (new/mid/oldest). Turn boundary detection uses
-`task_started`/`task_complete` for newer CLI; `user_message` boundaries for older.
-Tool calls classified by **end event type**, not function name.
-
-### Ports
-
-- Frontend dev: 1420
-- Backend HTTP: 11424
-- Docker: 1422
+- Rust/Tauri backend: `src-tauri/src/monitor/`.
+- React UI: `src/App.tsx`, `src/components/`, and `src/hooks/useMonitor.ts`.
+- Shared frontend contract: `shared/monitor-types.ts`.
+- Open Codex SQLite only with read-only flags.
+- Parse rollout records through an explicit metadata whitelist.
+- Never retain, log, emit, serialize, or display prompts, responses, reasoning text, tool arguments, tool output, credentials, or full workspace paths.
+- `turn_context.model` is the authoritative effective model; database model is fallback; requested-only values must be labeled as such.
+- Keep the Tauri command surface and permissions minimal and synchronized.

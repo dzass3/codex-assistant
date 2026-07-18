@@ -22,10 +22,10 @@ export function App() {
     return {
       models: [
         ...new Set(agents.map((agent) => agent.effective_model).filter(Boolean) as string[]),
-      ].sort(),
+      ].toSorted(),
       projects: [
         ...new Set(agents.map((agent) => agent.project).filter(Boolean) as string[]),
-      ].sort(),
+      ].toSorted(),
     };
   }, [monitor.snapshot]);
 

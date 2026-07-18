@@ -2,7 +2,7 @@
 name = "codex-agent-model-monitor"
 version = "0.4.0"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.82"
 
 [[bin]]
 name = "codex-agent-model-monitor"
@@ -17,24 +17,13 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-chrono = { version = "0.4", features = ["serde"] }
-notify = "8"
-tokio = { version = "1", features = ["full"] }
-thiserror = "2"
+chrono = "0.4"
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 dirs = "6"
 rusqlite = { version = "0.32", features = ["bundled"] }
-tauri-plugin-opener = "2.5.4"
 tauri-plugin-single-instance = "2"
-axum = { version = "0.8", features = ["json"] }
-tower-http = { version = "0.7", features = ["cors", "fs"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
-indexmap = { version = "2", features = ["serde"] }
-uuid = { version = "1", features = ["v4"] }
-zstd = "0.13"
-
 [lints.clippy]
 all = { level = "warn", priority = -1 }
 

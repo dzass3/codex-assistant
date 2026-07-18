@@ -53,7 +53,7 @@
   "ignorePatterns": ["dist", "src-tauri/gen", "src-tauri/target"],
   "overrides": [
     {
-      "files": ["src/lib/invoke.ts", "src/lib/listen.ts", "src/lib/openUrl.ts"],
+      "files": ["src/lib/monitorApi.ts"],
       "rules": {
         "no-restricted-imports": "off"
       }
