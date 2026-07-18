@@ -1,5 +1,31 @@
 use serde::{Deserialize, Serialize};
 
+pub type SourceResult<T> = Result<T, SourceError>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourceErrorCode {
+    Missing,
+    Busy,
+    SchemaMismatch,
+    Io,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceError {
+    pub code: SourceErrorCode,
+    pub message: String,
+}
+
+impl SourceError {
+    pub fn new(code: SourceErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AgentStatus {
