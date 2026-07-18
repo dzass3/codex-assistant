@@ -70,6 +70,24 @@ impl HealthEntry {
             error_count: 0,
         }
     }
+
+    pub fn degraded(message: impl Into<String>, last_success_ms: Option<i64>, errors: u64) -> Self {
+        Self {
+            level: HealthLevel::Degraded,
+            message: message.into(),
+            last_success_ms,
+            error_count: errors,
+        }
+    }
+
+    pub fn error(message: impl Into<String>, errors: u64) -> Self {
+        Self {
+            level: HealthLevel::Error,
+            message: message.into(),
+            last_success_ms: None,
+            error_count: errors,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
