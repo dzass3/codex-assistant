@@ -1,4 +1,5 @@
 pub mod monitor;
+pub mod routing;
 
 use std::sync::Arc;
 

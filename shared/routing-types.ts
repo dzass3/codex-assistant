@@ -1,0 +1,48 @@
+export type ModelTier = "spark" | "luna" | "terra" | "sol";
+export type RouteKind = "direct" | "nested";
+export type EligibilityStatus = "unknown" | "verifying" | "eligible" | "unavailable" | "stale";
+export type RoutePhase =
+  | "off"
+  | "enabled"
+  | "classifying"
+  | "implementing"
+  | "reviewing"
+  | "completed"
+  | "degraded";
+
+export interface RootRouteSnapshot {
+  route_key: string;
+  conversation_id: string;
+  enabled: boolean;
+  phase: RoutePhase;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface EligibilitySnapshot {
+  tier: ModelTier;
+  route_kind: RouteKind;
+  status: EligibilityStatus;
+  checked_at_ms: number;
+  profile_version: string;
+}
+
+export interface RouteActivitySnapshot {
+  route_key: string;
+  child_thread_id: string;
+  subtask_id: string;
+  route_kind: RouteKind;
+  phase: RoutePhase;
+  is_reviewer: boolean;
+  escalation_count: number;
+  started_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface RoutingSnapshot {
+  schema_version: number;
+  profile_version: string;
+  routes: RootRouteSnapshot[];
+  eligibility: EligibilitySnapshot[];
+  activity: RouteActivitySnapshot[];
+}
