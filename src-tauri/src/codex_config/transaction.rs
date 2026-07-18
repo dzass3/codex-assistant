@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     fmt,
-    fs::{self, File, OpenOptions},
+    fs::{self, OpenOptions},
     io::Write,
     path::{Component, Path, PathBuf},
 };
@@ -91,6 +91,7 @@ pub enum FailurePoint {
     ReplaceAsset,
     ReplaceConfig,
     PostWriteValidation,
+    CommitWrite,
     CommitMark,
 }
 
@@ -188,29 +189,46 @@ impl CodexConfigService {
         self.recover_incomplete()?;
         validate_request(&self.request)?;
         self.ensure_roots()?;
+        if self.installation_matches_desired()? {
+            return Ok(InstallReceipt {
+                changed: false,
+                conflicts: Vec::new(),
+            });
+        }
         let targets = self.owned_targets()?;
         let preimages = targets
             .iter()
             .map(|(label, path)| capture(label, path))
             .collect::<Result<Vec<_>>>()?;
         let backup = self.backup_path();
-        write_private_json(&backup, &preimages)?;
+        write_private_json_atomic(
+            &backup,
+            &preimages,
+            &format!("{}-backup", self.request.operation_id),
+            false,
+        )?;
         self.inject(FailurePoint::Backup)?;
         let journal_path = self.journal_path();
+        let journal_operation = format!("{}-journal", self.request.operation_id);
         let mut journal = Journal {
             operation_id: self.request.operation_id.clone(),
             committed: false,
             recovered: false,
             preimages,
         };
-        write_private_json(&journal_path, &journal)?;
+        write_private_json_atomic(&journal_path, &journal, &journal_operation, false)?;
         self.inject(FailurePoint::Journal)?;
 
         let result = (|| {
             let changed = self.install_after_journal(&targets)?;
             self.inject(FailurePoint::CommitMark)?;
             journal.committed = true;
-            write_private_json(&journal_path, &journal)?;
+            write_private_json_atomic(
+                &journal_path,
+                &journal,
+                &journal_operation,
+                self.request.failure_point == Some(FailurePoint::CommitWrite),
+            )?;
             Ok(changed)
         })();
         match result {
@@ -221,6 +239,9 @@ impl CodexConfigService {
             Err(error) => {
                 restore_preimages(&journal.preimages)?;
                 cleanup_staged(&targets, &self.request.operation_id);
+                if let Ok(temporary) = temp_path(&journal_path, &journal_operation) {
+                    let _ = fs::remove_file(temporary);
+                }
                 Err(error)
             }
         }
@@ -238,14 +259,14 @@ impl CodexConfigService {
         for (label, entry) in &manifest.files {
             let path = self.destination_for(&entry.relative_destination)?;
             reject_link_components(&path)?;
-            if !path.exists() {
+            let original = backup
+                .iter()
+                .find(|image| image.label == *label)
+                .ok_or_else(|| ConfigError::new("Routing backup is incomplete"))?;
+            if preimage_matches_current(original)? {
                 continue;
             }
-            if hash_matches(&path, &entry.installed_hash)? {
-                let original = backup
-                    .iter()
-                    .find(|image| image.label == *label)
-                    .ok_or_else(|| ConfigError::new("Routing backup is incomplete"))?;
+            if path.exists() && hash_matches(&path, &entry.installed_hash)? {
                 restore_preimages(std::slice::from_ref(original))?;
                 changed = true;
             } else {
@@ -253,12 +274,34 @@ impl CodexConfigService {
             }
         }
         let manifest_path = self.agent_root().join(MANIFEST_FILE);
-        if manifest_path.exists() && !conflicts.iter().any(|item| item == MANIFEST_FILE) {
+        if manifest_path.exists() && conflicts.is_empty() {
             fs::remove_file(manifest_path)
                 .map_err(|_| ConfigError::new("Owned routing manifest could not be removed"))?;
             changed = true;
         }
         Ok(RestoreReceipt { changed, conflicts })
+    }
+
+    fn installation_matches_desired(&self) -> Result<bool> {
+        let Some(manifest) = self.read_manifest()? else {
+            return Ok(false);
+        };
+        if manifest.asset_version != ASSET_VERSION || manifest.profile_version != PROFILE_VERSION {
+            return Ok(false);
+        }
+        self.read_backup(&manifest.backup_operation_id)?;
+        for asset in ASSETS {
+            let path = self.asset_destination(asset)?;
+            if !path.exists() || read_bytes(&path)? != asset.bytes {
+                return Ok(false);
+            }
+        }
+        let config_path = self.config_path();
+        if !config_path.exists() {
+            return Ok(false);
+        }
+        let config = read_bytes(&config_path)?;
+        Ok(self.merge_config(&config)?.as_bytes() == config)
     }
 
     fn install_after_journal(&self, targets: &[(String, PathBuf)]) -> Result<bool> {
@@ -429,6 +472,7 @@ impl CodexConfigService {
         if !directory.exists() {
             return Ok(false);
         }
+        reject_link_components(&directory)?;
         let mut recovered = false;
         for entry in fs::read_dir(&directory)
             .map_err(|_| ConfigError::new("Routing journal could not be inspected"))?
@@ -445,7 +489,12 @@ impl CodexConfigService {
                 self.validate_journal_preimages(&journal.preimages)?;
                 restore_preimages(&journal.preimages)?;
                 journal.recovered = true;
-                write_private_json(&path, &journal)?;
+                write_private_json_atomic(
+                    &path,
+                    &journal,
+                    &format!("{}-recovery", journal.operation_id),
+                    false,
+                )?;
                 recovered = true;
             }
         }
@@ -457,9 +506,34 @@ impl CodexConfigService {
         if !path.exists() {
             return Ok(None);
         }
-        serde_json::from_slice(&read_bytes(&path)?)
-            .map(Some)
-            .map_err(|_| ConfigError::new("Routing ownership manifest is malformed"))
+        reject_link_components(&path)?;
+        let manifest: Manifest = serde_json::from_slice(&read_bytes(&path)?)
+            .map_err(|_| ConfigError::new("Routing ownership manifest is malformed"))?;
+        if manifest.backup_operation_id.is_empty()
+            || manifest.backup_operation_id.contains(['/', '\\'])
+        {
+            return Err(ConfigError::new("Routing ownership manifest is malformed"));
+        }
+        let mut expected = BTreeMap::new();
+        expected.insert(
+            CONFIG_FILE.to_owned(),
+            self.relative_label(&self.config_path())?,
+        );
+        for asset in ASSETS {
+            expected.insert(
+                asset.label.to_owned(),
+                self.relative_label(&self.asset_destination(asset)?)?,
+            );
+        }
+        if manifest.files.len() != expected.len()
+            || manifest
+                .files
+                .iter()
+                .any(|(label, entry)| expected.get(label) != Some(&entry.relative_destination))
+        {
+            return Err(ConfigError::new("Routing ownership manifest is malformed"));
+        }
+        Ok(Some(manifest))
     }
     fn read_backup(&self, operation_id: &str) -> Result<Vec<Preimage>> {
         if operation_id.is_empty() || operation_id.contains(['/', '\\']) {
@@ -714,6 +788,13 @@ fn capture(label: &str, path: &Path) -> Result<Preimage> {
         },
     })
 }
+fn preimage_matches_current(image: &Preimage) -> Result<bool> {
+    if image.existed {
+        Ok(image.path.exists() && read_bytes(&image.path)? == image.bytes)
+    } else {
+        Ok(!image.path.exists())
+    }
+}
 fn restore_preimages(preimages: &[Preimage]) -> Result<()> {
     for image in preimages {
         if image.existed {
@@ -774,22 +855,16 @@ fn write_exact(path: &Path, bytes: &[u8]) -> Result<()> {
     replace_staged(path, &operation)
         .map_err(|_| ConfigError::new("Routing rollback could not replace a file"))
 }
-fn write_private_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
+fn write_private_json_atomic<T: Serialize>(
+    path: &Path,
+    value: &T,
+    operation: &str,
+    inject_sync_failure: bool,
+) -> Result<()> {
     let bytes = serde_json::to_vec(value)
         .map_err(|_| ConfigError::new("Routing evidence could not be encoded"))?;
-    write_bytes_direct(path, &bytes)
-}
-fn write_bytes_direct(path: &Path, bytes: &[u8]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        ensure_private_directory(parent)?;
-    }
-    let mut file = File::create(path)
-        .map_err(|_| ConfigError::new("Routing evidence could not be written"))?;
-    file.write_all(bytes)
-        .map_err(|_| ConfigError::new("Routing evidence could not be written"))?;
-    file.sync_all()
-        .map_err(|_| ConfigError::new("Routing evidence could not be synced"))?;
-    protect_private(path)
+    stage(path, &bytes, operation, inject_sync_failure)?;
+    replace_staged(path, operation)
 }
 fn read_bytes(path: &Path) -> Result<Vec<u8>> {
     fs::read(path).map_err(|_| ConfigError::new("Routing file could not be read"))

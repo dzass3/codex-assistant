@@ -70,6 +70,42 @@ fn reinstall_is_idempotent_and_keeps_the_same_owned_bytes() {
 }
 
 #[test]
+fn idempotent_reinstall_keeps_the_first_preimage_available_for_restore() {
+    let root = tempdir().expect("temporary root");
+    let codex_home = root.path().join("codex");
+    let skills_root = root.path().join("agents").join("skills");
+    let agent_root = codex_home.join("agents/codex-assistant");
+    fs::create_dir_all(&agent_root).expect("agent root");
+    fs::write(
+        codex_home.join("config.toml"),
+        b"# original\r\n[agents]\r\nmax_depth = 1\r\n",
+    )
+    .expect("config preimage");
+    fs::write(agent_root.join("spark.toml"), b"original spark profile").expect("asset preimage");
+    let config_before = fs::read(codex_home.join("config.toml")).expect("config bytes");
+    let spark_before = fs::read(agent_root.join("spark.toml")).expect("spark bytes");
+    let service = CodexConfigService::new(InstallRequest::new(
+        codex_home.clone(),
+        skills_root,
+        std::env::current_exe().expect("executable"),
+    ))
+    .expect("service");
+
+    service.install().expect("first install");
+    assert!(!service.install().expect("idempotent reinstall").changed);
+    service.restore().expect("restore first preimages");
+
+    assert_eq!(
+        fs::read(codex_home.join("config.toml")).expect("restored config"),
+        config_before
+    );
+    assert_eq!(
+        fs::read(agent_root.join("spark.toml")).expect("restored spark"),
+        spark_before
+    );
+}
+
+#[test]
 fn any_observed_transaction_failure_restores_exact_preoperation_bytes() {
     let root = tempdir().expect("temporary root");
     let codex_home = root.path().join("codex");
@@ -91,11 +127,6 @@ fn any_observed_transaction_failure_restores_exact_preoperation_bytes() {
         codex_home.join("agents/codex-assistant/spark.toml"),
         skills_root.join("codex-assistant-smart-routing/SKILL.md"),
     ];
-    let before = watched
-        .iter()
-        .map(|path| fs::read(path).expect("preimage"))
-        .collect::<Vec<_>>();
-
     for (index, point) in [
         FailurePoint::Backup,
         FailurePoint::Journal,
@@ -105,11 +136,18 @@ fn any_observed_transaction_failure_restores_exact_preoperation_bytes() {
         FailurePoint::ReplaceAsset,
         FailurePoint::ReplaceConfig,
         FailurePoint::PostWriteValidation,
+        FailurePoint::CommitWrite,
         FailurePoint::CommitMark,
     ]
     .into_iter()
     .enumerate()
     {
+        fs::write(&watched[1], format!("user drift before failure {index}"))
+            .expect("force a non-idempotent transaction");
+        let before = watched
+            .iter()
+            .map(|path| fs::read(path).expect("preimage"))
+            .collect::<Vec<_>>();
         let request = base
             .clone()
             .with_operation_id(format!("failure-{index}"))
@@ -129,7 +167,47 @@ fn any_observed_transaction_failure_restores_exact_preoperation_bytes() {
                 path.file_name().unwrap().to_string_lossy()
             );
         }
+        CodexConfigService::new(base.clone())
+            .expect("recovery service")
+            .inspect()
+            .expect("recover any journal left before the next failure point");
     }
+}
+
+#[test]
+fn interrupted_commit_evidence_keeps_a_valid_recoverable_journal() {
+    let root = tempdir().expect("temporary root");
+    let codex_home = root.path().join("codex");
+    fs::create_dir_all(&codex_home).expect("codex home");
+    fs::write(
+        codex_home.join("config.toml"),
+        b"# original\n[agents]\nmax_threads = 6\n",
+    )
+    .expect("config preimage");
+    let original = fs::read(codex_home.join("config.toml")).expect("config bytes");
+    let base = InstallRequest::new(
+        codex_home.clone(),
+        root.path().join("skills"),
+        std::env::current_exe().expect("executable"),
+    )
+    .with_operation_id("commit-write");
+
+    assert!(
+        CodexConfigService::new(base.clone().fail_at(FailurePoint::CommitWrite))
+            .expect("service")
+            .install()
+            .is_err()
+    );
+    let recovered = CodexConfigService::new(base)
+        .expect("service")
+        .inspect()
+        .expect("valid journal remains recoverable");
+
+    assert!(recovered.recovered_incomplete_operation);
+    assert_eq!(
+        fs::read(codex_home.join("config.toml")).expect("restored config"),
+        original
+    );
 }
 
 #[test]
@@ -147,6 +225,11 @@ fn inspect_recovers_an_incomplete_journal_without_replaying_a_committed_install(
         .install()
         .expect("install");
     let expected = fs::read(codex_home.join("config.toml")).expect("installed config");
+    fs::write(
+        codex_home.join("agents/codex-assistant/spark.toml"),
+        b"user drift before interruption",
+    )
+    .expect("force a non-idempotent transaction");
     assert!(CodexConfigService::new(
         base.with_operation_id("interrupted")
             .fail_at(FailurePoint::CommitMark)
@@ -207,6 +290,16 @@ fn restore_preserves_user_modified_owned_file_and_reports_only_a_relative_label(
     assert!(fs::read_to_string(codex_home.join("config.toml"))
         .expect("config")
         .contains("[agents]"));
+    assert!(codex_home
+        .join("agents/codex-assistant/manifest.json")
+        .is_file());
+
+    fs::remove_file(&edited).expect("resolve conflict by accepting the absent preimage");
+    let resolved = service.restore().expect("finish restore");
+    assert!(resolved.conflicts.is_empty());
+    assert!(!codex_home
+        .join("agents/codex-assistant/manifest.json")
+        .exists());
 }
 
 #[test]
@@ -374,6 +467,132 @@ fn failed_install_leaves_no_owned_operation_temp_files() {
                 .all(|name| !name.contains(".no-temp.tmp")));
         }
     }
+}
+
+#[test]
+fn tampered_manifest_destinations_fail_closed_for_every_public_operation() {
+    let root = tempdir().expect("temporary root");
+    let codex_home = root.path().join("codex");
+    let skills_root = root.path().join("skills");
+    let request = InstallRequest::new(
+        codex_home.clone(),
+        skills_root.clone(),
+        std::env::current_exe().expect("executable"),
+    );
+    CodexConfigService::new(request.clone())
+        .expect("service")
+        .install()
+        .expect("install");
+    let manifest_path = codex_home.join("agents/codex-assistant/manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("manifest bytes"))
+            .expect("manifest json");
+    manifest["files"]["spark.toml"]["relative_destination"] =
+        serde_json::Value::String("agent:../outside.txt".into());
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).expect("tampered manifest"),
+    )
+    .expect("write tampered manifest");
+    let outside = codex_home.join("agents/outside.txt");
+    fs::write(&outside, b"must stay untouched").expect("outside sentinel");
+
+    for operation in ["inspect", "install", "restore"] {
+        let service = CodexConfigService::new(request.clone()).expect("service");
+        let failed = match operation {
+            "inspect" => service.inspect().is_err(),
+            "install" => service.install().is_err(),
+            "restore" => service.restore().is_err(),
+            _ => unreachable!(),
+        };
+        assert!(failed, "{operation} accepted a path-escaping manifest");
+        assert_eq!(
+            fs::read(&outside).expect("outside sentinel"),
+            b"must stay untouched"
+        );
+    }
+}
+
+#[test]
+fn incomplete_ownership_manifest_fails_closed_instead_of_forgetting_owned_files() {
+    let root = tempdir().expect("temporary root");
+    let codex_home = root.path().join("codex");
+    let request = InstallRequest::new(
+        codex_home.clone(),
+        root.path().join("skills"),
+        std::env::current_exe().expect("executable"),
+    );
+    CodexConfigService::new(request.clone())
+        .expect("service")
+        .install()
+        .expect("install");
+    let manifest_path = codex_home.join("agents/codex-assistant/manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("manifest bytes"))
+            .expect("manifest json");
+    manifest["files"]
+        .as_object_mut()
+        .expect("manifest file map")
+        .remove("spark.toml");
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).expect("incomplete manifest"),
+    )
+    .expect("write incomplete manifest");
+
+    let service = CodexConfigService::new(request).expect("service");
+    assert!(service.inspect().is_err());
+    assert!(service.install().is_err());
+    assert!(service.restore().is_err());
+    assert!(codex_home
+        .join("agents/codex-assistant/spark.toml")
+        .is_file());
+}
+
+#[test]
+fn owned_journal_directory_may_not_be_replaced_by_a_link_or_reparse_point() {
+    let root = tempdir().expect("temporary root");
+    let codex_home = root.path().join("codex");
+    let request = InstallRequest::new(
+        codex_home.clone(),
+        root.path().join("skills"),
+        std::env::current_exe().expect("executable"),
+    );
+    CodexConfigService::new(request.clone())
+        .expect("service")
+        .install()
+        .expect("install");
+    let journal = codex_home.join("codex-assistant-journal");
+    let external = root.path().join("external-journal");
+    fs::rename(&journal, &external).expect("move journal outside owned directory");
+    create_dir_link(&external, &journal).expect("create journal directory link");
+
+    assert!(CodexConfigService::new(request)
+        .expect("service")
+        .inspect()
+        .is_err());
+}
+
+#[cfg(windows)]
+fn create_dir_link(original: &std::path::Path, link: &std::path::Path) -> std::io::Result<()> {
+    let output = std::process::Command::new("cmd")
+        .args(["/c", "mklink", "/J"])
+        .arg(link)
+        .arg(original)
+        .output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ))
+    }
+}
+
+#[cfg(unix)]
+fn create_dir_link(original: &std::path::Path, link: &std::path::Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(original, link)
 }
 
 fn walkdir_names(root: &std::path::Path) -> Vec<String> {
