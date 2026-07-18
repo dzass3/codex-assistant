@@ -391,7 +391,7 @@ fn is_active(phase: RoutePhase) -> bool {
 }
 
 #[cfg(not(windows))]
-fn protect_owned_path(path: &Path) -> Result<(), String> {
+pub(crate) fn protect_owned_path(path: &Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
 
     let mode = if path.is_dir() { 0o700 } else { 0o600 };
@@ -400,17 +400,17 @@ fn protect_owned_path(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-fn protect_owned_path(path: &Path) -> Result<(), String> {
+pub(crate) fn protect_owned_path(path: &Path) -> Result<(), String> {
     windows_acl::protect_current_user(path)
 }
 
 #[cfg(not(windows))]
-fn replace_existing(temporary: &Path, destination: &Path) -> Result<(), String> {
+pub(crate) fn replace_existing(temporary: &Path, destination: &Path) -> Result<(), String> {
     fs::rename(temporary, destination).map_err(|_| "Routing state could not be replaced".to_owned())
 }
 
 #[cfg(windows)]
-fn replace_existing(temporary: &Path, destination: &Path) -> Result<(), String> {
+pub(crate) fn replace_existing(temporary: &Path, destination: &Path) -> Result<(), String> {
     windows_acl::move_file(temporary, destination, true)
 }
 

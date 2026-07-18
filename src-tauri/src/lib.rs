@@ -1,3 +1,4 @@
+pub mod codex_config;
 pub mod monitor;
 pub mod routing;
 

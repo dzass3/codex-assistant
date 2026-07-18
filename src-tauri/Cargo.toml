@@ -32,6 +32,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 dirs = "6"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tauri-plugin-single-instance = "2"
+toml_edit = "=0.22.27"
+sha2 = "=0.10.9"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.59.0", features = [
@@ -60,5 +62,6 @@ opt-level = "s"
 strip = true
 
 [dev-dependencies]
-tempfile = "3"
+# 3.27 pulls getrandom 0.4 (edition 2024); keep the test-only dependency MSRV 1.82 compatible.
+tempfile = "=3.15.0"
 toml = "0.8"
