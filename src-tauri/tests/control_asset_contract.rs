@@ -1,8 +1,9 @@
 use std::{fs, path::PathBuf};
 
 use codex_assistant_lib::control_layer::injector::{
-    build_control_source, parse_binding_message, BindingError, ControlBootstrap, ControlEvent,
-    SubmitShortcut,
+    build_control_source, parse_binding_message, preflight_insertion_expression,
+    routing_enabled_expression, routing_ready_expression, BindingError, ControlBootstrap,
+    ControlEvent, SubmitShortcut,
 };
 use serde_json::Value;
 
@@ -11,6 +12,46 @@ fn resource(path: &str) -> PathBuf {
         .join("resources")
         .join("control")
         .join(path)
+}
+
+#[test]
+fn preflight_evaluation_accepts_only_the_fixed_visible_directive_grammar() {
+    let attempt = "6e90c53a-b93e-44d7-aeb8-9880ee199388";
+    let directive = format!(
+        "Codex Assistant preflight {attempt}: create exactly one visible native child from the current root using profile codex_assistant_luna with fork_turns=\"none\". The child performs no user work and reports only native availability."
+    );
+    let expression = preflight_insertion_expression(&directive).expect("fixed directive");
+    assert!(expression.contains("insertPreflightDirective"));
+    assert!(expression.contains(attempt));
+    assert!(!expression.contains("eval("));
+    assert!(
+        preflight_insertion_expression(&format!("{directive}\nfetch('https://example.com')"))
+            .is_err()
+    );
+    assert!(
+        preflight_insertion_expression(&directive.replace("codex_assistant_luna", "shell"))
+            .is_err()
+    );
+}
+
+#[test]
+fn routing_ready_activation_uses_only_the_fixed_namespaced_boolean_call() {
+    assert_eq!(
+        routing_ready_expression(true),
+        "globalThis.__codexAssistantControlV1?.setRoutingReady(true) === true"
+    );
+    assert_eq!(
+        routing_ready_expression(false),
+        "globalThis.__codexAssistantControlV1?.setRoutingReady(false) === true"
+    );
+    assert_eq!(
+        routing_enabled_expression(true),
+        "globalThis.__codexAssistantControlV1?.syncEnabled(true) === true"
+    );
+    assert_eq!(
+        routing_enabled_expression(false),
+        "globalThis.__codexAssistantControlV1?.syncEnabled(false) === true"
+    );
 }
 
 #[test]
@@ -31,6 +72,9 @@ fn injected_control_is_local_namespaced_and_forbids_content_exfiltration_apis() 
         ".ProseMirror",
         "document.execCommand(\"insertText\"",
         "[Codex Assistant Routing v1; route=",
+        "insertPreflightDirective",
+        "setRoutingReady",
+        "syncEnabled",
     ] {
         assert!(
             script.contains(required),

@@ -1,7 +1,7 @@
 use codex_assistant_lib::control_layer::cdp::{
-    browser_endpoint, fetch_browser_endpoint, validate_session_record, BrowserAnchor,
-    CdpDiscoveryError, CdpSecurityError, OwnedSessionRecord, OwnedSessionStore, SessionStoreError,
-    TargetDescriptor, TargetRegistry,
+    browser_endpoint, create_owned_session_record, fetch_browser_endpoint, fetch_page_targets,
+    validate_session_record, BrowserAnchor, CdpDiscoveryError, CdpSecurityError,
+    OwnedSessionRecord, OwnedSessionStore, SessionStoreError, TargetDescriptor, TargetRegistry,
 };
 use tempfile::tempdir;
 use tokio::{
@@ -115,6 +115,26 @@ fn owned_session_is_bounded_metadata_only_and_stales_by_pid_version_or_time() {
     }
 }
 
+#[test]
+fn verified_endpoint_creates_a_hashed_metadata_only_session_record() {
+    let endpoint = browser_endpoint(
+        49_321,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:49321/devtools/browser/{BROWSER_ID}"}}"#
+        ),
+    )
+    .unwrap();
+
+    let record = create_owned_session_record(&endpoint, 41_000, "26.715.3651.0", 1_000)
+        .expect("validated record");
+
+    assert_eq!(record.port, 49_321);
+    assert_eq!(record.verified_pid, 41_000);
+    assert_eq!(record.browser_id_hash.len(), 64);
+    assert_ne!(record.browser_id_hash, BROWSER_ID);
+    assert!(!serde_json::to_string(&record).unwrap().contains(BROWSER_ID));
+}
+
 #[tokio::test]
 async fn discovery_fetches_only_the_fixed_loopback_version_route_without_redirects() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
@@ -157,6 +177,43 @@ async fn discovery_fetches_only_the_fixed_loopback_version_route_without_redirec
         Err(CdpDiscoveryError::UnexpectedStatus)
     );
     redirect_server.await.unwrap();
+}
+
+#[tokio::test]
+async fn target_discovery_projects_only_verified_page_identity_from_the_fixed_list_route() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let endpoint = browser_endpoint(
+        port,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/browser/{BROWSER_ID}"}}"#
+        ),
+    )
+    .unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0_u8; 2_048];
+        let count = stream.read(&mut request).await.unwrap();
+        let request = String::from_utf8_lossy(&request[..count]);
+        assert!(request.starts_with("GET /json/list HTTP/1.1\r\n"));
+        let body = format!(
+            r#"[{{"id":"page-1","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/page-1","url":"http://localhost/local/private-task","title":"PRIVATE PAGE TITLE"}}]"#
+        );
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        stream.write_all(response.as_bytes()).await.unwrap();
+    });
+
+    let targets = fetch_page_targets(&endpoint, 1_000).await.unwrap();
+
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].target_id, "page-1");
+    assert!(!format!("{targets:?}").contains("PRIVATE PAGE TITLE"));
+    assert!(!format!("{targets:?}").contains("private-task"));
+    server.await.unwrap();
 }
 
 #[test]

@@ -21,6 +21,7 @@ pub fn run() {
         RoutingApplication::default_location()
             .expect("Smart Routing local runtime could not be initialized"),
     );
+    let setup_routing_runtime = Arc::clone(&routing_runtime);
 
     tauri::Builder::default()
         .plugin(
@@ -54,6 +55,9 @@ pub fn run() {
 
             let handle = app.handle().clone();
             let runtime = Arc::clone(&setup_runtime);
+            let control_monitor = Arc::clone(&setup_runtime);
+            let routing = Arc::clone(&setup_routing_runtime);
+            let control_routing = Arc::clone(&setup_routing_runtime);
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
                 loop {
@@ -64,9 +68,41 @@ pub fn run() {
                     let Ok((snapshot, changed)) = result else {
                         continue;
                     };
+                    let routing_worker = Arc::clone(&routing);
+                    let routing_snapshot = snapshot.clone();
+                    let _ = tauri::async_runtime::spawn_blocking(move || {
+                        routing_worker.reconcile_preflight(&routing_snapshot);
+                        routing_worker.insert_next_preflight();
+                        routing_worker.ensure_control_ready();
+                        routing_worker.sync_control_state();
+                    })
+                    .await;
                     if changed {
                         let _ = handle.emit(MONITOR_EVENT, snapshot);
                     }
+                }
+            });
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let active_native_children = control_monitor
+                        .snapshot()
+                        .agents
+                        .iter()
+                        .filter(|agent| {
+                            agent.is_subagent
+                                && matches!(
+                                    agent.status,
+                                    monitor::model::AgentStatus::Starting
+                                        | monitor::model::AgentStatus::Running
+                                )
+                        })
+                        .count();
+                    let worker = Arc::clone(&control_routing);
+                    let _ = tauri::async_runtime::spawn_blocking(move || {
+                        worker.poll_control_event(active_native_children)
+                    })
+                    .await;
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
             });
             Ok(())
@@ -150,17 +186,34 @@ async fn request_codex_restart(
 }
 
 #[tauri::command]
-fn begin_routing_preflight(
+async fn begin_routing_preflight(
     root_conversation_id: String,
     runtime: tauri::State<'_, Arc<RoutingApplication>>,
     monitor: tauri::State<'_, Arc<MonitorRuntime>>,
-) -> OperationReceipt {
+) -> Result<OperationReceipt, String> {
     let root_is_observed = monitor
         .snapshot()
         .agents
         .iter()
         .any(|agent| !agent.is_subagent && agent.thread_id == root_conversation_id);
-    runtime.begin_preflight(&root_conversation_id, root_is_observed)
+    let worker = Arc::clone(runtime.inner());
+    let fallback = Arc::clone(&worker);
+    match tauri::async_runtime::spawn_blocking(move || {
+        let started = worker.begin_preflight(&root_conversation_id, root_is_observed);
+        if matches!(
+            started.status,
+            routing_app::OperationStatus::Applied | routing_app::OperationStatus::Noop
+        ) {
+            worker.insert_next_preflight()
+        } else {
+            started
+        }
+    })
+    .await
+    {
+        Ok(receipt) => Ok(receipt),
+        Err(_) => Ok(fallback.unavailable_operation()),
+    }
 }
 
 #[tauri::command]
@@ -175,5 +228,22 @@ fn set_root_routing_enabled(
         .agents
         .iter()
         .any(|agent| !agent.is_subagent && agent.thread_id == root_conversation_id);
-    routing.set_root_enabled(&root_conversation_id, enabled, root_is_observed)
+    let active_native_children = monitor
+        .snapshot()
+        .agents
+        .iter()
+        .filter(|agent| {
+            agent.is_subagent
+                && matches!(
+                    agent.status,
+                    monitor::model::AgentStatus::Starting | monitor::model::AgentStatus::Running
+                )
+        })
+        .count();
+    routing.set_root_enabled_with_activity(
+        &root_conversation_id,
+        enabled,
+        root_is_observed,
+        active_native_children,
+    )
 }

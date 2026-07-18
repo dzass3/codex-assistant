@@ -166,6 +166,8 @@ pub fn reconcile_attempt(input: PreflightInput<'_>) -> PreflightOutcome {
             observation.started_at_ms >= input.attempt.started_at_ms
                 && observation.requested_model.as_deref()
                     == Some(input.attempt.key.requested_model.as_str())
+                && observation.parent_thread_id == Some(input.attempt.expected_parent_id)
+                && observation.depth == input.attempt.key.depth
         })
         .collect::<Vec<_>>();
     if candidates.len() > 1 {

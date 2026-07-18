@@ -199,6 +199,83 @@ impl RoutingRuntime {
         Ok(())
     }
 
+    pub fn ensure_root_route(
+        &self,
+        conversation_id: Uuid,
+        now_ms: i64,
+    ) -> Result<RootRouteState, String> {
+        if conversation_id.is_nil() || !(0..=MAX_JS_SAFE_INTEGER).contains(&now_ms) {
+            return Err("Routing root is invalid".to_owned());
+        }
+        let _file_lock = RoutingStateFileLock::acquire(self.store.directory())
+            .map_err(|_| "Routing state lock is unavailable".to_owned())?;
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut next = self.store.load()?;
+        if let Some(existing) = next
+            .routes
+            .iter()
+            .find(|route| route.conversation_id == conversation_id)
+            .cloned()
+        {
+            *state = next;
+            return Ok(existing);
+        }
+        let route = RootRouteState {
+            route_key: Uuid::new_v4(),
+            conversation_id,
+            enabled: false,
+            phase: RoutePhase::Off,
+            created_at_ms: now_ms,
+            updated_at_ms: now_ms,
+        };
+        next.routes.push(route.clone());
+        validate_envelope(&next)?;
+        self.store.save(&next)?;
+        *state = next;
+        Ok(route)
+    }
+
+    pub fn set_root_enabled(
+        &self,
+        conversation_id: Uuid,
+        enabled: bool,
+        now_ms: i64,
+    ) -> Result<bool, String> {
+        if conversation_id.is_nil() || !(0..=MAX_JS_SAFE_INTEGER).contains(&now_ms) {
+            return Err("Routing root is invalid".to_owned());
+        }
+        let _file_lock = RoutingStateFileLock::acquire(self.store.directory())
+            .map_err(|_| "Routing state lock is unavailable".to_owned())?;
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut next = self.store.load()?;
+        let route = next
+            .routes
+            .iter_mut()
+            .find(|route| route.conversation_id == conversation_id)
+            .ok_or_else(|| "Routing root is unknown".to_owned())?;
+        if route.enabled == enabled {
+            *state = next;
+            return Ok(false);
+        }
+        route.enabled = enabled;
+        route.phase = if enabled {
+            RoutePhase::Enabled
+        } else {
+            RoutePhase::Off
+        };
+        route.updated_at_ms = now_ms;
+        validate_envelope(&next)?;
+        self.store.save(&next)?;
+        *state = next;
+        Ok(true)
+    }
+
     pub fn try_start_activity(&self, mut activity: RouteActivity) -> Result<(), RouteReasonCode> {
         let mut state = self
             .state

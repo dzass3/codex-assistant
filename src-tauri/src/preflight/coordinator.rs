@@ -135,6 +135,69 @@ impl PreflightCoordinator {
         })
     }
 
+    pub fn next_visible_directive(
+        &self,
+    ) -> Result<Option<(EligibilityKey, Uuid, PreflightDirective)>, String> {
+        let Some(record) = self
+            .records
+            .iter()
+            .find(|record| {
+                record.attempt.phase == PreflightPhase::AwaitingVisibleCommand
+                    && record.attempt.key.route_kind == crate::routing::RouteKind::Nested
+            })
+            .or_else(|| {
+                self.records
+                    .iter()
+                    .find(|record| record.attempt.phase == PreflightPhase::AwaitingVisibleCommand)
+            })
+        else {
+            return Ok(None);
+        };
+        let key = record.attempt.key.clone();
+        let root_id = record.attempt.expected_root_id;
+        let directive = self.directive(&key)?;
+        Ok(Some((key, root_id, directive)))
+    }
+
+    pub fn active_keys(&self) -> Vec<EligibilityKey> {
+        self.records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.attempt.phase,
+                    PreflightPhase::AwaitingNativeChild | PreflightPhase::VerifyingLineage
+                )
+            })
+            .map(|record| record.attempt.key.clone())
+            .collect()
+    }
+
+    pub fn is_complete(&self) -> bool {
+        !self.records.is_empty()
+            && self.records.iter().all(|record| {
+                matches!(
+                    record.attempt.phase,
+                    PreflightPhase::Eligible
+                        | PreflightPhase::Unavailable
+                        | PreflightPhase::TimedOut
+                )
+            })
+    }
+
+    pub fn host_version(&self) -> Option<String> {
+        let first = self
+            .records
+            .first()?
+            .attempt
+            .key
+            .codex_package_version
+            .clone();
+        self.records
+            .iter()
+            .all(|record| record.attempt.key.codex_package_version == first)
+            .then_some(first)
+    }
+
     pub fn mark_visible_command_submitted(&mut self, key: &EligibilityKey) -> Result<(), String> {
         let record = self
             .records

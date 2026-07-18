@@ -83,6 +83,35 @@ describe("routing control compatibility", () => {
 });
 
 describe("mounted routing control", () => {
+  it("keeps routing locked until the verified preflight explicitly activates it", () => {
+    const document = fixture("local-root");
+    const send = vi.fn();
+    const control = mountRoutingControl({
+      document,
+      pathname: () => `/local/${ROOT_ID}`,
+      binding: binding(),
+      sessionId: "session-1",
+      targetId: "target-1",
+      send,
+      transaction: transaction(),
+      submitShortcut: "enter",
+    });
+    control.mount();
+    const button = document.querySelector<HTMLButtonElement>("[data-codex-assistant-control]")!;
+
+    expect(button.disabled).toBe(true);
+    button.click();
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "toggle" }));
+
+    control.setRoutingReady(true);
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "toggle", enabled: true }));
+    expect(button.textContent).toContain("Off");
+    control.syncEnabled(true);
+    expect(button.textContent).toContain("Enabled");
+  });
+
   it("boots the packaged runtime asset idempotently through the owned CDP bootstrap", () => {
     const document = fixture("local-root");
     const runtime = readFileSync(
@@ -127,8 +156,20 @@ describe("mounted routing control", () => {
     run();
     expect(document.querySelectorAll("[data-codex-assistant-control]")).toHaveLength(1);
     document.querySelector<HTMLButtonElement>("[data-codex-assistant-control]")!.click();
+    expect(bridge).not.toHaveBeenCalledWith(expect.stringContaining('"type":"toggle"'));
+    const runtimeControl = page["__codexAssistantControlV1"] as {
+      destroy(): void;
+      setRoutingReady(ready: boolean): boolean;
+      syncEnabled(enabled: boolean): boolean;
+    };
+    runtimeControl.setRoutingReady(true);
+    document.querySelector<HTMLButtonElement>("[data-codex-assistant-control]")!.click();
     expect(bridge).toHaveBeenCalledWith(expect.stringContaining('"type":"toggle"'));
-    (page["__codexAssistantControlV1"] as { destroy(): void }).destroy();
+    runtimeControl.syncEnabled(true);
+    expect(document.querySelector("[data-codex-assistant-control]")?.textContent).toContain(
+      "Enabled",
+    );
+    runtimeControl.destroy();
     delete page["__codexAssistantBootstrapV1"];
     delete page.codexAssistant;
   });
@@ -149,7 +190,9 @@ describe("mounted routing control", () => {
     expect(control.mount()).toBe(true);
     expect(control.mount()).toBe(true);
     expect(document.querySelectorAll("[data-codex-assistant-control]")).toHaveLength(1);
+    control.setRoutingReady(true);
     control.setEnabled(true);
+    control.syncEnabled(true);
     expect(document.querySelector("[data-codex-assistant-control]")?.textContent).toContain(
       "Enabled",
     );
@@ -181,7 +224,9 @@ describe("mounted routing control", () => {
       submitShortcut: "ctrl-enter",
     });
     control.mount();
+    control.setRoutingReady(true);
     control.setEnabled(true);
+    control.syncEnabled(true);
 
     editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     editor.dispatchEvent(
@@ -217,7 +262,9 @@ describe("mounted routing control", () => {
       submitShortcut: "enter",
     });
     control.mount();
+    control.setRoutingReady(true);
     control.setEnabled(true);
+    control.syncEnabled(true);
     const submit = document.querySelector<HTMLButtonElement>("[data-codex-submit]")!;
     const stop = document.querySelector<HTMLButtonElement>("[data-codex-stop]")!;
     stop.click();
@@ -243,6 +290,7 @@ describe("mounted routing control", () => {
       "gpt-5.6-luna · Implementing",
     );
     control.setEnabled(false);
+    control.syncEnabled(false);
     document.querySelector(".ProseMirror")!.dispatchEvent(new Event("input", { bubbles: true }));
     submit.click();
     expect(tx.inserted).toHaveLength(2);
@@ -263,7 +311,9 @@ describe("mounted routing control", () => {
       submitShortcut: "enter",
     });
     control.mount();
+    control.setRoutingReady(true);
     control.setEnabled(true);
+    control.syncEnabled(true);
     document.querySelector<HTMLButtonElement>("[data-codex-submit]")!.click();
     expect(document.querySelector("[data-codex-assistant-control]")?.textContent).toContain(
       "Degraded",
@@ -274,5 +324,41 @@ describe("mounted routing control", () => {
     path = "/remote";
     expect(control.refresh()).toBe(false);
     expect(document.querySelector("[data-codex-assistant-control]")).toBeNull();
+  });
+
+  it("inserts one bounded preflight directive only into the current empty root editor", () => {
+    const document = fixture("local-root");
+    const tx = transaction();
+    const control = mountRoutingControl({
+      document,
+      pathname: () => `/local/${ROOT_ID}`,
+      binding: binding(),
+      sessionId: "session-1",
+      targetId: "target-1",
+      send: vi.fn(),
+      transaction: tx,
+      submitShortcut: "enter",
+    });
+    control.mount();
+    const directive = `Codex Assistant preflight ${ROUTE_KEY}: create exactly one visible native child from the current root using profile codex_assistant_luna with fork_turns="none". The child performs no user work and reports only native availability.`;
+
+    expect(control.insertPreflightDirective(directive)).toBe(true);
+    expect(control.insertPreflightDirective(directive)).toBe(false);
+    expect(tx.inserted).toEqual([directive]);
+
+    const occupied = fixture("local-root");
+    occupied.querySelector(".ProseMirror")?.append(occupied.createTextNode("existing user draft"));
+    const guarded = mountRoutingControl({
+      document: occupied,
+      pathname: () => `/local/${ROOT_ID}`,
+      binding: binding(),
+      sessionId: "session-2",
+      targetId: "target-2",
+      send: vi.fn(),
+      transaction: transaction(),
+      submitShortcut: "enter",
+    });
+    guarded.mount();
+    expect(guarded.insertPreflightDirective(directive)).toBe(false);
   });
 });

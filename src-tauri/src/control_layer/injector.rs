@@ -5,7 +5,9 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
-use super::cdp::{CdpClient, CdpClientError};
+use super::cdp::{
+    fetch_page_targets, BrowserEndpoint, CdpClient, CdpClientError, CdpDiscoveryError,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InjectionPrimitive {
@@ -90,6 +92,167 @@ pub enum ApplyInjectionError {
     Cdp(CdpClientError),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisiblePreflightRequest {
+    pub session_id: String,
+    pub root_conversation_id: Uuid,
+    pub route_key: Uuid,
+    pub directive: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisibleControlBinding {
+    pub session_id: String,
+    pub target_id: String,
+    pub root_conversation_id: Uuid,
+    pub route_key: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VisiblePreflightError {
+    Discovery(CdpDiscoveryError),
+    InvalidControl,
+    Injection(ApplyInjectionError),
+    Cdp(CdpClientError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlReceiveError {
+    Discovery(CdpDiscoveryError),
+    TargetUnavailable,
+    Cdp(CdpClientError),
+    Binding(BindingError),
+}
+
+pub async fn receive_control_event(
+    endpoint: &BrowserEndpoint,
+    expected_target_id: &str,
+    expected_session_id: &str,
+    timeout_ms: u64,
+) -> Result<ControlEvent, ControlReceiveError> {
+    let target = fetch_page_targets(endpoint, timeout_ms)
+        .await
+        .map_err(ControlReceiveError::Discovery)?
+        .into_iter()
+        .find(|target| target.target_id == expected_target_id)
+        .ok_or(ControlReceiveError::TargetUnavailable)?;
+    let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
+        .await
+        .map_err(ControlReceiveError::Cdp)?;
+    client
+        .call("Runtime.enable", json!({}))
+        .await
+        .map_err(ControlReceiveError::Cdp)?;
+    let payload = client
+        .next_binding_payload()
+        .await
+        .map_err(ControlReceiveError::Cdp)?;
+    parse_binding_message(&payload, expected_session_id, expected_target_id)
+        .map_err(ControlReceiveError::Binding)
+}
+
+pub async fn set_control_routing_ready(
+    endpoint: &BrowserEndpoint,
+    expected_target_id: &str,
+    ready: bool,
+    timeout_ms: u64,
+) -> Result<bool, ControlReceiveError> {
+    let target = fetch_page_targets(endpoint, timeout_ms)
+        .await
+        .map_err(ControlReceiveError::Discovery)?
+        .into_iter()
+        .find(|target| target.target_id == expected_target_id)
+        .ok_or(ControlReceiveError::TargetUnavailable)?;
+    let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
+        .await
+        .map_err(ControlReceiveError::Cdp)?;
+    client
+        .evaluate_boolean(&routing_ready_expression(ready))
+        .await
+        .map_err(ControlReceiveError::Cdp)
+}
+
+pub async fn sync_control_routing_enabled(
+    endpoint: &BrowserEndpoint,
+    expected_target_id: &str,
+    enabled: bool,
+    timeout_ms: u64,
+) -> Result<bool, ControlReceiveError> {
+    let target = fetch_page_targets(endpoint, timeout_ms)
+        .await
+        .map_err(ControlReceiveError::Discovery)?
+        .into_iter()
+        .find(|target| target.target_id == expected_target_id)
+        .ok_or(ControlReceiveError::TargetUnavailable)?;
+    let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
+        .await
+        .map_err(ControlReceiveError::Cdp)?;
+    client
+        .evaluate_boolean(&routing_enabled_expression(enabled))
+        .await
+        .map_err(ControlReceiveError::Cdp)
+}
+
+pub async fn insert_preflight_directive_on_pages(
+    endpoint: &BrowserEndpoint,
+    script: &str,
+    css: &str,
+    request: &VisiblePreflightRequest,
+    timeout_ms: u64,
+) -> Result<bool, VisiblePreflightError> {
+    Ok(
+        insert_preflight_directive_on_pages_detailed(endpoint, script, css, request, timeout_ms)
+            .await?
+            .is_some(),
+    )
+}
+
+pub async fn insert_preflight_directive_on_pages_detailed(
+    endpoint: &BrowserEndpoint,
+    script: &str,
+    css: &str,
+    request: &VisiblePreflightRequest,
+    timeout_ms: u64,
+) -> Result<Option<VisibleControlBinding>, VisiblePreflightError> {
+    let expression = preflight_insertion_expression(&request.directive)
+        .map_err(|_| VisiblePreflightError::InvalidControl)?;
+    let targets = fetch_page_targets(endpoint, timeout_ms)
+        .await
+        .map_err(VisiblePreflightError::Discovery)?;
+    for target in targets {
+        let bootstrap = ControlBootstrap {
+            session_id: request.session_id.clone(),
+            target_id: target.target_id.clone(),
+            route_id: request.root_conversation_id.to_string(),
+            route_key: request.route_key.to_string(),
+            observed: true,
+            parent_thread_id: None,
+            submit_shortcut: SubmitShortcut::Enter,
+        };
+        let source = build_control_source(script, css, &bootstrap)
+            .map_err(|_| VisiblePreflightError::InvalidControl)?;
+        let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
+            .await
+            .map_err(VisiblePreflightError::Cdp)?;
+        apply_injection(&mut client, &source)
+            .await
+            .map_err(VisiblePreflightError::Injection)?;
+        if client
+            .evaluate_boolean(&expression)
+            .await
+            .map_err(VisiblePreflightError::Cdp)?
+        {
+            return Ok(Some(VisibleControlBinding {
+                session_id: request.session_id.clone(),
+                target_id: target.target_id,
+                root_conversation_id: request.root_conversation_id,
+                route_key: request.route_key,
+            }));
+        }
+    }
+    Ok(None)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SubmitShortcut {
@@ -159,6 +322,59 @@ pub fn build_control_source(
         return Err(InjectionPlanError::InvalidScript);
     }
     Ok(source)
+}
+
+pub fn preflight_insertion_expression(directive: &str) -> Result<String, InjectionPlanError> {
+    const PREFIX: &str = "Codex Assistant preflight ";
+    const ROUTES: [&str; 2] = [
+        "from the current root",
+        "from the verified visible Terra parent",
+    ];
+    const PROFILES: [&str; 4] = [
+        "codex_assistant_spark",
+        "codex_assistant_luna",
+        "codex_assistant_terra",
+        "codex_assistant_sol",
+    ];
+    if directive.len() < 80
+        || directive.len() > 1024
+        || !directive.is_ascii()
+        || directive.contains(['\n', '\r', '\0'])
+    {
+        return Err(InjectionPlanError::InvalidScript);
+    }
+    let (attempt, instruction) = directive
+        .strip_prefix(PREFIX)
+        .and_then(|rest| rest.split_once(": "))
+        .ok_or(InjectionPlanError::InvalidScript)?;
+    let attempt = Uuid::parse_str(attempt).map_err(|_| InjectionPlanError::InvalidScript)?;
+    if attempt.is_nil() {
+        return Err(InjectionPlanError::InvalidScript);
+    }
+    let valid = ROUTES.iter().any(|route| {
+        PROFILES.iter().any(|profile| {
+            instruction
+                == format!(
+                    "create exactly one visible native child {route} using profile {profile} with fork_turns=\"none\". The child performs no user work and reports only native availability."
+                )
+        })
+    });
+    if !valid {
+        return Err(InjectionPlanError::InvalidScript);
+    }
+    let serialized =
+        serde_json::to_string(directive).map_err(|_| InjectionPlanError::InvalidScript)?;
+    Ok(format!(
+        "globalThis.__codexAssistantControlV1?.insertPreflightDirective({serialized}) === true"
+    ))
+}
+
+pub fn routing_ready_expression(ready: bool) -> String {
+    format!("globalThis.__codexAssistantControlV1?.setRoutingReady({ready}) === true")
+}
+
+pub fn routing_enabled_expression(enabled: bool) -> String {
+    format!("globalThis.__codexAssistantControlV1?.syncEnabled({enabled}) === true")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

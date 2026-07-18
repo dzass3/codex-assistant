@@ -149,11 +149,13 @@ class RoutingControl {
   #composer: Element | null = null;
   #editor: Element | null = null;
   #enabled = false;
+  #routingReady = false;
   #degraded = false;
   #markedCurrentTurn = false;
   #submissionCounter = 0;
   #activity: RoutingActivity | null = null;
   #listenersAttached = false;
+  #preflightInserted = false;
 
   constructor(options: MountRoutingControlOptions) {
     this.#options = options;
@@ -213,7 +215,7 @@ class RoutingControl {
   }
 
   setEnabled(enabled: boolean): void {
-    if (this.#button === null || this.#degraded) return;
+    if (this.#button === null || this.#degraded || !this.#routingReady) return;
     const message: BridgeMessage = {
       v: 1,
       sessionId: this.#options.sessionId,
@@ -225,9 +227,23 @@ class RoutingControl {
     if (!this.#safeSend(message)) {
       this.#degraded = true;
       this.#enabled = false;
-    } else {
-      this.#enabled = enabled;
-      if (!enabled) this.#markedCurrentTurn = false;
+    }
+    this.#render();
+  }
+
+  syncEnabled(enabled: boolean): void {
+    if (!this.#routingReady || this.#degraded) return;
+    this.#enabled = enabled;
+    if (!enabled) this.#markedCurrentTurn = false;
+    this.#render();
+  }
+
+  setRoutingReady(ready: boolean): void {
+    if (this.#degraded) return;
+    this.#routingReady = ready;
+    if (!ready) {
+      this.#enabled = false;
+      this.#markedCurrentTurn = false;
     }
     this.#render();
   }
@@ -239,6 +255,28 @@ class RoutingControl {
       this.#enabled = false;
     }
     this.#render();
+  }
+
+  insertPreflightDirective(directive: string): boolean {
+    if (
+      this.#preflightInserted ||
+      this.#degraded ||
+      this.#editor === null ||
+      !this.#editor.matches(":empty") ||
+      directive.length < 80 ||
+      directive.length > 1024 ||
+      !/^Codex Assistant preflight [0-9a-f-]{36}: create exactly one visible native child /.test(
+        directive,
+      ) ||
+      directive.includes("\n") ||
+      directive.includes("\0")
+    ) {
+      return false;
+    }
+    const inserted =
+      this.#options.transaction.insertExact(this.#editor, directive).verified === true;
+    if (inserted) this.#preflightInserted = true;
+    return inserted;
   }
 
   #attachListeners(): void {
@@ -364,8 +402,13 @@ class RoutingControl {
   #render(): void {
     if (this.#button === null) return;
     this.#button.setAttribute("aria-pressed", String(this.#enabled));
+    this.#button.disabled = !this.#routingReady || this.#degraded;
     if (this.#degraded) {
       this.#button.textContent = "Codex Assistant · Degraded";
+      return;
+    }
+    if (!this.#routingReady) {
+      this.#button.textContent = "Codex Assistant · Preflight required";
       return;
     }
     if (!this.#enabled) {

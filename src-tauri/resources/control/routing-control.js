@@ -25,16 +25,21 @@
   let composer = null;
   let editor = null;
   let enabled = false;
+  let routingReady = false;
   let degraded = false;
   let markedCurrentTurn = false;
   let submissionCounter = 0;
   let activity = null;
   let listenersAttached = false;
+  let preflightInserted = false;
 
   const api = Object.freeze({
     refresh,
     destroy,
     updateActivity,
+    insertPreflightDirective,
+    setRoutingReady,
+    syncEnabled,
   });
   globalThis[GLOBAL_NAME] = api;
 
@@ -194,7 +199,7 @@
   }
 
   function onControlClick() {
-    if (degraded) return;
+    if (degraded || !routingReady) return;
     const requested = !enabled;
     if (
       !emit({
@@ -204,11 +209,9 @@
       })
     ) {
       enterDegraded();
+      render();
       return;
     }
-    enabled = requested;
-    if (!enabled) markedCurrentTurn = false;
-    render();
   }
 
   function onEditorInput() {
@@ -311,6 +314,36 @@
     return true;
   }
 
+  function insertPreflightDirective(value) {
+    if (
+      preflightInserted ||
+      degraded ||
+      !editor ||
+      !editor.matches(":empty") ||
+      typeof value !== "string" ||
+      value.length < 80 ||
+      value.length > 1024 ||
+      !/^Codex Assistant preflight [0-9a-f-]{36}: create exactly one visible native child /.test(
+        value,
+      ) ||
+      value.includes("\n") ||
+      value.includes("\0")
+    ) {
+      return false;
+    }
+    editor.focus();
+    const selection = document.getSelection();
+    if (!selection) return false;
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const inserted = insertExact(value);
+    if (inserted) preflightInserted = true;
+    return inserted;
+  }
+
   function validActivity(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return false;
     if (
@@ -333,12 +366,33 @@
     enabled = false;
   }
 
+  function setRoutingReady(ready) {
+    if (degraded || typeof ready !== "boolean") return false;
+    routingReady = ready;
+    if (!ready) {
+      enabled = false;
+      markedCurrentTurn = false;
+    }
+    render();
+    return true;
+  }
+
+  function syncEnabled(value) {
+    if (!routingReady || degraded || typeof value !== "boolean") return false;
+    enabled = value;
+    if (!enabled) markedCurrentTurn = false;
+    render();
+    return true;
+  }
+
   function render() {
     if (!button) return;
     button.setAttribute("aria-pressed", String(enabled));
+    button.disabled = !routingReady || degraded;
     button.setAttribute("data-state", degraded ? "degraded" : enabled ? "enabled" : "off");
     let label = "Codex Assistant · Smart Routing · Off";
     if (degraded) label = "Codex Assistant · Degraded";
+    else if (!routingReady) label = "Codex Assistant · Preflight required";
     else if (enabled) {
       label = `Codex Assistant · Enabled · ${bootstrap.routeKey}`;
       if (activity) label += ` · ${activityLabel(activity)}`;

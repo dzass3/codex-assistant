@@ -177,6 +177,7 @@ fn monitor_projection_is_metadata_only_and_coordinator_reaches_eligible() {
         .expect("reconcile");
     assert_eq!(outcome.phase, PreflightPhase::Eligible);
     assert_eq!(outcome.child_thread_id, Some(child));
+    assert!(coordinator.is_complete());
     let eligibility = coordinator
         .eligibility_record(&direct, 200)
         .expect("scoped eligibility record");
@@ -208,6 +209,73 @@ fn monitor_projection_is_metadata_only_and_coordinator_reaches_eligible() {
         )
         .expect("terminal outcome is stable");
     assert_eq!(still_eligible.phase, PreflightPhase::Eligible);
+}
+
+#[test]
+fn direct_check_ignores_same_model_children_from_a_different_depth_and_parent() {
+    let root = Uuid::new_v4();
+    let terra_parent = Uuid::new_v4();
+    let nested_spark = Uuid::new_v4();
+    let direct_spark = Uuid::new_v4();
+    let mut direct = key(RouteKind::Direct, 1);
+    direct.requested_model = "gpt-5.3-codex-spark".into();
+    let mut coordinator = PreflightCoordinator::new();
+    coordinator
+        .begin(direct.clone(), root, root, 100, 1_000)
+        .unwrap();
+    coordinator.mark_visible_command_submitted(&direct).unwrap();
+    let monitor = snapshot(vec![
+        agent(
+            root,
+            None,
+            None,
+            Some("gpt-5.6-sol"),
+            AgentStatus::Idle,
+            0,
+            1,
+        ),
+        agent(
+            terra_parent,
+            Some(root),
+            Some("gpt-5.6-terra"),
+            Some("gpt-5.6-terra"),
+            AgentStatus::Idle,
+            1,
+            105,
+        ),
+        agent(
+            nested_spark,
+            Some(terra_parent),
+            Some("gpt-5.3-codex-spark"),
+            Some("gpt-5.3-codex-spark"),
+            AgentStatus::Idle,
+            2,
+            110,
+        ),
+        agent(
+            direct_spark,
+            Some(root),
+            Some("gpt-5.3-codex-spark"),
+            Some("gpt-5.3-codex-spark"),
+            AgentStatus::Idle,
+            1,
+            120,
+        ),
+    ]);
+
+    let outcome = coordinator
+        .reconcile_monitor(
+            &direct,
+            &monitor,
+            CODEX_VERSION,
+            PROFILE_VERSION,
+            200,
+            PreflightSignal::None,
+        )
+        .unwrap();
+
+    assert_eq!(outcome.phase, PreflightPhase::Eligible);
+    assert_eq!(outcome.child_thread_id, Some(direct_spark));
 }
 
 #[test]
