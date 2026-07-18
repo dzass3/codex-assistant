@@ -28,6 +28,18 @@ fn nsis_instruction(instruction: &str) -> bool {
         .any(|line| line == instruction)
 }
 
+fn nsis_macro_instructions(macro_name: &str) -> Vec<&'static str> {
+    let header = format!("!macro {macro_name}");
+    NSIS_HOOK
+        .lines()
+        .map(str::trim)
+        .skip_while(|line| *line != header)
+        .skip(1)
+        .take_while(|line| *line != "!macroend")
+        .filter(|line| !line.is_empty() && !line.starts_with(';'))
+        .collect()
+}
+
 #[test]
 fn locks_the_codex_assistant_product_identity() {
     let tauri = json(TAURI_CONF, "tauri.conf.json");
@@ -97,20 +109,52 @@ fn locks_the_codex_assistant_product_identity() {
     assert!(nsis_instruction(
         "!define LEGACY_PRODUCT_NAME \"Codex Agent Monitor\""
     ));
+    assert!(nsis_instruction("!define LEGACY_VERSION \"0.4.0\""));
+
+    let preinstall = nsis_macro_instructions("NSIS_HOOK_PREINSTALL");
+    let postinstall = nsis_macro_instructions("NSIS_HOOK_POSTINSTALL");
     assert!(nsis_instruction(
         "ReadRegStr $R0 HKCU \"${LEGACY_UNINST_KEY}\" \"DisplayName\""
     ));
     assert!(nsis_instruction(
         "ReadRegStr $R3 HKCU \"${LEGACY_UNINST_KEY}\" \"MainBinaryName\""
     ));
-    assert!(nsis_instruction("ExecWait '$R2 /S /UPDATE _?=$R4' $0"));
-    assert!(nsis_instruction("Delete \"$R4\\uninstall.exe\""));
-    assert!(nsis_instruction(
-        "!insertmacro IsShortcutTarget \"$SMPROGRAMS\\${LEGACY_PRODUCT_NAME}.lnk\" \"$R4\\${LEGACY_MAIN_BINARY}\""
+    assert!(preinstall.contains(&"ReadRegStr $R6 HKCU \"${LEGACY_UNINST_KEY}\" \"DisplayVersion\""));
+    assert!(preinstall.contains(&"StrCmp $R6 \"${LEGACY_VERSION}\" 0 legacy_pre_done"));
+    assert!(preinstall
+        .contains(&"CopyFiles /SILENT \"$R4\\uninstall.exe\" \"$R4\\${LEGACY_UNINSTALL_BACKUP}\""));
+    assert!(preinstall.contains(
+        &"WriteRegStr HKCU \"${LEGACY_UNINST_KEY}\" \"UninstallString\" \"$\\\"$R4\\${LEGACY_UNINSTALL_BACKUP}$\\\"\""
     ));
-    assert!(nsis_instruction(
-        "!insertmacro IsShortcutTarget \"$DESKTOP\\${LEGACY_PRODUCT_NAME}.lnk\" \"$R4\\${LEGACY_MAIN_BINARY}\""
+    assert!(!preinstall.iter().any(|line| line.starts_with("ExecWait ")));
+    assert!(!preinstall
+        .iter()
+        .any(|line| line == &"Delete \"$R4\\${LEGACY_MAIN_BINARY}\""));
+    assert!(!preinstall
+        .iter()
+        .any(|line| line == &"DeleteRegKey HKCU \"${LEGACY_UNINST_KEY}\""));
+
+    assert!(postinstall.contains(
+        &"!insertmacro IsShortcutTarget \"$SMPROGRAMS\\${LEGACY_PRODUCT_NAME}.lnk\" \"$R4\\${LEGACY_MAIN_BINARY}\""
     ));
-    assert!(nsis_instruction("StrCpy $INSTDIR \"$R4\""));
-    assert!(nsis_instruction("SetOutPath \"$INSTDIR\""));
+    assert!(postinstall.contains(
+        &"!insertmacro IsShortcutTarget \"$DESKTOP\\${LEGACY_PRODUCT_NAME}.lnk\" \"$R4\\${LEGACY_MAIN_BINARY}\""
+    ));
+    assert!(postinstall.contains(&"Delete \"$R4\\${LEGACY_MAIN_BINARY}\""));
+    assert!(postinstall.contains(
+        &"System::Call 'kernel32::GetFileAttributesW(w \"$R4\\${MAINBINARYNAME}.exe\") i .r7'"
+    ));
+    assert!(postinstall.contains(&"Delete \"$R4\\${LEGACY_UNINSTALL_BACKUP}\""));
+    assert!(postinstall.contains(&"DeleteRegKey HKCU \"${LEGACY_UNINST_KEY}\""));
+    let current_version_guard = postinstall
+        .iter()
+        .position(|line| line == &"StrCmp $1 \"${VERSION}\" 0 legacy_post_rollback")
+        .expect("missing current-version POSTINSTALL guard");
+    let legacy_delete = postinstall
+        .iter()
+        .position(|line| line == &"Delete \"$R4\\${LEGACY_MAIN_BINARY}\"")
+        .expect("missing legacy executable cleanup");
+    assert!(current_version_guard < legacy_delete);
+    assert!(preinstall.contains(&"StrCpy $INSTDIR \"$R4\""));
+    assert!(preinstall.contains(&"SetOutPath \"$INSTDIR\""));
 }
