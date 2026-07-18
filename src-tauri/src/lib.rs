@@ -1,6 +1,7 @@
 pub mod codex_config;
 pub mod monitor;
 pub mod routing;
+pub mod routing_mcp;
 
 use std::sync::Arc;
 

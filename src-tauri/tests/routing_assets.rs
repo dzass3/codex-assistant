@@ -46,6 +46,8 @@ fn routing_skill_requires_native_eligibility_quality_gates_and_metadata_privacy(
     assert!(LUNA.contains("must not delegate"));
     assert!(TERRA.contains("one lower-tier native child"));
     assert!(POLICY.contains("Requested/effective-model drift is unavailable"));
+    assert!(POLICY.contains("high-risk or complex code-changing work"));
+    assert!(!POLICY.contains("code changes require an independent reviewer"));
     assert!(!SKILL.contains("routing-mcp --"));
 }
 

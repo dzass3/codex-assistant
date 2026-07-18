@@ -73,6 +73,14 @@ pub enum RoutePhase {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+pub enum QualityOutcome {
+    Passed,
+    Failed,
+    Degraded,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum RouteAction {
     KeepInParent,
     Delegate,
@@ -102,6 +110,17 @@ pub enum RouteReasonCode {
     NestedChildLimitReached,
     EscalationLimitReached,
     ReviewerRecursionForbidden,
+    NestedDelegationForbidden,
+    PreviousAttemptStillActive,
+    UnknownRoute,
+    ParentLineageMismatch,
+    ChildAlreadyRecorded,
+    UnknownChild,
+    TerminalChildReactivation,
+    EligibilityUnavailable,
+    QualityAlreadyRecorded,
+    EscalationCountMismatch,
+    RetryLimitReached,
     StatePersistenceFailed,
 }
 
@@ -165,12 +184,26 @@ pub struct RouteActivity {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct QualityRecord {
+    pub route_key: Uuid,
+    pub child_thread_id: Uuid,
+    pub outcome: QualityOutcome,
+    pub reviewer_tier: Option<ModelTier>,
+    pub retry_count: u8,
+    pub escalation_count: u8,
+    pub recorded_at_ms: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RoutingStateEnvelope {
     pub schema_version: u32,
     pub profile_version: String,
     pub routes: Vec<RootRouteState>,
     pub eligibility: Vec<EligibilityRecord>,
     pub activity: Vec<RouteActivity>,
+    #[serde(default)]
+    pub quality: Vec<QualityRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,6 +213,7 @@ pub struct RoutingSnapshot {
     pub routes: Vec<RootRouteState>,
     pub eligibility: Vec<EligibilityRecord>,
     pub activity: Vec<RouteActivity>,
+    pub quality: Vec<QualityRecord>,
 }
 
 impl RoutingStateEnvelope {
@@ -190,6 +224,7 @@ impl RoutingStateEnvelope {
             routes: Vec::new(),
             eligibility: Vec::new(),
             activity: Vec::new(),
+            quality: Vec::new(),
         }
     }
 
@@ -200,6 +235,7 @@ impl RoutingStateEnvelope {
             routes: self.routes.clone(),
             eligibility: self.eligibility.clone(),
             activity: self.activity.clone(),
+            quality: self.quality.clone(),
         }
     }
 }

@@ -3,7 +3,7 @@ use std::{fs, sync::Arc, thread};
 use codex_assistant_lib::routing::{
     state::{RoutingRuntime, RoutingStateStore, STATE_SCHEMA_VERSION},
     EligibilityRecord, EligibilityStatus, ModelTier, RootRouteState, RouteActivity, RouteKind,
-    RoutePhase, RoutingStateEnvelope,
+    RoutePhase, RouteReasonCode, RoutingStateEnvelope,
 };
 use tempfile::tempdir;
 use uuid::Uuid;
@@ -45,6 +45,7 @@ fn representative_state() -> RoutingStateEnvelope {
             started_at_ms: 2,
             updated_at_ms: 3,
         }],
+        quality: Vec::new(),
     }
 }
 
@@ -268,6 +269,9 @@ fn state_requires_exact_profile_and_verified_parent_lineage() {
         parent_thread_id: nested.activity[0].child_thread_id,
         subtask_id: Uuid::new_v4(),
         route_kind: RouteKind::Nested,
+        selected_tier: ModelTier::Luna,
+        requested_tier: Some(ModelTier::Luna),
+        effective_tier: Some(ModelTier::Luna),
         started_at_ms: 4,
         updated_at_ms: 4,
         ..nested.activity[0].clone()
@@ -285,10 +289,88 @@ fn state_requires_exact_profile_and_verified_parent_lineage() {
 }
 
 #[test]
+fn nested_work_requires_a_terra_parent_and_a_lower_tier_child() {
+    let base = representative_state();
+
+    let directory = tempdir().expect("non-Terra parent directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store.clone()).expect("runtime");
+    let mut luna_parent = base.clone();
+    luna_parent.activity[0].selected_tier = ModelTier::Luna;
+    luna_parent.activity[0].requested_tier = Some(ModelTier::Luna);
+    luna_parent.activity[0].effective_tier = Some(ModelTier::Luna);
+    runtime
+        .replace(luna_parent.clone())
+        .expect("valid direct parent");
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            subtask_id: Uuid::new_v4(),
+            route_kind: RouteKind::Nested,
+            parent_thread_id: luna_parent.activity[0].child_thread_id,
+            selected_tier: ModelTier::Spark,
+            requested_tier: Some(ModelTier::Spark),
+            effective_tier: Some(ModelTier::Spark),
+            ..luna_parent.activity[0].clone()
+        }),
+        Err(RouteReasonCode::NestedDelegationForbidden)
+    );
+
+    let directory = tempdir().expect("non-lower child directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store).expect("runtime");
+    runtime.replace(base.clone()).expect("valid Terra parent");
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            subtask_id: Uuid::new_v4(),
+            route_kind: RouteKind::Nested,
+            parent_thread_id: base.activity[0].child_thread_id,
+            selected_tier: ModelTier::Terra,
+            requested_tier: Some(ModelTier::Terra),
+            effective_tier: Some(ModelTier::Terra),
+            ..base.activity[0].clone()
+        }),
+        Err(RouteReasonCode::NestedDelegationForbidden)
+    );
+}
+
+#[test]
+fn a_subtask_cannot_start_a_replacement_while_its_previous_attempt_is_active() {
+    let state = representative_state();
+    let base = state.activity[0].clone();
+    let directory = tempdir().expect("state directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store.clone()).expect("runtime");
+    runtime.replace(state).expect("seed state");
+
+    assert_eq!(
+        runtime.try_start_activity(RouteActivity {
+            child_thread_id: Uuid::new_v4(),
+            ..base.clone()
+        }),
+        Err(RouteReasonCode::PreviousAttemptStillActive)
+    );
+
+    let mut tampered = representative_state();
+    let tampered_base = tampered.activity[0].clone();
+    tampered.activity.push(RouteActivity {
+        child_thread_id: Uuid::new_v4(),
+        escalation_count: 1,
+        ..tampered_base
+    });
+    assert!(
+        store.save(&tampered).is_err(),
+        "persisted state cannot bypass the sequential-attempt invariant"
+    );
+}
+
+#[test]
 fn state_requires_contiguous_implementation_escalations() {
     let directory = tempdir().expect("directory");
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
     let mut state = representative_state();
+    state.activity[0].phase = RoutePhase::Completed;
     let base = state.activity[0].clone();
     for escalation_count in [1, 2] {
         state.activity.push(RouteActivity {
@@ -357,6 +439,9 @@ fn runtime_derives_precise_budget_reason_codes_from_locked_state() {
             subtask_id: Uuid::new_v4(),
             route_kind: RouteKind::Nested,
             parent_thread_id: base.child_thread_id,
+            selected_tier: ModelTier::Luna,
+            requested_tier: Some(ModelTier::Luna),
+            effective_tier: Some(ModelTier::Luna),
             ..base.clone()
         })
         .expect("first nested child");
@@ -366,6 +451,9 @@ fn runtime_derives_precise_budget_reason_codes_from_locked_state() {
             subtask_id: Uuid::new_v4(),
             route_kind: RouteKind::Nested,
             parent_thread_id: base.child_thread_id,
+            selected_tier: ModelTier::Luna,
+            requested_tier: Some(ModelTier::Luna),
+            effective_tier: Some(ModelTier::Luna),
             ..base.clone()
         }),
         Err(codex_assistant_lib::routing::RouteReasonCode::NestedChildLimitReached)

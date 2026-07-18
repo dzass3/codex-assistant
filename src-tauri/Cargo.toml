@@ -28,12 +28,13 @@ time = "=0.3.44"
 # ICU 2.0 builds its locale display helpers with `writeable` allocation support.
 writeable = { version = "=0.6.2", features = ["alloc"] }
 chrono = "0.4"
-tokio = { version = "1", features = ["rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "io-util", "io-std", "macros"] }
 dirs = "6"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tauri-plugin-single-instance = "2"
 toml_edit = "=0.22.27"
 sha2 = "=0.10.9"
+fs2 = "=0.4.3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.59.0", features = [

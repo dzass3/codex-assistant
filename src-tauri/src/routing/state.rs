@@ -9,8 +9,8 @@ use std::{
 use uuid::Uuid;
 
 use super::{
-    EligibilityRecord, RootRouteState, RouteActivity, RouteKind, RoutePhase, RouteReasonCode,
-    RoutingSnapshot, RoutingStateEnvelope,
+    EligibilityRecord, QualityOutcome, QualityRecord, RootRouteState, RouteActivity, RouteKind,
+    RoutePhase, RouteReasonCode, RoutingSnapshot, RoutingStateEnvelope,
 };
 
 pub const STATE_SCHEMA_VERSION: u32 = 1;
@@ -39,6 +39,10 @@ impl RoutingStateStore {
             .join(SETTINGS_DIRECTORY)
             .join("routing");
         Self::in_directory(directory)
+    }
+
+    pub fn directory(&self) -> &Path {
+        &self.directory
     }
 
     pub fn load(&self) -> Result<RoutingStateEnvelope, String> {
@@ -157,22 +161,40 @@ impl RoutingRuntime {
             .routes
             .iter()
             .find(|route| route.route_key == activity.route_key)
-            .ok_or(RouteReasonCode::StatePersistenceFailed)?;
+            .ok_or(RouteReasonCode::UnknownRoute)?;
+        if let Some(existing) = state
+            .activity
+            .iter()
+            .find(|entry| entry.child_thread_id == activity.child_thread_id)
+        {
+            return Err(
+                if matches!(existing.phase, RoutePhase::Completed | RoutePhase::Degraded) {
+                    RouteReasonCode::TerminalChildReactivation
+                } else {
+                    RouteReasonCode::ChildAlreadyRecorded
+                },
+            );
+        }
         if activity.route_kind == RouteKind::Direct {
             if activity.parent_thread_id != route.conversation_id {
-                return Err(RouteReasonCode::StatePersistenceFailed);
+                return Err(RouteReasonCode::ParentLineageMismatch);
             }
         } else {
             let parent = state
                 .activity
                 .iter()
                 .find(|entry| entry.child_thread_id == activity.parent_thread_id)
-                .ok_or(RouteReasonCode::StatePersistenceFailed)?;
+                .ok_or(RouteReasonCode::ParentLineageMismatch)?;
             if parent.route_key != activity.route_key || parent.route_kind != RouteKind::Direct {
-                return Err(RouteReasonCode::StatePersistenceFailed);
+                return Err(RouteReasonCode::ParentLineageMismatch);
             }
             if parent.is_reviewer {
                 return Err(RouteReasonCode::ReviewerRecursionForbidden);
+            }
+            if parent.selected_tier != super::ModelTier::Terra
+                || activity.selected_tier >= super::ModelTier::Terra
+            {
+                return Err(RouteReasonCode::NestedDelegationForbidden);
             }
         }
         let active = state
@@ -199,6 +221,9 @@ impl RoutingRuntime {
                     && !entry.is_reviewer
             })
             .collect::<Vec<_>>();
+        if !activity.is_reviewer && attempts.iter().any(|entry| is_active(entry.phase)) {
+            return Err(RouteReasonCode::PreviousAttemptStillActive);
+        }
         let current_escalation = attempts.iter().map(|entry| entry.escalation_count).max();
         if activity.is_reviewer {
             activity.escalation_count =
@@ -212,6 +237,59 @@ impl RoutingRuntime {
         }
         let mut next = state.clone();
         next.activity.push(activity);
+        validate_envelope(&next).map_err(|_| RouteReasonCode::StatePersistenceFailed)?;
+        self.store
+            .save(&next)
+            .map_err(|_| RouteReasonCode::StatePersistenceFailed)?;
+        *state = next;
+        Ok(())
+    }
+
+    pub fn record_quality(&self, record: QualityRecord) -> Result<(), RouteReasonCode> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if !state
+            .routes
+            .iter()
+            .any(|route| route.route_key == record.route_key)
+        {
+            return Err(RouteReasonCode::UnknownRoute);
+        }
+        if record.retry_count > 2 {
+            return Err(RouteReasonCode::RetryLimitReached);
+        }
+        if state
+            .quality
+            .iter()
+            .any(|quality| quality.child_thread_id == record.child_thread_id)
+        {
+            return Err(RouteReasonCode::QualityAlreadyRecorded);
+        }
+        let position = state
+            .activity
+            .iter()
+            .position(|activity| activity.child_thread_id == record.child_thread_id)
+            .ok_or(RouteReasonCode::UnknownChild)?;
+        let activity = &state.activity[position];
+        if activity.route_key != record.route_key {
+            return Err(RouteReasonCode::ParentLineageMismatch);
+        }
+        if activity.escalation_count != record.escalation_count {
+            return Err(RouteReasonCode::EscalationCountMismatch);
+        }
+        if matches!(activity.phase, RoutePhase::Completed | RoutePhase::Degraded) {
+            return Err(RouteReasonCode::TerminalChildReactivation);
+        }
+        let mut next = state.clone();
+        let activity = &mut next.activity[position];
+        activity.phase = match record.outcome {
+            QualityOutcome::Passed => RoutePhase::Completed,
+            QualityOutcome::Failed | QualityOutcome::Degraded => RoutePhase::Degraded,
+        };
+        activity.updated_at_ms = record.recorded_at_ms;
+        next.quality.push(record);
         validate_envelope(&next).map_err(|_| RouteReasonCode::StatePersistenceFailed)?;
         self.store
             .save(&next)
@@ -248,6 +326,30 @@ fn validate_envelope(state: &RoutingStateEnvelope) -> Result<(), String> {
             return Err("Routing state is invalid".to_owned());
         }
     }
+    let mut quality_children = HashSet::new();
+    for quality in &state.quality {
+        valid_quality(quality)?;
+        if !quality_children.insert(quality.child_thread_id) {
+            return Err("Routing state is invalid".to_owned());
+        }
+        let activity = activities
+            .get(&quality.child_thread_id)
+            .ok_or_else(|| "Routing state is invalid".to_owned())?;
+        if activity.route_key != quality.route_key
+            || activity.escalation_count != quality.escalation_count
+            || activity.updated_at_ms != quality.recorded_at_ms
+            || !matches!(
+                (quality.outcome, activity.phase),
+                (QualityOutcome::Passed, RoutePhase::Completed)
+                    | (
+                        QualityOutcome::Failed | QualityOutcome::Degraded,
+                        RoutePhase::Degraded
+                    )
+            )
+        {
+            return Err("Routing state is invalid".to_owned());
+        }
+    }
     for activity in &state.activity {
         let route = routes
             .get(&activity.route_key)
@@ -263,6 +365,8 @@ fn validate_envelope(state: &RoutingStateEnvelope) -> Result<(), String> {
                 if parent.route_key != activity.route_key
                     || parent.route_kind != RouteKind::Direct
                     || parent.is_reviewer
+                    || parent.selected_tier != super::ModelTier::Terra
+                    || activity.selected_tier >= super::ModelTier::Terra
                 {
                     return Err("Routing state is invalid".to_owned());
                 }
@@ -323,6 +427,17 @@ fn valid_activity(
     Ok(())
 }
 
+fn valid_quality(quality: &QualityRecord) -> Result<(), String> {
+    valid_uuid(quality.route_key)?;
+    valid_uuid(quality.child_thread_id)?;
+    valid_timestamp(quality.recorded_at_ms)?;
+    if quality.retry_count > 2 || quality.escalation_count > 2 {
+        Err("Routing state is invalid".to_owned())
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_escalations(state: &RoutingStateEnvelope) -> Result<(), String> {
     let mut implementations: HashMap<(Uuid, Uuid), Vec<&RouteActivity>> = HashMap::new();
     let mut reviewers: HashMap<(Uuid, Uuid), Vec<&RouteActivity>> = HashMap::new();
@@ -342,6 +457,17 @@ fn validate_escalations(state: &RoutingStateEnvelope) -> Result<(), String> {
         if attempts.len() > 3
             || counts.len() != attempts.len()
             || !(0..attempts.len() as u8).all(|count| counts.contains(&count))
+        {
+            return Err("Routing state is invalid".to_owned());
+        }
+        let active_attempts = attempts
+            .iter()
+            .filter(|activity| is_active(activity.phase))
+            .collect::<Vec<_>>();
+        if active_attempts.len() > 1
+            || active_attempts.first().is_some_and(|activity| {
+                Some(activity.escalation_count) != counts.iter().copied().max()
+            })
         {
             return Err("Routing state is invalid".to_owned());
         }

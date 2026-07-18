@@ -41,6 +41,7 @@ const snapshot = {
       updated_at_ms: 3,
     },
   ],
+  quality: [],
 };
 
 describe("routing snapshot boundary", () => {
@@ -49,21 +50,79 @@ describe("routing snapshot boundary", () => {
   });
 
   it("keeps a historical reviewer attached to the implementation attempt it reviewed", () => {
+    const initial = { ...snapshot.activity[0], phase: "completed" };
     const escalated = {
-      ...snapshot.activity[0],
+      ...initial,
       child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab3",
       escalation_count: 1,
-      phase: "completed",
     };
     const reviewer = {
-      ...snapshot.activity[0],
+      ...initial,
       child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab4",
       is_reviewer: true,
       escalation_count: 0,
-      phase: "completed",
     };
-    const value = { ...snapshot, activity: [...snapshot.activity, escalated, reviewer] };
+    const value = { ...snapshot, activity: [initial, escalated, reviewer] };
     expect(toRoutingSnapshot(value)).toEqual(value);
+  });
+
+  it("accepts only Terra-parented lower-tier nested work", () => {
+    const nested = {
+      ...snapshot.activity[0],
+      child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab6",
+      subtask_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab7",
+      route_kind: "nested",
+      parent_thread_id: snapshot.activity[0].child_thread_id,
+      selected_tier: "luna",
+      requested_tier: "luna",
+      effective_tier: "luna",
+    };
+    const value = { ...snapshot, activity: [...snapshot.activity, nested] };
+    expect(toRoutingSnapshot(value)).toEqual(value);
+    expect(
+      toRoutingSnapshot({
+        ...value,
+        activity: [{ ...snapshot.activity[0], selected_tier: "luna" }, nested],
+      }),
+    ).toBeNull();
+    expect(
+      toRoutingSnapshot({
+        ...value,
+        activity: [...snapshot.activity, { ...nested, selected_tier: "terra" }],
+      }),
+    ).toBeNull();
+  });
+
+  it("accepts quality metadata only when it matches the terminal child exactly", () => {
+    const completed = { ...snapshot.activity[0], phase: "completed", updated_at_ms: 4 };
+    const quality = {
+      route_key: completed.route_key,
+      child_thread_id: completed.child_thread_id,
+      outcome: "passed",
+      reviewer_tier: "sol",
+      retry_count: 0,
+      escalation_count: 0,
+      recorded_at_ms: 4,
+    };
+    const value = { ...snapshot, activity: [completed], quality: [quality] };
+    expect(toRoutingSnapshot(value)).toEqual(value);
+    expect(
+      toRoutingSnapshot({
+        ...value,
+        quality: [{ ...quality, recorded_at_ms: 5 }],
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects overlapping attempts for one logical subtask", () => {
+    const replacement = {
+      ...snapshot.activity[0],
+      child_thread_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab8",
+      escalation_count: 1,
+    };
+    expect(
+      toRoutingSnapshot({ ...snapshot, activity: [...snapshot.activity, replacement] }),
+    ).toBeNull();
   });
 
   it.each([

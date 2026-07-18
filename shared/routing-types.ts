@@ -1,6 +1,7 @@
 export type ModelTier = "spark" | "luna" | "terra" | "sol";
 export type RouteKind = "direct" | "nested";
 export type EligibilityStatus = "unknown" | "verifying" | "eligible" | "unavailable" | "stale";
+export type QualityOutcome = "passed" | "failed" | "degraded";
 export type RoutePhase =
   | "off"
   | "enabled"
@@ -25,6 +26,17 @@ export type RouteReasonCode =
   | "nested-child-limit-reached"
   | "escalation-limit-reached"
   | "reviewer-recursion-forbidden"
+  | "nested-delegation-forbidden"
+  | "previous-attempt-still-active"
+  | "unknown-route"
+  | "parent-lineage-mismatch"
+  | "child-already-recorded"
+  | "unknown-child"
+  | "terminal-child-reactivation"
+  | "eligibility-unavailable"
+  | "quality-already-recorded"
+  | "escalation-count-mismatch"
+  | "retry-limit-reached"
   | "state-persistence-failed";
 
 export interface RootRouteSnapshot {
@@ -61,10 +73,21 @@ export interface RouteActivitySnapshot {
   updated_at_ms: number;
 }
 
+export interface QualitySnapshot {
+  route_key: string;
+  child_thread_id: string;
+  outcome: QualityOutcome;
+  reviewer_tier: ModelTier | null;
+  retry_count: number;
+  escalation_count: number;
+  recorded_at_ms: number;
+}
+
 export interface RoutingSnapshot {
   schema_version: number;
   profile_version: string;
   routes: RootRouteSnapshot[];
   eligibility: EligibilitySnapshot[];
   activity: RouteActivitySnapshot[];
+  quality: QualitySnapshot[];
 }

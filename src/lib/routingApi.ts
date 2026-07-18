@@ -2,6 +2,8 @@ import type {
   EligibilitySnapshot,
   EligibilityStatus,
   ModelTier,
+  QualityOutcome,
+  QualitySnapshot,
   RootRouteSnapshot,
   RouteActivitySnapshot,
   RouteKind,
@@ -31,6 +33,7 @@ const PHASES = new Set<RoutePhase>([
   "completed",
   "degraded",
 ]);
+const QUALITY_OUTCOMES = new Set<QualityOutcome>(["passed", "failed", "degraded"]);
 const REASONS = new Set<RouteReasonCode>([
   "mechanical-work",
   "bounded-work",
@@ -47,6 +50,17 @@ const REASONS = new Set<RouteReasonCode>([
   "nested-child-limit-reached",
   "escalation-limit-reached",
   "reviewer-recursion-forbidden",
+  "nested-delegation-forbidden",
+  "previous-attempt-still-active",
+  "unknown-route",
+  "parent-lineage-mismatch",
+  "child-already-recorded",
+  "unknown-child",
+  "terminal-child-reactivation",
+  "eligibility-unavailable",
+  "quality-already-recorded",
+  "escalation-count-mismatch",
+  "retry-limit-reached",
   "state-persistence-failed",
 ]);
 
@@ -239,6 +253,54 @@ function activity(value: unknown): RouteActivitySnapshot | null {
   };
 }
 
+function quality(value: unknown): QualitySnapshot | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, [
+      "route_key",
+      "child_thread_id",
+      "outcome",
+      "reviewer_tier",
+      "retry_count",
+      "escalation_count",
+      "recorded_at_ms",
+    ])
+  ) {
+    return null;
+  }
+  const routeKey = uuid(raw.route_key);
+  const childThreadId = uuid(raw.child_thread_id);
+  const outcome = string(raw.outcome);
+  const reviewerTier = raw.reviewer_tier === null ? null : string(raw.reviewer_tier);
+  const retryCount = integer(raw.retry_count);
+  const escalationCount = integer(raw.escalation_count);
+  const recordedAtMs = integer(raw.recorded_at_ms);
+  if (
+    routeKey === null ||
+    childThreadId === null ||
+    outcome === null ||
+    !QUALITY_OUTCOMES.has(outcome as QualityOutcome) ||
+    (reviewerTier !== null && !TIERS.has(reviewerTier as ModelTier)) ||
+    retryCount === null ||
+    retryCount > 2 ||
+    escalationCount === null ||
+    escalationCount > 2 ||
+    recordedAtMs === null
+  ) {
+    return null;
+  }
+  return {
+    route_key: routeKey,
+    child_thread_id: childThreadId,
+    outcome: outcome as QualityOutcome,
+    reviewer_tier: reviewerTier as ModelTier | null,
+    retry_count: retryCount,
+    escalation_count: escalationCount,
+    recorded_at_ms: recordedAtMs,
+  };
+}
+
 function parsedArray<T>(value: unknown, parser: (entry: unknown) => T | null): T[] | null {
   if (!Array.isArray(value)) return null;
   const parsed = value.map(parser);
@@ -249,7 +311,14 @@ export function toRoutingSnapshot(value: unknown): RoutingSnapshot | null {
   const raw = record(value);
   if (
     raw === null ||
-    !exactKeys(raw, ["schema_version", "profile_version", "routes", "eligibility", "activity"])
+    !exactKeys(raw, [
+      "schema_version",
+      "profile_version",
+      "routes",
+      "eligibility",
+      "activity",
+      "quality",
+    ])
   ) {
     return null;
   }
@@ -258,12 +327,14 @@ export function toRoutingSnapshot(value: unknown): RoutingSnapshot | null {
   const routes = parsedArray(raw.routes, route);
   const eligibilityRecords = parsedArray(raw.eligibility, eligibility);
   const activityRecords = parsedArray(raw.activity, activity);
+  const qualityRecords = parsedArray(raw.quality, quality);
   if (
     schemaVersion !== 1 ||
     profileVersion === null ||
     routes === null ||
     eligibilityRecords === null ||
-    activityRecords === null
+    activityRecords === null ||
+    qualityRecords === null
   ) {
     return null;
   }
@@ -273,6 +344,7 @@ export function toRoutingSnapshot(value: unknown): RoutingSnapshot | null {
     routes,
     eligibility: eligibilityRecords,
     activity: activityRecords,
+    quality: qualityRecords,
   };
   return validRelationships(snapshot) ? snapshot : null;
 }
@@ -307,7 +379,9 @@ function validRelationships(snapshot: RoutingSnapshot): boolean {
         !parent ||
         parent.route_key !== activityRecord.route_key ||
         parent.route_kind !== "direct" ||
-        parent.is_reviewer
+        parent.is_reviewer ||
+        parent.selected_tier !== "terra" ||
+        (activityRecord.selected_tier !== "spark" && activityRecord.selected_tier !== "luna")
       ) {
         return false;
       }
@@ -340,11 +414,41 @@ function validRelationships(snapshot: RoutingSnapshot): boolean {
       .map((attempt) => attempt.escalation_count)
       .toSorted((left, right) => left - right);
     if (counts.length > 3 || counts.some((count, index) => count !== index)) return false;
+    const activeAttempts = attempts.filter(
+      (attempt) =>
+        attempt.phase === "classifying" ||
+        attempt.phase === "implementing" ||
+        attempt.phase === "reviewing",
+    );
+    if (
+      activeAttempts.length > 1 ||
+      (activeAttempts.length === 1 &&
+        activeAttempts[0].escalation_count !== counts[counts.length - 1])
+    ) {
+      return false;
+    }
     const reviewers = snapshot.activity.filter(
       (reviewRecord) =>
         reviewRecord.is_reviewer && `${reviewRecord.route_key}:${reviewRecord.subtask_id}` === key,
     );
     if (reviewers.some((reviewer) => !counts.includes(reviewer.escalation_count))) return false;
+  }
+  const qualityChildren = new Set<string>();
+  for (const qualityRecord of snapshot.quality) {
+    if (qualityChildren.has(qualityRecord.child_thread_id)) return false;
+    qualityChildren.add(qualityRecord.child_thread_id);
+    const child = children.get(qualityRecord.child_thread_id);
+    if (
+      !child ||
+      child.route_key !== qualityRecord.route_key ||
+      child.escalation_count !== qualityRecord.escalation_count ||
+      child.updated_at_ms !== qualityRecord.recorded_at_ms ||
+      (qualityRecord.outcome === "passed"
+        ? child.phase !== "completed"
+        : child.phase !== "degraded")
+    ) {
+      return false;
+    }
   }
   return snapshot.activity
     .filter((reviewRecord) => reviewRecord.is_reviewer)
