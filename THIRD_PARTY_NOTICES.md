@@ -2,7 +2,7 @@
 
 ## Codex Trace
 
-Codex Agent Monitor is based on the Tauri application foundation from
+Codex Assistant is based on the Tauri application foundation from
 [PixelPaw-Labs/codex-trace](https://github.com/PixelPaw-Labs/codex-trace), base
 commit `4b00fad14dd41dd35238ba1f5cd03b34d4cc1c74`.
 

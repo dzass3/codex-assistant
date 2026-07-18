@@ -1,5 +1,5 @@
 [default]
-description = "Allow the sanitized Codex Agent Monitor command surface"
+description = "Allow the sanitized Codex Assistant command surface"
 permissions = [
   "allow-get-monitor-snapshot",
   "allow-refresh-monitor",

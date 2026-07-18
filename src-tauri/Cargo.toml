@@ -38,3 +38,4 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3"
+toml = "0.8"
