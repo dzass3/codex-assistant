@@ -1,5 +1,6 @@
 pub mod codex_config;
 pub mod monitor;
+pub mod preflight;
 pub mod routing;
 pub mod routing_mcp;
 

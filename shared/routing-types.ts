@@ -1,6 +1,21 @@
 export type ModelTier = "spark" | "luna" | "terra" | "sol";
 export type RouteKind = "direct" | "nested";
 export type EligibilityStatus = "unknown" | "verifying" | "eligible" | "unavailable" | "stale";
+export type EligibilityReasonCode =
+  | "awaiting-visible-command"
+  | "awaiting-native-child"
+  | "awaiting-effective-model"
+  | "child-still-running"
+  | "effective-model-mismatch"
+  | "native-profile-rejected"
+  | "lineage-ambiguous"
+  | "detached-process"
+  | "unrelated-root"
+  | "missing-parent"
+  | "parent-not-verified-terra"
+  | "timeout"
+  | "host-version-changed"
+  | "profile-version-changed";
 export type QualityOutcome = "passed" | "failed" | "degraded";
 export type RoutePhase =
   | "off"
@@ -54,6 +69,10 @@ export interface EligibilitySnapshot {
   status: EligibilityStatus;
   checked_at_ms: number;
   profile_version: string;
+  codex_package_version: string;
+  requested_model: string;
+  depth: number;
+  reason: EligibilityReasonCode | null;
 }
 
 export interface RouteActivitySnapshot {

@@ -10,7 +10,28 @@ pub enum ModelTier {
     Sol,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+impl ModelTier {
+    pub const fn model_id(self) -> &'static str {
+        match self {
+            Self::Spark => "gpt-5.3-codex-spark",
+            Self::Luna => "gpt-5.6-luna",
+            Self::Terra => "gpt-5.6-terra",
+            Self::Sol => "gpt-5.6-sol",
+        }
+    }
+
+    pub fn from_model_id(value: &str) -> Option<Self> {
+        match value {
+            "gpt-5.3-codex-spark" => Some(Self::Spark),
+            "gpt-5.6-luna" => Some(Self::Luna),
+            "gpt-5.6-terra" => Some(Self::Terra),
+            "gpt-5.6-sol" => Some(Self::Sol),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RouteKind {
     Direct,
@@ -57,6 +78,25 @@ pub enum EligibilityStatus {
     Eligible,
     Unavailable,
     Stale,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EligibilityReasonCode {
+    AwaitingVisibleCommand,
+    AwaitingNativeChild,
+    AwaitingEffectiveModel,
+    ChildStillRunning,
+    EffectiveModelMismatch,
+    NativeProfileRejected,
+    LineageAmbiguous,
+    DetachedProcess,
+    UnrelatedRoot,
+    MissingParent,
+    ParentNotVerifiedTerra,
+    Timeout,
+    HostVersionChanged,
+    ProfileVersionChanged,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -161,6 +201,14 @@ pub struct EligibilityRecord {
     pub status: EligibilityStatus,
     pub checked_at_ms: i64,
     pub profile_version: String,
+    #[serde(default)]
+    pub codex_package_version: String,
+    #[serde(default)]
+    pub requested_model: String,
+    #[serde(default)]
+    pub depth: u8,
+    #[serde(default)]
+    pub reason: Option<EligibilityReasonCode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -21,6 +21,10 @@ const snapshot = {
       status: "eligible",
       checked_at_ms: 2,
       profile_version: "routing-v1",
+      codex_package_version: "1.2.3",
+      requested_model: "gpt-5.6-terra",
+      depth: 1,
+      reason: null,
     },
   ],
   activity: [
@@ -125,6 +129,15 @@ describe("routing snapshot boundary", () => {
     ).toBeNull();
   });
 
+  it("rejects duplicate version-scoped eligibility keys", () => {
+    expect(
+      toRoutingSnapshot({
+        ...snapshot,
+        eligibility: [...snapshot.eligibility, { ...snapshot.eligibility[0] }],
+      }),
+    ).toBeNull();
+  });
+
   it.each([
     (() => {
       const missingSchemaVersion: Record<string, unknown> = { ...snapshot };
@@ -133,6 +146,17 @@ describe("routing snapshot boundary", () => {
     })(),
     { ...snapshot, routes: [{ ...snapshot.routes[0], phase: "mystery" }] },
     { ...snapshot, eligibility: [{ ...snapshot.eligibility[0], status: "mystery" }] },
+    {
+      ...snapshot,
+      eligibility: [{ ...snapshot.eligibility[0], requested_model: "gpt-5.6-luna" }],
+    },
+    { ...snapshot, eligibility: [{ ...snapshot.eligibility[0], depth: 2 }] },
+    {
+      ...snapshot,
+      eligibility: [
+        { ...snapshot.eligibility[0], status: "eligible", reason: "host-version-changed" },
+      ],
+    },
     { ...snapshot, routes: [{ ...snapshot.routes[0], route_key: "not-a-uuid" }] },
     {
       ...snapshot,

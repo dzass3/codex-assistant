@@ -1,17 +1,17 @@
 use std::{
-    fs::{File, OpenOptions},
     path::Path,
-    thread,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use fs2::FileExt;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
 use crate::routing::{
     policy::decide_route,
-    state::{protect_owned_path, RoutingRuntime, RoutingStateStore, MAX_JS_SAFE_INTEGER},
+    state::{
+        RoutingRuntime, RoutingStateFileLock, RoutingStateLockError, RoutingStateStore,
+        MAX_JS_SAFE_INTEGER,
+    },
     ComplexityBand, EligibilityStatus, ModelTier, QualityOutcome, QualityRecord, RiskBand,
     RouteAction, RouteActivity, RouteKind, RoutePhase, RoutePolicyInput, RouteReasonCode,
     UserOverride,
@@ -127,7 +127,7 @@ fn quality_record(
     };
     let retry_count = bounded_counter(arguments, "retry_count")?;
     let escalation_count = bounded_counter(arguments, "escalation_count")?;
-    let _lock = StateFileLock::acquire(state_directory)?;
+    let _lock = RoutingStateFileLock::acquire(state_directory).map_err(lock_error)?;
     let store = RoutingStateStore::in_directory(state_directory)
         .map_err(|_| CallError::Tool("state-unavailable"))?;
     let runtime = RoutingRuntime::load(store).map_err(|_| CallError::Tool("state-unavailable"))?;
@@ -188,7 +188,7 @@ fn route_started(
         .filter(|reasons| !reasons.is_empty())
         .ok_or(CallError::InvalidParams)?;
 
-    let _lock = StateFileLock::acquire(state_directory)?;
+    let _lock = RoutingStateFileLock::acquire(state_directory).map_err(lock_error)?;
     let store = RoutingStateStore::in_directory(state_directory)
         .map_err(|_| CallError::Tool("state-unavailable"))?;
     let state = store
@@ -416,46 +416,11 @@ fn reason_code(reason: RouteReasonCode) -> &'static str {
     }
 }
 
-struct StateFileLock {
-    file: File,
-}
-
-impl StateFileLock {
-    fn acquire(state_directory: &Path) -> Result<Self, CallError> {
-        std::fs::create_dir_all(state_directory)
-            .map_err(|_| CallError::Tool("state-unavailable"))?;
-        let path = state_directory.join("routing-mcp.lock");
-        let file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&path)
-            .map_err(|_| CallError::Tool("state-unavailable"))?;
-        protect_owned_path(&path).map_err(|_| CallError::Tool("state-unavailable"))?;
-        let deadline = Instant::now() + Duration::from_millis(500);
-        loop {
-            match file.try_lock_exclusive() {
-                Ok(()) => return Ok(Self { file }),
-                Err(error)
-                    if error.kind() == std::io::ErrorKind::WouldBlock
-                        || matches!(error.raw_os_error(), Some(32 | 33)) =>
-                {
-                    if Instant::now() >= deadline {
-                        return Err(CallError::Tool("state-lock-timeout"));
-                    }
-                    thread::sleep(Duration::from_millis(10));
-                }
-                Err(_) => return Err(CallError::Tool("state-unavailable")),
-            }
-        }
-    }
-}
-
-impl Drop for StateFileLock {
-    fn drop(&mut self) {
-        let _ = FileExt::unlock(&self.file);
-    }
+fn lock_error(error: RoutingStateLockError) -> CallError {
+    CallError::Tool(match error {
+        RoutingStateLockError::Timeout => "state-lock-timeout",
+        RoutingStateLockError::Unavailable => "state-unavailable",
+    })
 }
 
 fn tool_success(metadata: Value) -> Value {

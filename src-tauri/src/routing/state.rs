@@ -1,16 +1,20 @@
 use std::{
     collections::{HashMap, HashSet},
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     sync::Mutex,
+    thread,
+    time::{Duration, Instant},
 };
 
+use fs2::FileExt;
 use uuid::Uuid;
 
 use super::{
-    EligibilityRecord, QualityOutcome, QualityRecord, RootRouteState, RouteActivity, RouteKind,
-    RoutePhase, RouteReasonCode, RoutingSnapshot, RoutingStateEnvelope,
+    EligibilityReasonCode, EligibilityRecord, EligibilityStatus, QualityOutcome, QualityRecord,
+    RootRouteState, RouteActivity, RouteKind, RoutePhase, RouteReasonCode, RoutingSnapshot,
+    RoutingStateEnvelope,
 };
 
 pub const STATE_SCHEMA_VERSION: u32 = 1;
@@ -59,7 +63,8 @@ impl RoutingStateStore {
             }
             Err(_) => return Err("Routing state could not be read".to_owned()),
         };
-        match serde_json::from_slice::<RoutingStateEnvelope>(&bytes).and_then(|state| {
+        match serde_json::from_slice::<RoutingStateEnvelope>(&bytes).and_then(|mut state| {
+            migrate_legacy_eligibility(&mut state);
             validate_envelope(&state).map_err(|error| {
                 serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
             })?;
@@ -147,6 +152,48 @@ impl RoutingRuntime {
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.store.save(&next)?;
+        *state = next;
+        Ok(())
+    }
+
+    pub fn upsert_eligibility(&self, record: EligibilityRecord) -> Result<(), String> {
+        valid_eligibility(&record)?;
+        let _file_lock = RoutingStateFileLock::acquire(self.store.directory())
+            .map_err(|_| "Routing state lock is unavailable".to_owned())?;
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut next = self.store.load()?;
+        for existing in &mut next.eligibility {
+            if existing.tier == record.tier
+                && existing.route_kind == record.route_kind
+                && existing.depth == record.depth
+                && (existing.codex_package_version != record.codex_package_version
+                    || existing.profile_version != record.profile_version)
+            {
+                existing.status = EligibilityStatus::Stale;
+                existing.reason = Some(if existing.profile_version != record.profile_version {
+                    EligibilityReasonCode::ProfileVersionChanged
+                } else {
+                    EligibilityReasonCode::HostVersionChanged
+                });
+            }
+        }
+        let exact = next.eligibility.iter().position(|existing| {
+            existing.codex_package_version == record.codex_package_version
+                && existing.profile_version == record.profile_version
+                && existing.requested_model == record.requested_model
+                && existing.route_kind == record.route_kind
+                && existing.depth == record.depth
+        });
+        if let Some(position) = exact {
+            next.eligibility[position] = record;
+        } else {
+            next.eligibility.push(record);
+        }
+        validate_envelope(&next)?;
         self.store.save(&next)?;
         *state = next;
         Ok(())
@@ -299,6 +346,53 @@ impl RoutingRuntime {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoutingStateLockError {
+    Timeout,
+    Unavailable,
+}
+
+pub struct RoutingStateFileLock {
+    file: File,
+}
+
+impl RoutingStateFileLock {
+    pub fn acquire(state_directory: &Path) -> Result<Self, RoutingStateLockError> {
+        fs::create_dir_all(state_directory).map_err(|_| RoutingStateLockError::Unavailable)?;
+        let path = state_directory.join("routing-mcp.lock");
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|_| RoutingStateLockError::Unavailable)?;
+        protect_owned_path(&path).map_err(|_| RoutingStateLockError::Unavailable)?;
+        let deadline = Instant::now() + Duration::from_millis(500);
+        loop {
+            match file.try_lock_exclusive() {
+                Ok(()) => return Ok(Self { file }),
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::WouldBlock
+                        || matches!(error.raw_os_error(), Some(32 | 33)) =>
+                {
+                    if Instant::now() >= deadline {
+                        return Err(RoutingStateLockError::Timeout);
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(_) => return Err(RoutingStateLockError::Unavailable),
+            }
+        }
+    }
+}
+
+impl Drop for RoutingStateFileLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
 fn validate_envelope(state: &RoutingStateEnvelope) -> Result<(), String> {
     if state.schema_version != STATE_SCHEMA_VERSION || !valid_profile(&state.profile_version) {
         return Err("Routing state is invalid".to_owned());
@@ -313,8 +407,18 @@ fn validate_envelope(state: &RoutingStateEnvelope) -> Result<(), String> {
             return Err("Routing state is invalid".to_owned());
         }
     }
+    let mut eligibility_keys = HashSet::new();
     for eligibility in &state.eligibility {
         valid_eligibility(eligibility)?;
+        if !eligibility_keys.insert((
+            eligibility.codex_package_version.clone(),
+            eligibility.profile_version.clone(),
+            eligibility.requested_model.clone(),
+            eligibility.route_kind,
+            eligibility.depth,
+        )) {
+            return Err("Routing state is invalid".to_owned());
+        }
     }
     let mut activities = HashMap::new();
     for activity in &state.activity {
@@ -401,11 +505,66 @@ fn valid_route(route: &RootRouteState) -> Result<(), String> {
 
 fn valid_eligibility(eligibility: &EligibilityRecord) -> Result<(), String> {
     valid_timestamp(eligibility.checked_at_ms)?;
-    if valid_profile(&eligibility.profile_version) {
+    let expected_depth = match eligibility.route_kind {
+        RouteKind::Direct => 1,
+        RouteKind::Nested => 2,
+    };
+    let status_reason_valid = match eligibility.status {
+        EligibilityStatus::Unknown | EligibilityStatus::Eligible => eligibility.reason.is_none(),
+        EligibilityStatus::Verifying => matches!(
+            eligibility.reason,
+            Some(
+                EligibilityReasonCode::AwaitingVisibleCommand
+                    | EligibilityReasonCode::AwaitingNativeChild
+                    | EligibilityReasonCode::AwaitingEffectiveModel
+                    | EligibilityReasonCode::ChildStillRunning
+            )
+        ),
+        EligibilityStatus::Unavailable => eligibility.reason.is_some(),
+        EligibilityStatus::Stale => matches!(
+            eligibility.reason,
+            Some(
+                EligibilityReasonCode::HostVersionChanged
+                    | EligibilityReasonCode::ProfileVersionChanged
+            )
+        ),
+    };
+    if valid_profile(&eligibility.profile_version)
+        && safe_host_version(&eligibility.codex_package_version)
+        && eligibility.requested_model == eligibility.tier.model_id()
+        && eligibility.depth == expected_depth
+        && status_reason_valid
+    {
         Ok(())
     } else {
         Err("Routing state is invalid".to_owned())
     }
+}
+
+fn migrate_legacy_eligibility(state: &mut RoutingStateEnvelope) {
+    for eligibility in &mut state.eligibility {
+        if eligibility.codex_package_version.is_empty()
+            || eligibility.requested_model.is_empty()
+            || eligibility.depth == 0
+        {
+            eligibility.codex_package_version = "legacy-unverified".to_owned();
+            eligibility.requested_model = eligibility.tier.model_id().to_owned();
+            eligibility.depth = match eligibility.route_kind {
+                RouteKind::Direct => 1,
+                RouteKind::Nested => 2,
+            };
+            eligibility.status = EligibilityStatus::Stale;
+            eligibility.reason = Some(EligibilityReasonCode::HostVersionChanged);
+        }
+    }
+}
+
+fn safe_host_version(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 32
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '+')
+        })
 }
 
 fn valid_activity(

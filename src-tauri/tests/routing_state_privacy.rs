@@ -2,8 +2,8 @@ use std::{fs, sync::Arc, thread};
 
 use codex_assistant_lib::routing::{
     state::{RoutingRuntime, RoutingStateStore, STATE_SCHEMA_VERSION},
-    EligibilityRecord, EligibilityStatus, ModelTier, RootRouteState, RouteActivity, RouteKind,
-    RoutePhase, RouteReasonCode, RoutingStateEnvelope,
+    EligibilityReasonCode, EligibilityRecord, EligibilityStatus, ModelTier, RootRouteState,
+    RouteActivity, RouteKind, RoutePhase, RouteReasonCode, RoutingStateEnvelope,
 };
 use tempfile::tempdir;
 use uuid::Uuid;
@@ -28,6 +28,10 @@ fn representative_state() -> RoutingStateEnvelope {
             status: EligibilityStatus::Eligible,
             checked_at_ms: 2,
             profile_version: "routing-v1".to_owned(),
+            codex_package_version: "1.2.3".to_owned(),
+            requested_model: ModelTier::Terra.model_id().to_owned(),
+            depth: 1,
+            reason: None,
         }],
         activity: vec![RouteActivity {
             route_key,
@@ -54,7 +58,12 @@ fn state_rejects_all_content_and_unknown_fields_at_every_level() {
     let directory = tempdir().expect("directory");
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
     let mut state = serde_json::to_value(representative_state()).expect("state JSON");
-    let slots = ["/profile_version", "/eligibility/0/profile_version"];
+    let slots = [
+        "/profile_version",
+        "/eligibility/0/profile_version",
+        "/eligibility/0/codex_package_version",
+        "/eligibility/0/requested_model",
+    ];
     for slot in slots {
         let mut candidate = state.clone();
         *candidate.pointer_mut(slot).expect("string slot") =
@@ -110,6 +119,131 @@ fn persisted_state_is_metadata_only_and_snapshot_is_sanitized() {
         snapshot.activity[0].child_thread_id,
         state.activity[0].child_thread_id
     );
+}
+
+#[test]
+fn eligibility_proofs_are_exact_versioned_keys_and_legacy_records_become_stale() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let mut state = representative_state();
+    state.eligibility[0].requested_model = ModelTier::Luna.model_id().to_owned();
+    assert!(
+        store.save(&state).is_err(),
+        "tier/model drift is never eligible"
+    );
+
+    let mut duplicate = representative_state();
+    duplicate.eligibility.push(duplicate.eligibility[0].clone());
+    assert!(
+        store.save(&duplicate).is_err(),
+        "eligibility keys are unique"
+    );
+
+    let mut missing_reason = representative_state();
+    missing_reason.eligibility[0].status = EligibilityStatus::Verifying;
+    assert!(store.save(&missing_reason).is_err());
+
+    let legacy = serde_json::json!({
+        "schema_version": 1,
+        "profile_version": "routing-v1",
+        "routes": [],
+        "eligibility": [{
+            "tier": "luna",
+            "route_kind": "direct",
+            "status": "eligible",
+            "checked_at_ms": 1,
+            "profile_version": "routing-v1"
+        }],
+        "activity": [],
+        "quality": []
+    });
+    std::fs::write(
+        directory.path().join("routing-state.json"),
+        serde_json::to_vec(&legacy).unwrap(),
+    )
+    .unwrap();
+    let loaded = store.load().expect("legacy state migrates in memory");
+    assert_eq!(loaded.eligibility[0].status, EligibilityStatus::Stale);
+    assert_eq!(
+        loaded.eligibility[0].reason,
+        Some(EligibilityReasonCode::HostVersionChanged)
+    );
+    assert_eq!(
+        loaded.eligibility[0].requested_model,
+        ModelTier::Luna.model_id()
+    );
+    assert_eq!(loaded.eligibility[0].depth, 1);
+}
+
+#[test]
+fn runtime_upserts_scoped_eligibility_and_stales_the_previous_host_version() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let runtime = RoutingRuntime::load(store).expect("runtime");
+    runtime.replace(representative_state()).expect("seed state");
+    let mut next = runtime.snapshot().eligibility[0].clone();
+    next.codex_package_version = "1.2.4".into();
+    next.status = EligibilityStatus::Verifying;
+    next.reason = Some(EligibilityReasonCode::AwaitingNativeChild);
+
+    runtime
+        .upsert_eligibility(next.clone())
+        .expect("new host scope");
+    let scoped = runtime.snapshot();
+    assert_eq!(scoped.eligibility.len(), 2);
+    assert_eq!(scoped.eligibility[0].status, EligibilityStatus::Stale);
+    assert_eq!(
+        scoped.eligibility[0].reason,
+        Some(EligibilityReasonCode::HostVersionChanged)
+    );
+    assert_eq!(scoped.eligibility[1], next);
+
+    next.status = EligibilityStatus::Eligible;
+    next.reason = None;
+    runtime
+        .upsert_eligibility(next.clone())
+        .expect("replace exact key");
+    let scoped = runtime.snapshot();
+    assert_eq!(scoped.eligibility.len(), 2);
+    assert_eq!(scoped.eligibility[1], next);
+}
+
+#[test]
+fn stale_runtime_instances_reload_before_upserting_eligibility() {
+    let directory = tempdir().expect("directory");
+    let store = RoutingStateStore::in_directory(directory.path()).expect("store");
+    let first = RoutingRuntime::load(store.clone()).expect("first runtime");
+    let second = RoutingRuntime::load(store.clone()).expect("second runtime");
+    let luna = EligibilityRecord {
+        tier: ModelTier::Luna,
+        route_kind: RouteKind::Direct,
+        status: EligibilityStatus::Eligible,
+        checked_at_ms: 1,
+        profile_version: "routing-v1".into(),
+        codex_package_version: "1.2.3".into(),
+        requested_model: ModelTier::Luna.model_id().into(),
+        depth: 1,
+        reason: None,
+    };
+    let terra = EligibilityRecord {
+        tier: ModelTier::Terra,
+        requested_model: ModelTier::Terra.model_id().into(),
+        ..luna.clone()
+    };
+
+    first.upsert_eligibility(luna).expect("first upsert");
+    second.upsert_eligibility(terra).expect("second upsert");
+
+    let persisted = store.load().expect("persisted state");
+    assert_eq!(persisted.eligibility.len(), 2);
+    assert!(persisted
+        .eligibility
+        .iter()
+        .any(|record| record.tier == ModelTier::Luna));
+    assert!(persisted
+        .eligibility
+        .iter()
+        .any(|record| record.tier == ModelTier::Terra));
 }
 
 #[test]

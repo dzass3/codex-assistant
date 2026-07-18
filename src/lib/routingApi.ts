@@ -1,5 +1,6 @@
 import type {
   EligibilitySnapshot,
+  EligibilityReasonCode,
   EligibilityStatus,
   ModelTier,
   QualityOutcome,
@@ -23,6 +24,22 @@ const ELIGIBILITY = new Set<EligibilityStatus>([
   "eligible",
   "unavailable",
   "stale",
+]);
+const ELIGIBILITY_REASONS = new Set<EligibilityReasonCode>([
+  "awaiting-visible-command",
+  "awaiting-native-child",
+  "awaiting-effective-model",
+  "child-still-running",
+  "effective-model-mismatch",
+  "native-profile-rejected",
+  "lineage-ambiguous",
+  "detached-process",
+  "unrelated-root",
+  "missing-parent",
+  "parent-not-verified-terra",
+  "timeout",
+  "host-version-changed",
+  "profile-version-changed",
 ]);
 const PHASES = new Set<RoutePhase>([
   "off",
@@ -87,6 +104,11 @@ function version(value: unknown): string | null {
   return candidate === PROFILE_VERSION ? candidate : null;
 }
 
+function hostVersion(value: unknown): string | null {
+  const parsed = string(value);
+  return parsed !== null && /^[A-Za-z0-9.+-]{1,32}$/.test(parsed) ? parsed : null;
+}
+
 function uuid(value: unknown): string | null {
   const candidate = string(value);
   return candidate !== null &&
@@ -145,7 +167,17 @@ function eligibility(value: unknown): EligibilitySnapshot | null {
   const raw = record(value);
   if (
     raw === null ||
-    !exactKeys(raw, ["tier", "route_kind", "status", "checked_at_ms", "profile_version"])
+    !exactKeys(raw, [
+      "tier",
+      "route_kind",
+      "status",
+      "checked_at_ms",
+      "profile_version",
+      "codex_package_version",
+      "requested_model",
+      "depth",
+      "reason",
+    ])
   ) {
     return null;
   }
@@ -154,12 +186,23 @@ function eligibility(value: unknown): EligibilitySnapshot | null {
   const status = string(raw.status);
   const checkedAtMs = integer(raw.checked_at_ms);
   const profileVersion = version(raw.profile_version);
+  const codexPackageVersion = hostVersion(raw.codex_package_version);
+  const requestedModel = string(raw.requested_model);
+  const depth = integer(raw.depth);
+  const reason = raw.reason === null ? null : string(raw.reason);
   if (
     tier === null ||
     routeKind === null ||
     status === null ||
     checkedAtMs === null ||
     profileVersion === null ||
+    codexPackageVersion === null ||
+    requestedModel === null ||
+    requestedModel !== modelForTier(tier as ModelTier) ||
+    depth === null ||
+    depth !== (routeKind === "direct" ? 1 : 2) ||
+    (reason !== null && !ELIGIBILITY_REASONS.has(reason as EligibilityReasonCode)) ||
+    !validEligibilityReason(status as EligibilityStatus, reason as EligibilityReasonCode | null) ||
     !TIERS.has(tier as ModelTier) ||
     !KINDS.has(routeKind as RouteKind) ||
     !ELIGIBILITY.has(status as EligibilityStatus)
@@ -172,7 +215,39 @@ function eligibility(value: unknown): EligibilitySnapshot | null {
     status: status as EligibilityStatus,
     checked_at_ms: checkedAtMs,
     profile_version: profileVersion,
+    codex_package_version: codexPackageVersion,
+    requested_model: requestedModel,
+    depth,
+    reason: reason as EligibilityReasonCode | null,
   };
+}
+
+function modelForTier(tier: ModelTier): string {
+  return {
+    spark: "gpt-5.3-codex-spark",
+    luna: "gpt-5.6-luna",
+    terra: "gpt-5.6-terra",
+    sol: "gpt-5.6-sol",
+  }[tier];
+}
+
+function validEligibilityReason(
+  status: EligibilityStatus,
+  reason: EligibilityReasonCode | null,
+): boolean {
+  if (status === "unknown" || status === "eligible") return reason === null;
+  if (status === "verifying") {
+    return (
+      reason === "awaiting-visible-command" ||
+      reason === "awaiting-native-child" ||
+      reason === "awaiting-effective-model" ||
+      reason === "child-still-running"
+    );
+  }
+  if (status === "stale") {
+    return reason === "host-version-changed" || reason === "profile-version-changed";
+  }
+  return reason !== null;
 }
 
 function activity(value: unknown): RouteActivitySnapshot | null {
@@ -350,6 +425,18 @@ export function toRoutingSnapshot(value: unknown): RoutingSnapshot | null {
 }
 
 function validRelationships(snapshot: RoutingSnapshot): boolean {
+  const eligibilityKeys = new Set<string>();
+  for (const eligibilityRecord of snapshot.eligibility) {
+    const key = [
+      eligibilityRecord.codex_package_version,
+      eligibilityRecord.profile_version,
+      eligibilityRecord.requested_model,
+      eligibilityRecord.route_kind,
+      eligibilityRecord.depth,
+    ].join(":");
+    if (eligibilityKeys.has(key)) return false;
+    eligibilityKeys.add(key);
+  }
   const routes = new Map<string, RootRouteSnapshot>();
   const conversations = new Set<string>();
   for (const rootRecord of snapshot.routes) {

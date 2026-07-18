@@ -335,6 +335,10 @@ async fn policy_get_returns_only_sanitized_metadata_without_mutating_state() {
         status: EligibilityStatus::Eligible,
         checked_at_ms: 1,
         profile_version: "routing-v1".into(),
+        codex_package_version: "1.2.3".into(),
+        requested_model: ModelTier::Luna.model_id().into(),
+        depth: 1,
+        reason: None,
     });
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
     store.save(&state).expect("state");
@@ -412,6 +416,10 @@ async fn route_started_persists_valid_metadata_and_rejects_bad_lineage_or_enums(
         status: EligibilityStatus::Eligible,
         checked_at_ms: 1,
         profile_version: "routing-v1".into(),
+        codex_package_version: "1.2.3".into(),
+        requested_model: ModelTier::Luna.model_id().into(),
+        depth: 1,
+        reason: None,
     });
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
     store.save(&state).expect("state");
@@ -493,6 +501,10 @@ async fn route_started_rejects_profiles_below_the_classified_quality_floor() {
             status: EligibilityStatus::Eligible,
             checked_at_ms: 1,
             profile_version: "routing-v1".into(),
+            codex_package_version: "1.2.3".into(),
+            requested_model: tier.model_id().into(),
+            depth: 1,
+            reason: None,
         });
     }
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
@@ -596,6 +608,10 @@ async fn concurrent_sidecars_serialize_state_updates_and_enforce_the_active_chil
         status: EligibilityStatus::Eligible,
         checked_at_ms: 1,
         profile_version: "routing-v1".into(),
+        codex_package_version: "1.2.3".into(),
+        requested_model: ModelTier::Luna.model_id().into(),
+        depth: 1,
+        reason: None,
     });
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
     store.save(&state).expect("state");
@@ -668,6 +684,10 @@ async fn quality_record_completes_the_child_once_and_persists_bounded_metadata()
         status: EligibilityStatus::Eligible,
         checked_at_ms: 1,
         profile_version: "routing-v1".into(),
+        codex_package_version: "1.2.3".into(),
+        requested_model: ModelTier::Luna.model_id().into(),
+        depth: 1,
+        reason: None,
     });
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
     store.save(&state).expect("state");
@@ -760,6 +780,10 @@ async fn one_opaque_subtask_can_escalate_twice_but_never_start_a_fourth_attempt(
             status: EligibilityStatus::Eligible,
             checked_at_ms: 1,
             profile_version: "routing-v1".into(),
+            codex_package_version: "1.2.3".into(),
+            requested_model: tier.model_id().into(),
+            depth: 1,
+            reason: None,
         });
     }
     let store = RoutingStateStore::in_directory(directory.path()).expect("store");
