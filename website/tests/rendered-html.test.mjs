@@ -35,10 +35,11 @@ test("server-renders the complete Codex Assistant public showcase", async () => 
 });
 
 test("removes starter metadata and keeps public/native capability boundaries explicit", async () => {
-  const [page, layout, productDemo, packageJson] = await Promise.all([
+  const [page, layout, productDemo, homepageMotion, packageJson] = await Promise.all([
     readFile(new URL("app/page.tsx", siteRoot), "utf8"),
     readFile(new URL("app/layout.tsx", siteRoot), "utf8"),
     readFile(new URL("app/ProductDemo.tsx", siteRoot), "utf8"),
+    readFile(new URL("app/HomepageMotion.tsx", siteRoot), "utf8"),
     readFile(new URL("package.json", siteRoot), "utf8"),
   ]);
 
@@ -49,7 +50,11 @@ test("removes starter metadata and keeps public/native capability boundaries exp
   assert.match(productDemo, /仅展示脱敏示例数据/);
   assert.match(productDemo, /控制本机 Codex 需要 Windows 桌面版/);
   assert.match(page, /\/downloads\/Codex-Assistant-0\.5\.0-x64-setup\.exe/);
+  assert.match(page, /\/images\/observatory-hero\.webp/);
+  assert.match(homepageMotion, /IntersectionObserver/);
+  assert.match(homepageMotion, /prefers-reduced-motion/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("public/downloads/Codex-Assistant-0.5.0-x64-setup.exe", siteRoot));
+  await access(new URL("public/images/observatory-hero.webp", siteRoot));
   await assert.rejects(access(new URL("app/_sites-preview", siteRoot)));
 });

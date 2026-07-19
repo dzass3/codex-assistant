@@ -14,7 +14,7 @@ const tabs: Array<{ id: DemoTab; label: string }> = [
 export function ProductDemo() {
   const [active, setActive] = useState<DemoTab>("agents");
   return (
-    <div className="product-window">
+    <div className="product-window" data-tilt="window" data-spotlight data-reveal>
       <div className="window-bar">
         <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
         <strong>Codex Assistant</strong>
@@ -62,7 +62,7 @@ export function ProductDemo() {
         <div className="panel-heading"><div><small>RIGHTS-AUDITED THEMES</small><h3>声明式一键换肤</h3></div><span>只分发原创素材</span></div>
         <div className="theme-grid">
           <article className="demo-theme aurora-theme"><div className="theme-art"><span>AURORA GRID</span></div><div><small>原创抽象</small><h4>Aurora Grid</h4><p>深海极光与克制的玻璃表面。</p><span className="rights-pill">版权已核验</span></div></article>
-          <article className="demo-theme muse-theme"><div className="theme-art"><Image src="/themes/observatory-muse.jpg" alt="Observatory Muse 原创角色主题" fill sizes="(max-width: 650px) 100vw, 30vw" /></div><div><small>原创角色</small><h4>Observatory Muse</h4><p>安静的紫色未来观测站。</p><span className="rights-pill">版权已核验</span></div></article>
+          <article className="demo-theme muse-theme"><div className="theme-art"><Image src="/themes/observatory-muse.jpg" alt="Observatory Muse 原创角色主题" fill unoptimized sizes="(max-width: 650px) 100vw, 30vw" /></div><div><small>原创角色</small><h4>Observatory Muse</h4><p>安静的紫色未来观测站。</p><span className="rights-pill">版权已核验</span></div></article>
         </div>
       </section>
       <div className="native-note">控制本机 Codex 需要 Windows 桌面版</div>
@@ -71,7 +71,7 @@ export function ProductDemo() {
 }
 
 function AgentRow({ depth, name, role, requested, effective, status }: { depth: number; name: string; role: string; requested: string; effective: string; status: string }) {
-  return <div className="agent-row" style={{ "--depth": depth } as React.CSSProperties}><span className="tree-mark" aria-hidden="true" /><div><strong>{name}</strong><small>{role}</small></div><div className="model-stack"><small>REQUESTED</small><span>{requested}</span></div><div className="model-stack"><small>EFFECTIVE</small><span>{effective}</span></div><b>{status}</b></div>;
+  return <div className={`agent-row agent-row--depth-${depth}`}><span className="tree-mark" aria-hidden="true" /><div><strong>{name}</strong><small>{role}</small></div><div className="model-stack"><small>REQUESTED</small><span>{requested}</span></div><div className="model-stack"><small>EFFECTIVE</small><span>{effective}</span></div><b>{status}</b></div>;
 }
 
 function RouteRow({ task, model, floor, tone }: { task: string; model: string; floor: string; tone: string }) {
