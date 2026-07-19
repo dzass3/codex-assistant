@@ -30,6 +30,10 @@ test("server-renders the complete Codex Assistant public showcase", async () => 
   assert.match(html, /主题管理/);
   assert.match(html, /Observatory Muse/);
   assert.match(html, /版权已核验/);
+  assert.match(html, /12 个主题/);
+  assert.match(html, /票据化受控强制重启/);
+  assert.match(html, /Noir Stage/);
+  assert.match(html, /一套清单，桌面端与网站同步/);
   assert.match(html, /Windows 桌面版/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
@@ -49,11 +53,15 @@ test("removes starter metadata and keeps public/native capability boundaries exp
   assert.match(productDemo, /aria-selected/);
   assert.match(productDemo, /仅展示脱敏示例数据/);
   assert.match(productDemo, /控制本机 Codex 需要 Windows 桌面版/);
-  assert.match(page, /\/downloads\/Codex-Assistant-0\.5\.0-x64-setup\.exe/);
+  assert.match(page, /\/downloads\/Codex-Assistant-0\.6\.0-x64-setup\.exe/);
+  assert.match(page, /40,466,919 bytes/);
+  assert.match(page, /c2c0e9ae4559/);
+  assert.match(page, /shared\/theme-catalog\.json/);
   assert.match(page, /\/images\/observatory-hero\.webp/);
   assert.match(homepageMotion, /IntersectionObserver/);
   assert.match(homepageMotion, /prefers-reduced-motion/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  await access(new URL("public/downloads/Codex-Assistant-0.6.0-x64-setup.exe", siteRoot));
   await access(new URL("public/downloads/Codex-Assistant-0.5.0-x64-setup.exe", siteRoot));
   await access(new URL("public/images/observatory-hero.webp", siteRoot));
   await assert.rejects(access(new URL("app/_sites-preview", siteRoot)));

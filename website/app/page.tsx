@@ -1,6 +1,8 @@
 import Image from "next/image";
+import type { CSSProperties } from "react";
 import { HomepageMotion } from "./HomepageMotion";
 import { ProductDemo } from "./ProductDemo";
+import themeCatalog from "../../shared/theme-catalog.json";
 
 export default function Home() {
   return (
@@ -72,7 +74,7 @@ export default function Home() {
           <div data-spotlight><strong>元数据限定</strong><span>隐私边界</span></div>
           <div data-spotlight><strong><span data-count-to="2">2</span> 层</strong><span>原生子代理深度</span></div>
           <div data-spotlight><strong><span data-count-to="4">4</span> 个模型层级</strong><span>质量优先路由</span></div>
-          <div data-spotlight><strong><span data-count-to="1">1</span> 次点击</strong><span>版权核验主题</span></div>
+          <div data-spotlight><strong>12 个主题</strong><span>原创且版权核验</span></div>
         </section>
       </div>
 
@@ -105,6 +107,28 @@ export default function Home() {
         </article>
       </section>
 
+      <section className="theme-library" aria-labelledby="theme-library-title" data-reveal>
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">ONE MANIFEST · {themeCatalog.themes.length} RIGHTS-REVIEWED THEMES</span>
+            <h2 id="theme-library-title">一套清单，桌面端与网站同步。</h2>
+          </div>
+          <p>全部主题均为项目原创或已完成商业再分发人工复核；不远程加载脚本、人物 IP 或仓库截图。</p>
+        </div>
+        <div className="theme-library-grid">
+          {themeCatalog.themes.map((theme) => (
+            <article key={theme.id} style={{ "--theme-accent": theme.palette.accent } as CSSProperties}>
+              <i aria-hidden="true" />
+              <div>
+                <strong>{theme.name}</strong>
+                <span>{theme.id}</span>
+              </div>
+              <b>已核验</b>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="desktop-boundary" id="desktop">
         <div data-reveal>
           <span className="eyebrow">NATIVE BY DESIGN</span>
@@ -119,18 +143,18 @@ export default function Home() {
           <strong>Codex Assistant Desktop</strong>
           <ul>
             <li>原生子代理面板内持续路由</li>
-            <li>安全重启与可恢复配置</li>
-            <li>版权已核验的一键主题</li>
+            <li>安全重启与票据化受控强制重启</li>
+            <li>12 个版权已核验的一键主题</li>
           </ul>
           <a
             className="download-action"
             data-spotlight
-            href="/downloads/Codex-Assistant-0.5.0-x64-setup.exe"
+            href="/downloads/Codex-Assistant-0.6.0-x64-setup.exe"
             download
           >
-            下载 Windows 安装包 <span>2.75 MiB</span>
+            下载 Windows 安装包 <span>38.59 MiB</span>
           </a>
-          <p>SHA-256 · f76c2aaf093a…11c724e</p>
+          <p>0.6.0 · 40,466,919 bytes · SHA-256 · c2c0e9ae4559…da23910</p>
         </div>
       </section>
 
