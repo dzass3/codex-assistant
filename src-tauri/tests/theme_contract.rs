@@ -1,6 +1,6 @@
 use codex_assistant_lib::theme::{
     apply_theme_on_pages, bundled_theme_packs, theme_application_source, theme_restore_source,
-    validate_theme_pack, RightsStatus, ThemeBackdrop, ThemeCategory,
+    validate_theme_pack, RightsStatus, ThemeBackdrop, ThemeCategory, ThemeEngineError,
 };
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
@@ -171,7 +171,7 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
 
         let (stream, _) = listener.accept().await.unwrap();
         let mut socket = accept_async(stream).await.unwrap();
-        for index in 0..3 {
+        for index in 0..4 {
             let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
             let call: serde_json::Value = serde_json::from_str(&call).unwrap();
             match index {
@@ -183,8 +183,26 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
                         .unwrap()
                         .contains("data-codex-assistant-theme"));
                 }
+                2 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    socket
+                        .send(Message::Text(
+                            format!(
+                                r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                                call["id"]
+                            )
+                            .into(),
+                        ))
+                        .await
+                        .unwrap();
+                    continue;
+                }
                 _ => {
                     assert_eq!(call["method"], "Runtime.evaluate");
+                    assert!(call["params"]["expression"]
+                        .as_str()
+                        .unwrap()
+                        .contains("getComputedStyle"));
                     socket
                         .send(Message::Text(
                             format!(
@@ -220,5 +238,208 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
     assert_eq!(result.scripts.len(), 1);
     assert_eq!(result.scripts[0].target_id, "page-1");
     assert_eq!(result.scripts[0].identifier, "theme-script-1");
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn incompatible_utility_page_does_not_block_main_task_theme() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let endpoint = codex_assistant_lib::control_layer::cdp::browser_endpoint(
+        port,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/browser/7d47a800-c734-4f9a-a56c-55d875ea1cab"}}"#
+        ),
+    )
+    .unwrap();
+    let server = tokio::spawn(async move {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0_u8; 2_048];
+        let count = stream.read(&mut request).await.unwrap();
+        assert!(
+            String::from_utf8_lossy(&request[..count]).starts_with("GET /json/list HTTP/1.1\r\n")
+        );
+        let body = format!(
+            r#"[{{"id":"main-task","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/main-task"}},{{"id":"utility","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/utility"}}]"#
+        );
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        drop(stream);
+
+        for compatible in [true, false] {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut socket = accept_async(stream).await.unwrap();
+            let request = socket.next().await.unwrap().unwrap().into_text().unwrap();
+            let request: serde_json::Value = serde_json::from_str(&request).unwrap();
+            assert_eq!(request["method"], "Runtime.evaluate");
+            socket
+                .send(Message::Text(
+                    format!(
+                        r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":{compatible}}}}}}}"#,
+                        request["id"]
+                    )
+                    .into(),
+                ))
+                .await
+                .unwrap();
+        }
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        for index in 0..4 {
+            let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
+            let call: serde_json::Value = serde_json::from_str(&call).unwrap();
+            let result = match index {
+                0 => {
+                    assert_eq!(call["method"], "Page.enable");
+                    "{}"
+                }
+                1 => {
+                    assert_eq!(call["method"], "Page.addScriptToEvaluateOnNewDocument");
+                    r#"{"identifier":"theme-script-main"}"#
+                }
+                2 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+                _ => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    assert!(call["params"]["expression"]
+                        .as_str()
+                        .unwrap()
+                        .contains("getComputedStyle"));
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+            };
+            socket
+                .send(Message::Text(
+                    format!(r#"{{"id":{},"result":{result}}}"#, call["id"]).into(),
+                ))
+                .await
+                .unwrap();
+        }
+    });
+    let pack = bundled_theme_packs().remove(0);
+
+    let result = apply_theme_on_pages(&endpoint, &pack, &[], 1_000)
+        .await
+        .unwrap();
+
+    assert_eq!(result.applied_pages, 1);
+    assert_eq!(result.scripts.len(), 1);
+    assert_eq!(result.scripts[0].target_id, "main-task");
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn theme_is_not_applied_until_computed_style_is_verified() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let endpoint = codex_assistant_lib::control_layer::cdp::browser_endpoint(
+        port,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/browser/7d47a800-c734-4f9a-a56c-55d875ea1cab"}}"#
+        ),
+    )
+    .unwrap();
+    let server = tokio::spawn(async move {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0_u8; 2_048];
+        let count = stream.read(&mut request).await.unwrap();
+        assert!(
+            String::from_utf8_lossy(&request[..count]).starts_with("GET /json/list HTTP/1.1\r\n")
+        );
+        let body = format!(
+            r#"[{{"id":"main-task","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/main-task"}}]"#
+        );
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        drop(stream);
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        let compatibility = socket.next().await.unwrap().unwrap().into_text().unwrap();
+        let compatibility: serde_json::Value = serde_json::from_str(&compatibility).unwrap();
+        socket
+            .send(Message::Text(
+                format!(
+                    r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                    compatibility["id"]
+                )
+                .into(),
+            ))
+            .await
+            .unwrap();
+        drop(socket);
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        for index in 0..6 {
+            let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
+            let call: serde_json::Value = serde_json::from_str(&call).unwrap();
+            let result = match index {
+                0 => {
+                    assert_eq!(call["method"], "Page.enable");
+                    "{}"
+                }
+                1 => {
+                    assert_eq!(call["method"], "Page.addScriptToEvaluateOnNewDocument");
+                    r#"{"identifier":"theme-script-main"}"#
+                }
+                2 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+                3 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    assert!(call["params"]["expression"]
+                        .as_str()
+                        .unwrap()
+                        .contains("getComputedStyle"));
+                    r#"{"result":{"type":"boolean","value":false}}"#
+                }
+                4 => {
+                    assert_eq!(call["method"], "Page.removeScriptToEvaluateOnNewDocument");
+                    assert_eq!(call["params"]["identifier"], "theme-script-main");
+                    "{}"
+                }
+                _ => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+            };
+            socket
+                .send(Message::Text(
+                    format!(r#"{{"id":{},"result":{result}}}"#, call["id"]).into(),
+                ))
+                .await
+                .unwrap();
+        }
+    });
+    let pack = bundled_theme_packs().remove(0);
+
+    let result = apply_theme_on_pages(&endpoint, &pack, &[], 1_000).await;
+
+    assert!(matches!(result, Err(ThemeEngineError::PartialApplication)));
     server.await.unwrap();
 }

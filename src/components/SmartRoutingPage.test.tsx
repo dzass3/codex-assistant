@@ -9,7 +9,7 @@ describe("SmartRoutingPage", () => {
   it("explains the uninstalled state before offering the owned setup", () => {
     vi.mocked(useRouting).mockReturnValue({
       snapshot: {
-        contract_version: 1,
+        contract_version: 2,
         setup: {
           installation_status: "uninstalled",
           restart_status: "not-required",
@@ -31,6 +31,7 @@ describe("SmartRoutingPage", () => {
           activity: [],
           quality: [],
         },
+        controls: [],
       },
       loading: false,
       refreshing: false,
@@ -65,7 +66,7 @@ describe("SmartRoutingPage", () => {
     const setRootEnabled = vi.fn();
     vi.mocked(useRouting).mockReturnValue({
       snapshot: {
-        contract_version: 1,
+        contract_version: 2,
         setup: {
           installation_status: "installed",
           restart_status: "not-required",
@@ -126,6 +127,12 @@ describe("SmartRoutingPage", () => {
           activity: [],
           quality: [],
         },
+        controls: [
+          {
+            conversation_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab0",
+            status: "enabled",
+          },
+        ],
       },
       loading: false,
       refreshing: false,
@@ -184,7 +191,7 @@ describe("SmartRoutingPage", () => {
     const requestRestart = vi.fn();
     vi.mocked(useRouting).mockReturnValue({
       snapshot: {
-        contract_version: 1,
+        contract_version: 2,
         setup: {
           installation_status: "restart-required",
           restart_status: "required",
@@ -202,6 +209,7 @@ describe("SmartRoutingPage", () => {
           activity: [],
           quality: [],
         },
+        controls: [],
       },
       loading: false,
       refreshing: false,
@@ -233,7 +241,7 @@ describe("SmartRoutingPage", () => {
     const confirmForceRestart = vi.fn();
     vi.mocked(useRouting).mockReturnValue({
       snapshot: {
-        contract_version: 1,
+        contract_version: 2,
         setup: {
           installation_status: "restart-required",
           restart_status: "blocked-active-child",
@@ -251,6 +259,7 @@ describe("SmartRoutingPage", () => {
           activity: [],
           quality: [],
         },
+        controls: [],
       },
       loading: false,
       refreshing: false,
@@ -289,7 +298,7 @@ describe("SmartRoutingPage", () => {
     const beginPreflight = vi.fn();
     vi.mocked(useRouting).mockReturnValue({
       snapshot: {
-        contract_version: 1,
+        contract_version: 2,
         setup: {
           installation_status: "installed",
           restart_status: "not-required",
@@ -307,6 +316,7 @@ describe("SmartRoutingPage", () => {
           activity: [],
           quality: [],
         },
+        controls: [],
       },
       loading: false,
       refreshing: false,

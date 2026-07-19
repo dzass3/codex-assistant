@@ -1,6 +1,6 @@
 import type { RoutingOperationReceipt } from "./routing-types";
 
-export type ThemeSessionStatus = "inactive" | "ready" | "degraded";
+export type ThemeSessionStatus = "inactive" | "paused" | "ready" | "degraded";
 export type ThemeCategory = "abstract" | "original-character" | "project-showcase" | "local-import";
 export type ThemeRightsStatus = "verified" | "local-only" | "rejected";
 

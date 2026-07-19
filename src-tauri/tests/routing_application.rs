@@ -2,7 +2,7 @@ use std::fs;
 
 use codex_assistant_lib::control_layer::{
     cdp::{OwnedSessionRecord, OwnedSessionStore},
-    injector::ControlEvent,
+    injector::{CompatibilityReason, ControlEvent, InsertionResult},
 };
 use codex_assistant_lib::monitor::model::{
     AgentObservation, AgentStatus, HealthEntry, ModelSource, MonitorSnapshot, SourceHealth,
@@ -10,8 +10,9 @@ use codex_assistant_lib::monitor::model::{
 };
 use codex_assistant_lib::routing::{EligibilityReasonCode, EligibilityStatus, RouteKind};
 use codex_assistant_lib::routing_app::{
-    OperationStatus, RestartIntent, RoutingApplication, RoutingInstallationStatus,
-    RoutingRestartStatus, RoutingSetupReasonCode, VerifiedRootFingerprint,
+    OperationStatus, RestartIntent, RoutingActivationStatus, RoutingApplication,
+    RoutingInstallationStatus, RoutingRestartStatus, RoutingSetupReasonCode,
+    VerifiedRootFingerprint,
 };
 use tempfile::tempdir;
 
@@ -606,19 +607,109 @@ fn monitor_reconciliation_marks_the_exact_visible_terra_child_eligible() {
         .eligibility
         .iter()
         .all(|entry| entry.status == EligibilityStatus::Eligible));
+    let restored = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().expect("test executable"),
+        root.path().join("state"),
+    )
+    .expect("restored routing application");
+    assert!(restored.reconcile_persisted_preflight_with("26.715.3651.0"));
+    assert_eq!(
+        restored.snapshot().setup.preflight_status,
+        codex_assistant_lib::routing_app::RoutingPreflightStatus::Complete
+    );
+    let discovered_root = uuid::Uuid::parse_str("b7786c3b-a608-4a57-afd5-a31e29f6ef48").unwrap();
+    let observed = app.observe_roots(&monitor_with(
+        vec![observation(discovered_root, None, None, "gpt-5.6-sol", 0)],
+        now_ms + 6,
+    ));
+    assert_eq!(observed.status, OperationStatus::Applied);
+    assert!(app
+        .snapshot()
+        .routing
+        .routes
+        .iter()
+        .any(|route| route.conversation_id == discovered_root && !route.enabled));
     assert_eq!(
         app.set_root_enabled(&root_id.to_string(), true, true)
             .status,
         OperationStatus::Applied
     );
     assert!(app.snapshot().routing.routes[0].enabled);
-    let blocked = app.set_root_enabled_with_activity(&root_id.to_string(), false, true, 1);
-    assert_eq!(blocked.status, OperationStatus::Blocked);
+
+    let unopened_root = uuid::Uuid::parse_str("a087a511-1635-437a-9de8-4019b479aa13").unwrap();
     assert_eq!(
-        blocked.reason_codes,
-        vec![codex_assistant_lib::routing_app::RoutingSetupReasonCode::ActiveChild]
+        app.set_root_enabled(&unopened_root.to_string(), true, true)
+            .status,
+        OperationStatus::Applied
     );
-    assert!(app.snapshot().routing.routes[0].enabled);
+    let unopened_control = app
+        .snapshot()
+        .controls
+        .into_iter()
+        .find(|control| control.conversation_id == unopened_root)
+        .expect("new observed root should gain a control state");
+    assert_eq!(
+        unopened_control.status,
+        RoutingActivationStatus::PendingOpen
+    );
+    let unopened_route_key = app
+        .snapshot()
+        .routing
+        .routes
+        .into_iter()
+        .find(|route| route.conversation_id == unopened_root)
+        .expect("new root route")
+        .route_key;
+    assert_eq!(
+        app.apply_control_event(
+            ControlEvent::Compatibility {
+                route_id: unopened_root,
+                compatible: true,
+                reason: CompatibilityReason::Ready,
+            },
+            0,
+        )
+        .status,
+        OperationStatus::Applied
+    );
+    assert_eq!(
+        app.snapshot()
+            .controls
+            .into_iter()
+            .find(|control| control.conversation_id == unopened_root)
+            .unwrap()
+            .status,
+        RoutingActivationStatus::PendingNextTurn
+    );
+    assert_eq!(
+        app.apply_control_event(
+            ControlEvent::InsertionResult {
+                route_id: unopened_root,
+                route_key: unopened_route_key,
+                submission_id: "submission-1".to_owned(),
+                result: InsertionResult::Inserted,
+            },
+            0,
+        )
+        .status,
+        OperationStatus::Applied
+    );
+    assert_eq!(
+        app.snapshot()
+            .controls
+            .into_iter()
+            .find(|control| control.conversation_id == unopened_root)
+            .unwrap()
+            .status,
+        RoutingActivationStatus::Enabled
+    );
+
+    let disabled = app.set_root_enabled_with_activity(&root_id.to_string(), false, true, 1);
+    assert_eq!(disabled.status, OperationStatus::Applied);
+    assert!(disabled.reason_codes.is_empty());
+    assert!(!app.snapshot().routing.routes[0].enabled);
     assert_eq!(
         app.apply_control_event(
             ControlEvent::Toggle {
@@ -628,7 +719,7 @@ fn monitor_reconciliation_marks_the_exact_visible_terra_child_eligible() {
             0,
         )
         .status,
-        OperationStatus::Applied
+        OperationStatus::Noop
     );
     assert!(!app.snapshot().routing.routes[0].enabled);
     let wrong_root = uuid::Uuid::parse_str("c1f7ed94-63ce-4a60-bab7-23b855e843b8").unwrap();

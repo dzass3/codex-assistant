@@ -26,6 +26,7 @@ The theme engine ports or vendors an audited subset of Codex Dream Skin pinned b
 
 - The product as a whole is no longer purely read-only: the configurator writes narrowly scoped, backed-up Codex configuration and the CDP layer changes only live presentation. The Observer remains read-only and metadata-only.
 - Initial setup requires one Codex restart. Normal routing and theme switching do not open a second execution window.
+- Restoring the official appearance removes only theme-owned scripts and theme preference state. It does not disable root-thread routing or interrupt native subagents; the verified CDP session may remain while another control-layer capability still needs it.
 - Restart lifecycle operations are serialized. Safe restart remains the default; an active native child requires a user-confirmed, short-lived, single-use destructive ticket before the verified process tree can be stopped and, after a five-second grace period, terminated leaf-first. This is the only exception to the idle-only rule.
 - UI controls can temporarily become unavailable after Codex updates; compatibility fallback preserves official appearance and the Observer.
 - Luna and Spark availability cannot be promised ahead of native preflight. Unsupported profiles remain visible as unavailable rather than being silently substituted.

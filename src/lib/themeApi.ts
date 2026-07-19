@@ -21,7 +21,7 @@ const LOCAL_PREVIEW = /^\/themes\/[a-z0-9][a-z0-9./-]{0,150}$/;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const SESSION_STATUSES = new Set<ThemeSessionStatus>(["inactive", "ready", "degraded"]);
+const SESSION_STATUSES = new Set<ThemeSessionStatus>(["inactive", "paused", "ready", "degraded"]);
 const CATEGORIES = new Set<ThemeCategory>([
   "abstract",
   "original-character",

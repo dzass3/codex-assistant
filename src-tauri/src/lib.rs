@@ -22,6 +22,7 @@ pub fn run() {
         RoutingApplication::default_location()
             .expect("Smart Routing local runtime could not be initialized"),
     );
+    routing_runtime.reconcile_persisted_preflight();
     let setup_routing_runtime = Arc::clone(&routing_runtime);
 
     tauri::Builder::default()
@@ -79,7 +80,9 @@ pub fn run() {
                     let routing_snapshot = snapshot.clone();
                     let _ = tauri::async_runtime::spawn_blocking(move || {
                         routing_worker.reconcile_preflight(&routing_snapshot);
+                        routing_worker.observe_roots(&routing_snapshot);
                         routing_worker.insert_next_preflight();
+                        routing_worker.reconcile_root_controls();
                         routing_worker.ensure_control_ready();
                         routing_worker.sync_control_state();
                         routing_worker.reconcile_active_theme();
@@ -300,6 +303,7 @@ fn set_root_routing_enabled(
 
 #[tauri::command]
 fn get_theme_snapshot(runtime: tauri::State<'_, Arc<RoutingApplication>>) -> ThemeUiSnapshot {
+    runtime.reconcile_theme_session();
     runtime.theme_snapshot()
 }
 

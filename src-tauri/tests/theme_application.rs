@@ -89,6 +89,44 @@ fn inactive_theme_activation_restarts_once_and_applies_the_selected_theme() {
 }
 
 #[test]
+fn one_click_theme_activation_retries_until_the_main_task_dom_is_ready() {
+    let root = tempdir().unwrap();
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().unwrap(),
+        root.path().join("state"),
+    )
+    .unwrap();
+    app.start_theme_session_with(0, || Ok(session()));
+    let mut attempts = 0;
+    let mut waits = 0;
+
+    let receipt = app.retry_theme_application_with(
+        3,
+        || {
+            attempts += 1;
+            app.apply_theme_with("crystal-daylight", |_| {
+                if attempts == 1 {
+                    Err(RoutingSetupReasonCode::DomIncompatible)
+                } else {
+                    Ok(1)
+                }
+            })
+        },
+        || waits += 1,
+    );
+
+    assert_eq!(receipt.status, OperationStatus::Applied);
+    assert_eq!(attempts, 2);
+    assert_eq!(waits, 1);
+    assert_eq!(
+        app.theme_snapshot().applied_theme_id.as_deref(),
+        Some("crystal-daylight")
+    );
+}
+
+#[test]
 fn failed_theme_switch_keeps_selected_and_applied_state_distinct() {
     let root = tempdir().unwrap();
     let app = RoutingApplication::for_paths(
@@ -139,4 +177,131 @@ fn theme_session_restart_is_blocked_while_a_native_child_is_active() {
         app.theme_snapshot().session_status,
         ThemeSessionStatus::Inactive
     );
+}
+
+#[test]
+fn selected_theme_survives_application_restart_as_paused_not_applied() {
+    let root = tempdir().unwrap();
+    let codex = root.path().join("codex");
+    let skills = root.path().join("skills");
+    let state = root.path().join("state");
+    {
+        let app = RoutingApplication::for_paths(
+            codex.clone(),
+            skills.clone(),
+            std::env::current_exe().unwrap(),
+            state.clone(),
+        )
+        .unwrap();
+        app.start_theme_session_with(0, || Ok(session()));
+        assert_eq!(
+            app.apply_theme_with("violet-afterdark", |_| Ok(1)).status,
+            OperationStatus::Applied
+        );
+    }
+
+    let restarted =
+        RoutingApplication::for_paths(codex, skills, std::env::current_exe().unwrap(), state)
+            .unwrap();
+    let snapshot = restarted.theme_snapshot();
+
+    assert_eq!(snapshot.session_status, ThemeSessionStatus::Paused);
+    assert_eq!(
+        snapshot.selected_theme_id.as_deref(),
+        Some("violet-afterdark")
+    );
+    assert!(snapshot.applied_theme_id.is_none());
+}
+
+#[test]
+fn stale_control_session_pauses_theme_and_can_be_reestablished() {
+    let root = tempdir().unwrap();
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().unwrap(),
+        root.path().join("state"),
+    )
+    .unwrap();
+    app.start_theme_session_with(0, || Ok(session()));
+    app.apply_theme_with("cyan-chorus", |_| Ok(1));
+
+    app.reconcile_theme_session_with(|_| false);
+
+    let paused = app.theme_snapshot();
+    assert_eq!(paused.session_status, ThemeSessionStatus::Paused);
+    assert_eq!(paused.selected_theme_id.as_deref(), Some("cyan-chorus"));
+    assert!(paused.applied_theme_id.is_none());
+
+    let mut restarted = false;
+    let resumed = app.activate_theme_with(
+        "cyan-chorus",
+        0,
+        || {
+            restarted = true;
+            Ok(session())
+        },
+        |_| Ok(1),
+    );
+    assert!(restarted);
+    assert_eq!(resumed.status, OperationStatus::Applied);
+}
+
+#[test]
+fn recovered_session_reapplies_saved_theme_without_a_second_user_click() {
+    let root = tempdir().unwrap();
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().unwrap(),
+        root.path().join("state"),
+    )
+    .unwrap();
+    app.start_theme_session_with(0, || Ok(session()));
+    app.apply_theme_with("roseglass-atelier", |_| Ok(1));
+    app.reconcile_theme_session_with(|_| false);
+    app.start_theme_session_with(0, || Ok(session()));
+
+    let reapplied = app.reconcile_selected_theme_with(|pack| {
+        assert_eq!(pack.id, "roseglass-atelier");
+        Ok(1)
+    });
+
+    assert_eq!(reapplied.status, OperationStatus::Applied);
+    assert_eq!(
+        app.theme_snapshot().applied_theme_id.as_deref(),
+        Some("roseglass-atelier")
+    );
+}
+
+#[test]
+fn restoring_a_paused_theme_clears_the_saved_preference() {
+    let root = tempdir().unwrap();
+    let codex = root.path().join("codex");
+    let skills = root.path().join("skills");
+    let state = root.path().join("state");
+    let app = RoutingApplication::for_paths(
+        codex.clone(),
+        skills.clone(),
+        std::env::current_exe().unwrap(),
+        state.clone(),
+    )
+    .unwrap();
+    app.start_theme_session_with(0, || Ok(session()));
+    app.apply_theme_with("noir-stage", |_| Ok(1));
+    app.reconcile_theme_session_with(|_| false);
+
+    let restored = app.restore_theme_with(|| panic!("paused theme has no live styles to remove"));
+
+    assert_eq!(restored.status, OperationStatus::Applied);
+    let snapshot = app.theme_snapshot();
+    assert_eq!(snapshot.session_status, ThemeSessionStatus::Inactive);
+    assert!(snapshot.selected_theme_id.is_none());
+    assert!(snapshot.applied_theme_id.is_none());
+    drop(app);
+
+    let restarted =
+        RoutingApplication::for_paths(codex, skills, std::env::current_exe().unwrap(), state)
+            .unwrap();
+    assert!(restarted.theme_snapshot().selected_theme_id.is_none());
 }

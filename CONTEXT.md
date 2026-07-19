@@ -20,7 +20,11 @@ A subagent created through Codex's built-in agent mechanism and represented in C
 
 ### Delegation mode
 
-A user-enabled policy attached to the currently selected root thread. While enabled, later native subagent work in that conversation may be routed repeatedly to an eligible model according to task complexity. Enabling delegation mode does not itself start a run and must not launch a detached Codex process or a second conversation window.
+A user-enabled policy attached to the currently selected root thread. While enabled, later native subagent work in that conversation may be routed repeatedly to an eligible model according to task complexity. Disabling it restores ordinary execution for later turns in that root thread without interrupting work already running or changing another root thread. Enabling delegation mode does not itself start a run and must not launch a detached Codex process or a second conversation window.
+
+### Routing configuration restore
+
+A global rollback of the Codex Assistant-managed routing configuration. It is distinct from disabling delegation mode for one root thread and may affect the routing capability of every root thread after Codex reloads the restored configuration.
 
 ### Model router
 
@@ -94,9 +98,33 @@ The audited local runtime that applies themes to the official Codex UI through C
 
 A Codex desktop session launched once with a random loopback-only CDP endpoint and verified official process identity. Theme changes may be applied live inside that existing window until the user restores the official appearance or the session ends.
 
+### Theme preference
+
+The theme pack a user has selected for future verified themed sessions. A saved preference is not proof that the theme is currently visible.
+
+### Applied theme
+
+A theme preference whose styles have been injected into every Codex main task window in the current verified themed session and independently verified as visible. Only this state may be presented as successful application; an incompatible utility or shortcut window may retain the official appearance without invalidating it.
+
+### Paused theme
+
+A saved theme preference that is not currently applied because no verified themed session is available. Resuming it requires an explicit user action when doing so would restart Codex.
+
 ### Conversation control layer
 
 The Codex Assistant control surface injected into the active Codex composer through the verified theme engine. It binds routing state to the visible root thread, displays delegation activity, and contributes only a compact routing control marker to each submitted user turn while enabled; it does not read or retain the user's prompt body.
+
+### Routing control surface
+
+The paired Smart Routing controls shown for a root thread in both the task tree and its active Codex composer. Both controls expose one shared root-thread delegation policy; subagent observations inherit or report routing activity and never own an independent routing toggle.
+
+### Verified routing activation
+
+The state in which delegation mode, native model eligibility, the selected root thread, and its active composer control have all been verified as one binding. A saved preference or illuminated control without this proof is pending or failed, never enabled.
+
+### Pending routing activation
+
+A root-thread preference to enable delegation mode that cannot yet be verified because the corresponding Codex task is not open in a main task window. Opening that task may complete activation automatically; pending activation never opens or switches a Codex window on the user's behalf.
 
 ### Compatibility fallback
 
@@ -143,6 +171,7 @@ The observer rule that conversation bodies, reasoning text, tool arguments, tool
 - Project identity is shown as a directory basename unless the user explicitly reveals the full path.
 - Monitoring failure must never alter Codex state.
 - Delegation mode is opt-in for a selected root thread and must remain visibly active until disabled or the thread ends.
+- Delegation mode is reported as enabled only after verified routing activation; a currently running turn is unchanged and the new policy begins with the next submitted turn.
 - Delegation mode uses opportunistic delegation; it must not create a subagent for every user message or every trivial operation.
 - Before routing, the parent considers delegation overhead and keeps work local when a child is unlikely to produce a net time or quota benefit.
 - Delegation mode must not implement model execution through a detached process, hidden conversation, injected imitation card, or second execution window.
@@ -164,7 +193,7 @@ The observer rule that conversation bodies, reasoning text, tool arguments, tool
 - User-imported local theme assets are not uploaded, published, or redistributed by Codex Assistant.
 - Enabling the theme engine may restart Codex once; subsequent theme switches operate in the existing Codex window and must not open a second Codex window.
 - Safe restart never terminates active native agents. A user-confirmed force restart is a destructive exception: it uses a 60-second single-use ticket bound to the exact verified root process identity and current impact, offers a five-second cancellable grace period, terminates only the revalidated descendant tree leaf-first, and never retries after an irreversible partial failure.
-- The theme engine uses a random loopback-only CDP port, verifies official Codex process identity, and closes the endpoint when restoring the official appearance.
+- The theme engine uses a random loopback-only CDP port and verifies official Codex process identity. Restoring the official appearance removes only theme-owned scripts and saved theme state; it never changes root-thread delegation policy or interrupts routed work, and the shared verified control session may remain available for Smart Routing.
 - Codex updates trigger a compatibility check; an incompatible or failed theme must fall back to the official appearance without modifying official application files.
 - The selected architecture is a native-agent configurator plus a conversation control layer; detached execution and official application patching are excluded.
 - The conversation control layer binds delegation mode to the visible root thread and must not enable routing for another task in the same workspace.

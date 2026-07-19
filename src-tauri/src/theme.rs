@@ -1,5 +1,12 @@
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
+
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::control_layer::cdp::{
     fetch_page_targets, BrowserEndpoint, CdpClient, CdpClientError, CdpDiscoveryError,
@@ -137,6 +144,106 @@ pub struct ThemeApplyResult {
 struct ThemeCatalog {
     schema_version: u32,
     themes: Vec<ThemePack>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ThemePreferenceRecord {
+    schema_version: u32,
+    selected_theme_id: Option<String>,
+}
+
+pub struct ThemePreferenceStore {
+    directory: PathBuf,
+    state_file: PathBuf,
+}
+
+impl ThemePreferenceStore {
+    pub fn in_directory(directory: &Path) -> Result<Self, String> {
+        if directory.exists()
+            && directory
+                .symlink_metadata()
+                .map_err(|_| "Theme preference directory is unavailable")?
+                .file_type()
+                .is_symlink()
+        {
+            return Err("Theme preference directory is unavailable".to_owned());
+        }
+        fs::create_dir_all(directory)
+            .map_err(|_| "Theme preference directory is unavailable".to_owned())?;
+        crate::routing::state::protect_owned_path(directory)?;
+        let state_file = directory.join("theme-state.json");
+        if state_file.exists()
+            && state_file
+                .symlink_metadata()
+                .map_err(|_| "Theme preference state is unavailable")?
+                .file_type()
+                .is_symlink()
+        {
+            return Err("Theme preference state is unavailable".to_owned());
+        }
+        Ok(Self {
+            directory: directory.to_path_buf(),
+            state_file,
+        })
+    }
+
+    pub fn load(&self) -> Result<Option<String>, String> {
+        let bytes = match fs::read(&self.state_file) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err("Theme preference state is unavailable".to_owned()),
+        };
+        if bytes.len() > 512 {
+            return Err("Theme preference state is invalid".to_owned());
+        }
+        let record: ThemePreferenceRecord = serde_json::from_slice(&bytes)
+            .map_err(|_| "Theme preference state is invalid".to_owned())?;
+        if record.schema_version != 1
+            || record.selected_theme_id.as_ref().is_some_and(|theme_id| {
+                !bundled_theme_packs()
+                    .iter()
+                    .any(|pack| pack.id == *theme_id)
+            })
+        {
+            return Err("Theme preference state is invalid".to_owned());
+        }
+        Ok(record.selected_theme_id)
+    }
+
+    pub fn save(&self, selected_theme_id: Option<&str>) -> Result<(), String> {
+        if selected_theme_id
+            .is_some_and(|theme_id| !bundled_theme_packs().iter().any(|pack| pack.id == theme_id))
+        {
+            return Err("Theme preference is invalid".to_owned());
+        }
+        let bytes = serde_json::to_vec(&ThemePreferenceRecord {
+            schema_version: 1,
+            selected_theme_id: selected_theme_id.map(str::to_owned),
+        })
+        .map_err(|_| "Theme preference state is invalid".to_owned())?;
+        let temporary = self
+            .directory
+            .join(format!(".theme-state-{}.tmp", Uuid::new_v4()));
+        let write_result = (|| {
+            let mut file =
+                File::create(&temporary).map_err(|_| "Theme preference state is unavailable")?;
+            crate::routing::state::protect_owned_path(&temporary)?;
+            file.write_all(&bytes)
+                .map_err(|_| "Theme preference state is unavailable".to_owned())?;
+            file.sync_all()
+                .map_err(|_| "Theme preference state is unavailable".to_owned())
+        })();
+        if let Err(error) = write_result {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
+        if crate::routing::state::replace_existing(&temporary, &self.state_file).is_err() {
+            let _ = fs::remove_file(&temporary);
+            return Err("Theme preference state is unavailable".to_owned());
+        }
+        Ok(())
+    }
 }
 
 pub fn bundled_theme_packs() -> Vec<ThemePack> {
@@ -285,10 +392,11 @@ pub async fn apply_theme_on_pages(
     timeout_ms: u64,
 ) -> Result<ThemeApplyResult, ThemeEngineError> {
     let source = theme_application_source(pack).map_err(ThemeEngineError::InvalidPack)?;
+    let verification = theme_verification_source(pack).map_err(ThemeEngineError::InvalidPack)?;
     let targets = fetch_page_targets(endpoint, timeout_ms)
         .await
         .map_err(ThemeEngineError::Discovery)?;
-    let mut compatible = 0_usize;
+    let mut compatible_targets = Vec::new();
     for target in &targets {
         let mut client = CdpClient::connect_target(target, endpoint.port(), timeout_ms)
             .await
@@ -300,18 +408,15 @@ pub async fn apply_theme_on_pages(
             .await
             .map_err(ThemeEngineError::Cdp)?
         {
-            compatible += 1;
+            compatible_targets.push(target.clone());
         }
     }
-    if compatible == 0 {
+    if compatible_targets.is_empty() {
         return Err(ThemeEngineError::DomIncompatible);
-    }
-    if compatible != targets.len() {
-        return Err(ThemeEngineError::PartialApplication);
     }
     let mut applied = 0;
     let mut scripts = Vec::new();
-    for target in targets {
+    for target in compatible_targets {
         let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
             .await
             .map_err(ThemeEngineError::Cdp)?;
@@ -335,16 +440,34 @@ pub async fn apply_theme_on_pages(
             .register_script(&source)
             .await
             .map_err(ThemeEngineError::Cdp)?;
-        if client
+        let inserted = client
             .evaluate_boolean(&source)
             .await
-            .map_err(ThemeEngineError::Cdp)?
-        {
+            .map_err(ThemeEngineError::Cdp)?;
+        let visible = inserted
+            && client
+                .evaluate_boolean(&verification)
+                .await
+                .map_err(ThemeEngineError::Cdp)?;
+        if visible {
             applied += 1;
             scripts.push(ThemeScriptRegistration {
                 target_id: target.target_id,
                 identifier,
             });
+        } else {
+            client
+                .call(
+                    "Page.removeScriptToEvaluateOnNewDocument",
+                    serde_json::json!({"identifier": identifier}),
+                )
+                .await
+                .map_err(ThemeEngineError::Cdp)?;
+            client
+                .evaluate_boolean(theme_restore_source())
+                .await
+                .map_err(ThemeEngineError::Cdp)?;
+            return Err(ThemeEngineError::PartialApplication);
         }
     }
     Ok(ThemeApplyResult {
@@ -391,6 +514,15 @@ pub async fn restore_theme_on_pages(
 
 pub fn theme_restore_source() -> &'static str {
     r#"(()=>{"use strict";const NAME="__codexAssistantThemeV1";const current=globalThis[NAME];if(current&&typeof current.destroy==="function")current.destroy();const owned=document.querySelector("style[data-codex-assistant-theme]");if(owned)owned.remove();return true})()"#
+}
+
+pub fn theme_verification_source(pack: &ThemePack) -> Result<String, ThemeValidationError> {
+    validate_theme_pack(pack, false)?;
+    let theme_id =
+        serde_json::to_string(&pack.id).map_err(|_| ThemeValidationError::InvalidMetadata)?;
+    Ok(format!(
+        r#"(()=>{{"use strict";const id={theme_id};const api=globalThis.__codexAssistantThemeV1;const style=document.querySelector(`style[data-codex-assistant-theme="${{id}}"]`);const backdrop=getComputedStyle(document.body,"::before");return Boolean(api&&api.id===id&&style&&style.isConnected&&style.sheet&&style.sheet.cssRules.length>0&&backdrop.position==="fixed"&&backdrop.backgroundImage!=="none")}})()"#
+    ))
 }
 
 fn asset_bytes(asset_id: &str) -> Option<&'static [u8]> {

@@ -11,14 +11,22 @@
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const MODELS = new Set(["gpt-5.3-codex-spark", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]);
 
-  const existing = globalThis[GLOBAL_NAME];
-  if (existing && typeof existing.refresh === "function") {
-    existing.refresh();
-    return;
-  }
-
   const bootstrap = globalThis[BOOTSTRAP_NAME];
   if (!validBootstrap(bootstrap) || typeof globalThis.codexAssistant !== "function") return;
+  const existing = globalThis[GLOBAL_NAME];
+  if (existing && typeof existing.refresh === "function") {
+    if (
+      existing.routeId === bootstrap.routeId &&
+      existing.routeKey === bootstrap.routeKey &&
+      existing.sessionId === bootstrap.sessionId &&
+      existing.targetId === bootstrap.targetId
+    ) {
+      existing.refresh();
+      return;
+    }
+    if (typeof existing.destroy !== "function") return;
+    existing.destroy();
+  }
 
   let controlRoot = null;
   let button = null;
@@ -34,6 +42,10 @@
   let preflightInserted = false;
 
   const api = Object.freeze({
+    routeId: bootstrap.routeId,
+    routeKey: bootstrap.routeKey,
+    sessionId: bootstrap.sessionId,
+    targetId: bootstrap.targetId,
     refresh,
     destroy,
     updateActivity,

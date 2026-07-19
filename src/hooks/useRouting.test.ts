@@ -18,7 +18,7 @@ vi.mock("../lib/routingApi", () => ({
 }));
 
 const validSnapshot: RoutingUiSnapshot = {
-  contract_version: 1,
+  contract_version: 2,
   setup: {
     installation_status: "installed",
     restart_status: "not-required",
@@ -36,6 +36,7 @@ const validSnapshot: RoutingUiSnapshot = {
     activity: [],
     quality: [],
   },
+  controls: [],
 };
 
 describe("useRouting", () => {

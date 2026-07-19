@@ -219,7 +219,7 @@ describe("routing snapshot boundary", () => {
 describe("Smart Routing status boundary", () => {
   it("accepts the exact metadata-only setup envelope", () => {
     const value = {
-      contract_version: 1,
+      contract_version: 2,
       setup: {
         installation_status: "restart-required",
         restart_status: "required",
@@ -230,6 +230,12 @@ describe("Smart Routing status boundary", () => {
         reason_codes: [],
       },
       routing: snapshot,
+      controls: [
+        {
+          conversation_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab0",
+          status: "pending-next-turn",
+        },
+      ],
     };
 
     expect(toRoutingUiSnapshot(value)).toEqual(value);
@@ -238,7 +244,7 @@ describe("Smart Routing status boundary", () => {
   it("rejects duplicate setup metadata", () => {
     expect(
       toRoutingUiSnapshot({
-        contract_version: 1,
+        contract_version: 2,
         setup: {
           installation_status: "uninstalled",
           restart_status: "not-required",
@@ -249,6 +255,7 @@ describe("Smart Routing status boundary", () => {
           reason_codes: [],
         },
         routing: { ...snapshot, routes: [], activity: [] },
+        controls: [],
       }),
     ).toBeNull();
   });

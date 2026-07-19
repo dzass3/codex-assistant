@@ -42,6 +42,14 @@ const REASON_LABELS: Record<string, string> = {
   "profile-version-changed": "路由配置版本已变化",
 };
 
+const CONTROL_STATUS_LABELS: Record<string, string> = {
+  off: "正常",
+  "pending-open": "等待打开",
+  "pending-next-turn": "下一条消息生效",
+  enabled: "已启用",
+  "needs-repair": "需要修复",
+};
+
 export interface RoutingRootOption {
   conversationId: string;
   label: string;
@@ -221,16 +229,15 @@ export function SmartRoutingPage({ roots = EMPTY_ROOTS }: { roots?: RoutingRootO
               const label =
                 roots.find((root) => root.conversationId === route.conversation_id)?.label ??
                 `任务 ${route.conversation_id.slice(0, 8)}`;
-              const hasActiveChild = routing.snapshot?.routing.activity.some(
-                (activity) =>
-                  activity.route_key === route.route_key &&
-                  ["classifying", "implementing", "reviewing"].includes(activity.phase),
-              );
+              const controlStatus =
+                routing.snapshot?.controls.find(
+                  (control) => control.conversation_id === route.conversation_id,
+                )?.status ?? (route.enabled ? "pending-open" : "off");
               return (
                 <div className="routing-root-row" key={route.route_key}>
                   <div>
                     <strong>{label}</strong>
-                    <span>{route.enabled ? `已启用 · ${route.phase}` : "已关闭"}</span>
+                    <span>{CONTROL_STATUS_LABELS[controlStatus] ?? "需要修复"}</span>
                   </div>
                   <button
                     className={route.enabled ? "button-secondary" : "button-primary"}
@@ -238,13 +245,9 @@ export function SmartRoutingPage({ roots = EMPTY_ROOTS }: { roots?: RoutingRootO
                     onClick={() =>
                       void routing.setRootEnabled(route.conversation_id, !route.enabled)
                     }
-                    disabled={routing.operation !== null || (route.enabled && hasActiveChild)}
+                    disabled={routing.operation !== null}
                   >
-                    {route.enabled && hasActiveChild
-                      ? "等待子代理结束"
-                      : route.enabled
-                        ? "关闭"
-                        : "启用"}
+                    {route.enabled ? "关闭" : "启用"}
                   </button>
                 </div>
               );

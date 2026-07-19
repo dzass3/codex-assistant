@@ -13,6 +13,8 @@ import {
 
 const ROOT_ID = "7d47a800-c734-4f9a-a56c-55d875ea1cab";
 const ROUTE_KEY = "6e90c53a-b93e-44d7-aeb8-9880ee199388";
+const OTHER_ROOT_ID = "bd542ff9-fc21-41c5-957d-c45adc842d21";
+const OTHER_ROUTE_KEY = "fb49751f-64ae-4613-89de-5997d766486a";
 
 function fixture(name: string): Document {
   const html = readFileSync(
@@ -170,6 +172,70 @@ describe("mounted routing control", () => {
       "Enabled",
     );
     runtimeControl.destroy();
+    delete page["__codexAssistantBootstrapV1"];
+    delete page.codexAssistant;
+  });
+
+  it("rebinds the packaged native control when the same target navigates to another root", () => {
+    const document = fixture("local-root");
+    const runtime = readFileSync(
+      resolve(process.cwd(), "src-tauri", "resources", "control", "routing-control.js"),
+      "utf8",
+    );
+    const page = window as typeof window & Record<string, unknown>;
+    delete page["__codexAssistantControlV1"];
+    page.codexAssistant = vi.fn();
+    const location = { pathname: `/local/${ROOT_ID}` };
+    const execute = new Function(
+      "globalThis",
+      "document",
+      "location",
+      "addEventListener",
+      "removeEventListener",
+      "Node",
+      runtime,
+    );
+    const run = () =>
+      execute(
+        page,
+        document,
+        location,
+        page.addEventListener.bind(page),
+        page.removeEventListener.bind(page),
+        page.Node,
+      );
+
+    page["__codexAssistantBootstrapV1"] = {
+      v: 1,
+      sessionId: "session-root-1",
+      targetId: "target-1",
+      routeId: ROOT_ID,
+      routeKey: ROUTE_KEY,
+      observed: true,
+      parentThreadId: null,
+      submitShortcut: "enter",
+      css: "",
+    };
+    run();
+    expect((page["__codexAssistantControlV1"] as { routeId: string }).routeId).toBe(ROOT_ID);
+
+    location.pathname = `/local/${OTHER_ROOT_ID}`;
+    page["__codexAssistantBootstrapV1"] = {
+      v: 1,
+      sessionId: "session-root-2",
+      targetId: "target-1",
+      routeId: OTHER_ROOT_ID,
+      routeKey: OTHER_ROUTE_KEY,
+      observed: true,
+      parentThreadId: null,
+      submitShortcut: "enter",
+      css: "",
+    };
+    run();
+
+    expect((page["__codexAssistantControlV1"] as { routeId: string }).routeId).toBe(OTHER_ROOT_ID);
+    expect(document.querySelectorAll("[data-codex-assistant-control]")).toHaveLength(1);
+    (page["__codexAssistantControlV1"] as { destroy(): void }).destroy();
     delete page["__codexAssistantBootstrapV1"];
     delete page.codexAssistant;
   });

@@ -158,10 +158,23 @@ export interface RoutingSetupSnapshot {
   reason_codes: RoutingSetupReasonCode[];
 }
 
+export type RoutingActivationStatus =
+  | "off"
+  | "pending-open"
+  | "pending-next-turn"
+  | "enabled"
+  | "needs-repair";
+
+export interface RootRoutingControlSnapshot {
+  conversation_id: string;
+  status: RoutingActivationStatus;
+}
+
 export interface RoutingUiSnapshot {
-  contract_version: 1;
+  contract_version: 2;
   setup: RoutingSetupSnapshot;
   routing: RoutingSnapshot;
+  controls: RootRoutingControlSnapshot[];
 }
 
 export type RoutingOperationStatus = "applied" | "noop" | "blocked" | "failed";

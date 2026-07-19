@@ -8,6 +8,7 @@ import { SmartRoutingPage } from "./components/SmartRoutingPage";
 import { ThemesPage } from "./components/ThemesPage";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "./config";
 import { useMonitor } from "./hooks/useMonitor";
+import { useRouting } from "./hooks/useRouting";
 
 const DEFAULT_FILTERS: MonitorFilters = {
   query: "",
@@ -18,6 +19,7 @@ const DEFAULT_FILTERS: MonitorFilters = {
 
 export function App() {
   const monitor = useMonitor();
+  const routing = useRouting();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [page, setPage] = useState<AppPage>("live");
@@ -116,7 +118,20 @@ export function App() {
             {monitor.loading ? (
               <LoadingState />
             ) : (
-              <AgentTree agents={monitor.snapshot?.agents ?? []} filters={filters} />
+              <AgentTree
+                agents={monitor.snapshot?.agents ?? []}
+                filters={filters}
+                routing={{
+                  available:
+                    routing.snapshot?.setup.installation_status === "installed" &&
+                    routing.snapshot.setup.preflight_status === "complete",
+                  operationActive: routing.operation !== null,
+                  routes: routing.snapshot?.routing.routes ?? [],
+                  controls: routing.snapshot?.controls ?? [],
+                  onSetRootEnabled: (conversationId, enabled) =>
+                    void routing.setRootEnabled(conversationId, enabled),
+                }}
+              />
             )}
           </section>
 

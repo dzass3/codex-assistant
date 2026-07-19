@@ -2,8 +2,8 @@ use std::{fs, path::PathBuf};
 
 use codex_assistant_lib::control_layer::injector::{
     build_control_source, parse_binding_message, preflight_insertion_expression,
-    routing_enabled_expression, routing_ready_expression, BindingError, ControlBootstrap,
-    ControlEvent, SubmitShortcut,
+    routing_enabled_expression, routing_ready_expression, visible_root_match_expression,
+    BindingError, ControlBootstrap, ControlEvent, SubmitShortcut,
 };
 use serde_json::Value;
 
@@ -52,6 +52,19 @@ fn routing_ready_activation_uses_only_the_fixed_namespaced_boolean_call() {
         routing_enabled_expression(false),
         "globalThis.__codexAssistantControlV1?.syncEnabled(false) === true"
     );
+}
+
+#[test]
+fn visible_root_matching_is_exact_and_never_reads_conversation_content() {
+    let route_id = "7d47a800-c734-4f9a-a56c-55d875ea1cab";
+    let expression = visible_root_match_expression(route_id).expect("verified route expression");
+    assert!(expression.contains(&format!("/local/{route_id}")));
+    assert!(expression.contains("main.main-surface"));
+    assert!(expression.contains("[data-codex-composer=\\\"true\\\"]"));
+    for forbidden in ["textContent", "innerText", "prompt", "response", "fetch("] {
+        assert!(!expression.contains(forbidden));
+    }
+    assert!(visible_root_match_expression("not-a-route").is_err());
 }
 
 #[test]

@@ -101,6 +101,13 @@ pub struct VisiblePreflightRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisibleRootControlRequest {
+    pub root_conversation_id: Uuid,
+    pub route_key: Uuid,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VisibleControlBinding {
     pub session_id: String,
     pub target_id: String,
@@ -253,6 +260,83 @@ pub async fn insert_preflight_directive_on_pages_detailed(
     Ok(None)
 }
 
+pub async fn bind_routing_controls_on_pages_detailed(
+    endpoint: &BrowserEndpoint,
+    script: &str,
+    css: &str,
+    requests: &[VisibleRootControlRequest],
+    timeout_ms: u64,
+) -> Result<Vec<VisibleControlBinding>, VisiblePreflightError> {
+    let targets = fetch_page_targets(endpoint, timeout_ms)
+        .await
+        .map_err(VisiblePreflightError::Discovery)?;
+    let mut bindings = Vec::new();
+    for target in targets {
+        if !safe_bridge_id(&target.target_id) {
+            continue;
+        }
+        let Ok(mut client) = CdpClient::connect_target(&target, endpoint.port(), timeout_ms).await
+        else {
+            continue;
+        };
+        for request in requests {
+            let expression =
+                visible_root_match_expression(&request.root_conversation_id.to_string())
+                    .map_err(|_| VisiblePreflightError::InvalidControl)?;
+            let matches = client
+                .evaluate_boolean(&expression)
+                .await
+                .map_err(VisiblePreflightError::Cdp)?;
+            if !matches {
+                continue;
+            }
+            let session_id = format!("root-{}", request.route_key);
+            let bootstrap = ControlBootstrap {
+                session_id: session_id.clone(),
+                target_id: target.target_id.clone(),
+                route_id: request.root_conversation_id.to_string(),
+                route_key: request.route_key.to_string(),
+                observed: true,
+                parent_thread_id: None,
+                submit_shortcut: SubmitShortcut::Enter,
+            };
+            let current_expression = format!(
+                "globalThis.__codexAssistantControlV1?.routeId===\"{}\"&&globalThis.__codexAssistantControlV1?.routeKey===\"{}\"&&globalThis.__codexAssistantControlV1?.sessionId===\"{}\"&&globalThis.__codexAssistantControlV1?.targetId===\"{}\"",
+                request.root_conversation_id, request.route_key, session_id, target.target_id
+            );
+            let already_bound = client
+                .evaluate_boolean(&current_expression)
+                .await
+                .map_err(VisiblePreflightError::Cdp)?;
+            if !already_bound {
+                let source = build_control_source(script, css, &bootstrap)
+                    .map_err(|_| VisiblePreflightError::InvalidControl)?;
+                apply_injection(&mut client, &source)
+                    .await
+                    .map_err(VisiblePreflightError::Injection)?;
+            }
+            let verified_expression = format!(
+                "({current_expression})&&document.querySelectorAll(\"[data-codex-assistant-control]\").length===1"
+            );
+            if !client
+                .evaluate_boolean(&verified_expression)
+                .await
+                .map_err(VisiblePreflightError::Cdp)?
+            {
+                return Err(VisiblePreflightError::InvalidControl);
+            }
+            bindings.push(VisibleControlBinding {
+                session_id,
+                target_id: target.target_id.clone(),
+                root_conversation_id: request.root_conversation_id,
+                route_key: request.route_key,
+            });
+            break;
+        }
+    }
+    Ok(bindings)
+}
+
 pub async fn request_visible_agent_stop(
     endpoint: &BrowserEndpoint,
     timeout_ms: u64,
@@ -399,6 +483,15 @@ pub fn routing_ready_expression(ready: bool) -> String {
 
 pub fn routing_enabled_expression(enabled: bool) -> String {
     format!("globalThis.__codexAssistantControlV1?.syncEnabled({enabled}) === true")
+}
+
+pub fn visible_root_match_expression(route_id: &str) -> Result<String, InjectionPlanError> {
+    if !valid_uuid(route_id) {
+        return Err(InjectionPlanError::InvalidScript);
+    }
+    Ok(format!(
+        r#"(()=>{{const roots=document.querySelectorAll("[data-codex-composer-root]");const composers=document.querySelectorAll("[data-codex-composer=\"true\"]");return location.pathname==="/local/{route_id}"&&document.querySelectorAll("main.main-surface").length===1&&document.querySelectorAll("aside.app-shell-left-panel").length===1&&roots.length===1&&composers.length===1&&roots[0].contains(composers[0])&&composers[0].querySelectorAll(".ProseMirror").length===1}})()"#
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

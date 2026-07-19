@@ -13,6 +13,9 @@ export function ThemesPage() {
   const themes = useTheme();
   const snapshot = themes.snapshot;
   const ready = snapshot?.session_status === "ready";
+  const paused = snapshot?.session_status === "paused";
+  const selectedThemeId = snapshot?.selected_theme_id ?? null;
+  const hasThemeState = Boolean(selectedThemeId || snapshot?.applied_theme_id);
 
   if (themes.loading) {
     return (
@@ -29,7 +32,7 @@ export function ThemesPage() {
         <div>
           <span className="eyebrow">RIGHTS-AUDITED ONE-CLICK SKINS</span>
           <h2>主题管理</h2>
-          <p>选择版权已核验的声明式主题，一键应用到当前 Codex 窗口。</p>
+          <p>选择版权已核验的声明式主题，一键应用到所有已打开的 Codex 主任务窗口。</p>
         </div>
         <button className="icon-button" onClick={themes.refresh} disabled={themes.refreshing}>
           {themes.refreshing ? "刷新中" : "刷新状态"}
@@ -45,19 +48,28 @@ export function ThemesPage() {
       <article className="theme-session-panel">
         <div>
           <span className="eyebrow">VERIFIED LOCAL SESSION</span>
-          <h3>{ready ? "主题会话已就绪" : "启动主题会话"}</h3>
+          <h3>{ready ? "主题会话已就绪" : paused ? "主题已暂停" : "启动主题会话"}</h3>
           <p>
-            首次启用会安全重启一次 Codex，以建立仅绑定本机、同一 Windows 用户和官方 Codex
-            进程的控制会话。若运行中的原生子代理存在，会先要求确认；确认后可终止任务并强制重启。
+            {paused
+              ? "已保留你的主题选择，但当前没有经过验证的控制会话。恢复时会在你确认后重新建立会话并验证主题确实可见。"
+              : "首次启用会安全重启一次 Codex，以建立仅绑定本机、同一 Windows 用户和官方 Codex 进程的控制会话。若运行中的原生子代理存在，会先要求确认；确认后可终止任务并强制重启。"}
           </p>
         </div>
         {!ready ? (
           <button
             className="button-primary"
-            onClick={() => void themes.startSession()}
+            onClick={() =>
+              void (paused && selectedThemeId
+                ? themes.activate(selectedThemeId)
+                : themes.startSession())
+            }
             disabled={themes.operation !== null}
           >
-            {themes.operation === "start-session" ? "正在安全启动…" : "启动主题会话"}
+            {themes.operation === "start-session" || themes.operation === "activate"
+              ? "正在安全启动…"
+              : paused
+                ? "恢复主题会话"
+                : "启动主题会话"}
           </button>
         ) : (
           <span className="theme-session-ready" role="status">
@@ -127,15 +139,28 @@ export function ThemesPage() {
         <div>
           <span className="eyebrow">SAFE RESTORE</span>
           <h3>恢复官方外观</h3>
-          <p>仅移除 Codex Assistant 注入的样式，不修改 Codex 安装文件或用户数据。</p>
+          <p>
+            仅移除 Codex Assistant 注入到主任务窗口的样式，不修改 Smart Routing、Codex
+            安装文件或用户数据。
+          </p>
         </div>
-        <button
-          className="button-secondary"
-          onClick={() => void themes.restore()}
-          disabled={!snapshot?.applied_theme_id || themes.operation !== null}
-        >
-          {themes.operation === "restore" ? "正在恢复…" : "恢复官方外观"}
-        </button>
+        {hasThemeState ? (
+          <button
+            className="button-secondary"
+            onClick={() => void themes.restore()}
+            disabled={themes.operation !== null}
+          >
+            {themes.operation === "restore"
+              ? "正在恢复…"
+              : paused && !snapshot?.applied_theme_id
+                ? "取消主题并保持官方外观"
+                : "恢复官方外观"}
+          </button>
+        ) : (
+          <span className="theme-official-status" role="status">
+            当前已是官方外观
+          </span>
+        )}
       </article>
 
       {themes.pendingForce ? (

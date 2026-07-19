@@ -802,7 +802,10 @@ button:disabled {
 
 .agent-row {
   display: grid;
-  grid-template-columns: 9px minmax(180px, 1.4fr) minmax(170px, 1fr) minmax(140px, 0.9fr) 88px;
+  grid-template-columns: 9px minmax(180px, 1.35fr) minmax(160px, 0.9fr) minmax(
+      120px,
+      0.75fr
+    ) minmax(220px, 1.1fr);
   align-items: center;
   gap: 13px;
   min-height: 68px;
@@ -814,6 +817,90 @@ button:disabled {
     border-color 160ms ease,
     background 160ms ease,
     transform 160ms ease;
+}
+
+.agent-row-wrap {
+  display: grid;
+  gap: 7px;
+}
+
+.root-routing-control {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: end;
+  gap: 6px 8px;
+}
+
+.root-routing-control details {
+  grid-column: 1 / -1;
+  color: var(--quiet);
+  font-size: 9px;
+  text-align: right;
+}
+
+.root-routing-control summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.root-routing-control details p {
+  max-width: 310px;
+  margin: 6px 0 0 auto;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.routing-state {
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #b9c2d4;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.routing-state--pending-open,
+.routing-state--pending-next-turn {
+  color: #f7d9a5;
+  background: rgba(240, 189, 109, 0.1);
+}
+
+.routing-state--enabled {
+  color: #aeecc9;
+  background: rgba(103, 212, 154, 0.1);
+}
+
+.routing-state--needs-repair {
+  color: #ffc0c7;
+  background: rgba(255, 122, 134, 0.1);
+}
+
+.routing-first-use {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(108, 167, 255, 0.2);
+  border-radius: 10px;
+  color: #cbdcff;
+  background: rgba(108, 167, 255, 0.055);
+}
+
+.routing-first-use strong,
+.routing-first-use p {
+  margin: 0;
+  font-size: 10px;
+}
+
+.routing-first-use p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.routing-first-use button {
+  grid-row: 1 / 3;
+  grid-column: 2;
 }
 
 .agent-row:hover {
@@ -1310,6 +1397,16 @@ footer {
 .theme-session-ready {
   padding: 8px 11px;
   border-radius: 8px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.theme-official-status {
+  padding: 8px 11px;
+  border: 1px solid rgba(103, 212, 154, 0.2);
+  border-radius: 8px;
+  color: #aeecc9;
+  background: rgba(103, 212, 154, 0.07);
   font-size: 10px;
   white-space: nowrap;
 }

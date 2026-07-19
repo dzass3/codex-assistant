@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { AgentObservation } from "../../shared/monitor-types";
 import { AgentTree } from "./AgentTree";
 
@@ -58,5 +58,55 @@ describe("AgentTree", () => {
       />,
     );
     expect(screen.getByText("没有匹配的代理")).toBeInTheDocument();
+  });
+
+  it("places a verified Smart Routing control only on each root row", () => {
+    const setRootEnabled = vi.fn();
+    render(
+      <AgentTree
+        agents={[root, child]}
+        filters={{ query: "", model: "all", project: "all", activeOnly: false }}
+        routing={{
+          available: true,
+          operationActive: false,
+          routes: [{ conversation_id: "root", enabled: true }],
+          controls: [{ conversation_id: "root", status: "pending-open" }],
+          onSetRootEnabled: setRootEnabled,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("等待打开")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "关闭 主任务 Smart Routing" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: /后端实现 Smart Routing/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/数据不足/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭 主任务 Smart Routing" }));
+    expect(setRootEnabled).toHaveBeenCalledWith("root", false);
+  });
+
+  it("explains quality-first routing when a root enables it for the first time", () => {
+    const setRootEnabled = vi.fn();
+    render(
+      <AgentTree
+        agents={[root]}
+        filters={{ query: "", model: "all", project: "all", activeOnly: false }}
+        routing={{
+          available: true,
+          operationActive: false,
+          routes: [{ conversation_id: "root", enabled: false }],
+          controls: [{ conversation_id: "root", status: "off" }],
+          onSetRootEnabled: setRootEnabled,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "启用 主任务 Smart Routing" }));
+
+    expect(setRootEnabled).toHaveBeenCalledWith("root", true);
+    expect(screen.getByRole("status")).toHaveTextContent("质量优先");
+    expect(screen.getByRole("status")).toHaveTextContent("下一条消息");
   });
 });

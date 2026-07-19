@@ -27,6 +27,8 @@ import type {
   ForceRestartImpact,
   RestartIntent,
   RestartMode,
+  RootRoutingControlSnapshot,
+  RoutingActivationStatus,
 } from "../../shared/routing-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -65,6 +67,13 @@ const PHASES = new Set<RoutePhase>([
   "reviewing",
   "completed",
   "degraded",
+]);
+const ACTIVATION_STATUSES = new Set<RoutingActivationStatus>([
+  "off",
+  "pending-open",
+  "pending-next-turn",
+  "enabled",
+  "needs-repair",
 ]);
 const QUALITY_OUTCOMES = new Set<QualityOutcome>(["passed", "failed", "degraded"]);
 const REASONS = new Set<RouteReasonCode>([
@@ -553,11 +562,33 @@ function routingSetup(value: unknown): RoutingSetupSnapshot | null {
 
 export function toRoutingUiSnapshot(value: unknown): RoutingUiSnapshot | null {
   const raw = record(value);
-  if (raw === null || !exactKeys(raw, ["contract_version", "setup", "routing"])) return null;
+  if (raw === null || !exactKeys(raw, ["contract_version", "setup", "routing", "controls"])) {
+    return null;
+  }
   const setup = routingSetup(raw.setup);
   const routing = toRoutingSnapshot(raw.routing);
-  return raw.contract_version === 1 && setup !== null && routing !== null
-    ? { contract_version: 1, setup, routing }
+  const controls = Array.isArray(raw.controls)
+    ? raw.controls.map((entry): RootRoutingControlSnapshot | null => {
+        const control = record(entry);
+        if (control === null || !exactKeys(control, ["conversation_id", "status"])) return null;
+        const conversationId = uuid(control.conversation_id);
+        const status = string(control.status);
+        return conversationId !== null &&
+          status !== null &&
+          ACTIVATION_STATUSES.has(status as RoutingActivationStatus)
+          ? { conversation_id: conversationId, status: status as RoutingActivationStatus }
+          : null;
+      })
+    : null;
+  if (
+    controls === null ||
+    controls.some((control) => control === null) ||
+    new Set(controls.map((control) => control?.conversation_id)).size !== controls.length
+  ) {
+    return null;
+  }
+  return raw.contract_version === 2 && setup !== null && routing !== null
+    ? { contract_version: 2, setup, routing, controls: controls as RootRoutingControlSnapshot[] }
     : null;
 }
 

@@ -179,4 +179,23 @@ describe("ThemesPage", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(cancelForceRestart).toHaveBeenCalledOnce();
   });
+
+  it("shows a paused preference with explicit resume and official-appearance actions", () => {
+    const value = state({
+      contract_version: 2,
+      session_status: "paused",
+      selected_theme_id: "aurora-grid",
+      applied_theme_id: null,
+      packs: [aurora],
+    });
+    vi.mocked(useTheme).mockReturnValue(value);
+    render(<ThemesPage />);
+
+    expect(screen.getByRole("heading", { name: "主题已暂停" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "恢复主题会话" }));
+    expect(value.activate).toHaveBeenCalledWith("aurora-grid");
+
+    fireEvent.click(screen.getByRole("button", { name: "取消主题并保持官方外观" }));
+    expect(value.restore).toHaveBeenCalledOnce();
+  });
 });
