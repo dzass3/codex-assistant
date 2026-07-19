@@ -138,7 +138,7 @@ legacy_pre_done:
     Goto legacy_post_rollback
   ${EndIf}
 
-  DetailPrint "Codex Assistant 0.6.0 verified; removing the legacy identity"
+  DetailPrint "Codex Assistant 0.7.0 verified; removing the legacy identity"
   Delete "$R4\${LEGACY_MAIN_BINARY}"
   ${If} ${FileExists} "$R4\${LEGACY_MAIN_BINARY}"
     Abort "Codex Assistant was installed, but the legacy executable could not be removed. Its recovery identity was retained."

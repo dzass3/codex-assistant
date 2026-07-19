@@ -142,19 +142,19 @@ export default function Home() {
           <span>Windows 11</span>
           <strong>Codex Assistant Desktop</strong>
           <ul>
-            <li>原生子代理面板内持续路由</li>
+            <li>每个根任务独立开关并同步原生输入框</li>
             <li>安全重启与票据化受控强制重启</li>
             <li>12 个版权已核验的一键主题</li>
           </ul>
           <a
             className="download-action"
             data-spotlight
-            href="/downloads/Codex-Assistant-0.6.0-x64-setup.exe"
+            href="/downloads/Codex-Assistant-0.7.0-x64-setup.exe"
             download
           >
-            下载 Windows 安装包 <span>3.57 MiB</span>
+            下载 Windows 安装包 <span>3.59 MiB</span>
           </a>
-          <p>0.6.0 · 3,747,870 bytes · SHA-256 · d88382969a45…a26bab55</p>
+          <p>0.7.0 · 3,765,482 bytes · SHA-256 · bd282f25c4d3…81ea7462</p>
         </div>
       </section>
 
