@@ -7,16 +7,16 @@ use crate::control_layer::cdp::{
 
 const ENGINE_VERSION: u32 = 1;
 const OBSERVATORY_MUSE: &[u8] = include_bytes!("../resources/themes/original-observatory-muse.jpg");
-const GOTHIC_HORIZON: &[u8] = include_bytes!("../../public/themes/gothic-horizon.png");
-const ROSEGLASS_ATELIER: &[u8] = include_bytes!("../../public/themes/roseglass-atelier.png");
-const BLUSH_CIRCUIT: &[u8] = include_bytes!("../../public/themes/blush-circuit.png");
-const FORTUNE_FOUNDRY: &[u8] = include_bytes!("../../public/themes/fortune-foundry.png");
-const CRIMSON_RELAY: &[u8] = include_bytes!("../../public/themes/crimson-relay.png");
-const CRYSTAL_DAYLIGHT: &[u8] = include_bytes!("../../public/themes/crystal-daylight.png");
-const POCKET_COSMOS: &[u8] = include_bytes!("../../public/themes/pocket-cosmos.png");
-const VIOLET_AFTERDARK: &[u8] = include_bytes!("../../public/themes/violet-afterdark.png");
-const CYAN_CHORUS: &[u8] = include_bytes!("../../public/themes/cyan-chorus.png");
-const NOIR_STAGE: &[u8] = include_bytes!("../../public/themes/noir-stage.png");
+const GOTHIC_HORIZON: &[u8] = include_bytes!("../../public/themes/gothic-horizon.webp");
+const ROSEGLASS_ATELIER: &[u8] = include_bytes!("../../public/themes/roseglass-atelier.webp");
+const BLUSH_CIRCUIT: &[u8] = include_bytes!("../../public/themes/blush-circuit.webp");
+const FORTUNE_FOUNDRY: &[u8] = include_bytes!("../../public/themes/fortune-foundry.webp");
+const CRIMSON_RELAY: &[u8] = include_bytes!("../../public/themes/crimson-relay.webp");
+const CRYSTAL_DAYLIGHT: &[u8] = include_bytes!("../../public/themes/crystal-daylight.webp");
+const POCKET_COSMOS: &[u8] = include_bytes!("../../public/themes/pocket-cosmos.webp");
+const VIOLET_AFTERDARK: &[u8] = include_bytes!("../../public/themes/violet-afterdark.webp");
+const CYAN_CHORUS: &[u8] = include_bytes!("../../public/themes/cyan-chorus.webp");
+const NOIR_STAGE: &[u8] = include_bytes!("../../public/themes/noir-stage.webp");
 const THEME_CATALOG: &str = include_str!("../../shared/theme-catalog.json");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

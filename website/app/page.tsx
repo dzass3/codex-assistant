@@ -152,9 +152,9 @@ export default function Home() {
             href="/downloads/Codex-Assistant-0.6.0-x64-setup.exe"
             download
           >
-            下载 Windows 安装包 <span>38.59 MiB</span>
+            下载 Windows 安装包 <span>3.57 MiB</span>
           </a>
-          <p>0.6.0 · 40,466,919 bytes · SHA-256 · c2c0e9ae4559…da23910</p>
+          <p>0.6.0 · 3,747,870 bytes · SHA-256 · d88382969a45…a26bab55</p>
         </div>
       </section>
 

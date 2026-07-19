@@ -8,7 +8,7 @@
       "name": "Aurora Grid",
       "description": "Project-owned abstract aurora with restrained glass surfaces.",
       "category": "abstract",
-      "preview_path": "/themes/aurora-grid.png",
+      "preview_path": "/themes/aurora-grid.webp",
       "backdrop": { "kind": "gradient", "angle": 135, "colors": ["#07111f", "#18204b", "#0b4d5f"] },
       "palette": {
         "surface": "#101827",
@@ -21,8 +21,8 @@
       "assets": [
         {
           "id": "aurora-grid-preview",
-          "mime_type": "image/png",
-          "sha256": "63df155c5dcb72c5c572e5e9c0253be8d72dc2d5f367c17754def8474dbc6a69"
+          "mime_type": "image/webp",
+          "sha256": "d3834b3f7b603dc65dc6920d891ef8e323a5c8077ed2eaa71085efeb1680478a"
         }
       ],
       "rights": {
@@ -84,7 +84,7 @@
       "name": "Gothic Horizon",
       "description": "A fictional graphite horizon framed by monumental teal-lit forms.",
       "category": "project-showcase",
-      "preview_path": "/themes/gothic-horizon.png",
+      "preview_path": "/themes/gothic-horizon.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "gothic-horizon",
@@ -103,8 +103,8 @@
       "assets": [
         {
           "id": "gothic-horizon",
-          "mime_type": "image/png",
-          "sha256": "635824e3103e8c0036bb4a7af8e0ec7d921426a3e7f388a4f9b72e8899700aa2"
+          "mime_type": "image/webp",
+          "sha256": "bb7e0774e4bc9ac1affe7736030f6b0e7be8a9c877eca221e0682da32098abed"
         }
       ],
       "rights": {
@@ -125,7 +125,7 @@
       "name": "Roseglass Atelier",
       "description": "Layered rose glass and quiet champagne light for a bright workspace.",
       "category": "abstract",
-      "preview_path": "/themes/roseglass-atelier.png",
+      "preview_path": "/themes/roseglass-atelier.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "roseglass-atelier",
@@ -144,8 +144,8 @@
       "assets": [
         {
           "id": "roseglass-atelier",
-          "mime_type": "image/png",
-          "sha256": "7796eeb9ad8f9cf32322086fe2eb3bf82976fb4990f67b738edf03d952fd1411"
+          "mime_type": "image/webp",
+          "sha256": "caf553b9a731734ac5306970a387f5dfb86bbb580024aaad6cfe734285bac04f"
         }
       ],
       "rights": {
@@ -166,7 +166,7 @@
       "name": "Blush Circuit",
       "description": "Fine coral signal paths around a calm plum workspace.",
       "category": "abstract",
-      "preview_path": "/themes/blush-circuit.png",
+      "preview_path": "/themes/blush-circuit.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "blush-circuit",
@@ -185,8 +185,8 @@
       "assets": [
         {
           "id": "blush-circuit",
-          "mime_type": "image/png",
-          "sha256": "b3674018a500798258279a7bf74931f99ead7b307fe6465dd582d4c0b50e9682"
+          "mime_type": "image/webp",
+          "sha256": "c1ac0d757d4b7f0918f2d444ef6fc82f06f966e27306655ac42b0610acf9c145"
         }
       ],
       "rights": {
@@ -207,7 +207,7 @@
       "name": "Fortune Foundry",
       "description": "Warm geometric metals and amber rings in a restrained fictional foundry.",
       "category": "project-showcase",
-      "preview_path": "/themes/fortune-foundry.png",
+      "preview_path": "/themes/fortune-foundry.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "fortune-foundry",
@@ -226,8 +226,8 @@
       "assets": [
         {
           "id": "fortune-foundry",
-          "mime_type": "image/png",
-          "sha256": "a5790aa043355755c8eec370854aa0452a8cb66609f48714cf439417b16fa29c"
+          "mime_type": "image/webp",
+          "sha256": "aafb0a7c97c7fda90e4df00a6d937233f4af34f38481583005ba85871b5de633"
         }
       ],
       "rights": {
@@ -248,7 +248,7 @@
       "name": "Crimson Relay",
       "description": "Fast crimson light ribbons crossing a precise graphite field.",
       "category": "abstract",
-      "preview_path": "/themes/crimson-relay.png",
+      "preview_path": "/themes/crimson-relay.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "crimson-relay",
@@ -267,8 +267,8 @@
       "assets": [
         {
           "id": "crimson-relay",
-          "mime_type": "image/png",
-          "sha256": "259367a00dd4b7118a20abc190abb0362d19a111a567568847d90f50241764d6"
+          "mime_type": "image/webp",
+          "sha256": "d9b3ec779b6aa37495292a488eb2f50fc7a266baadb63ccc34337863cc203907"
         }
       ],
       "rights": {
@@ -289,7 +289,7 @@
       "name": "Crystal Daylight",
       "description": "Frosted blue prisms and open daylight for a clear, quiet workspace.",
       "category": "project-showcase",
-      "preview_path": "/themes/crystal-daylight.png",
+      "preview_path": "/themes/crystal-daylight.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "crystal-daylight",
@@ -308,8 +308,8 @@
       "assets": [
         {
           "id": "crystal-daylight",
-          "mime_type": "image/png",
-          "sha256": "2a48f4e75b4bc84530b7b555bc0957756763550955e91f9ccf91dcb913b8137c"
+          "mime_type": "image/webp",
+          "sha256": "3ace777021e049fc21189ce0297e14bfea813f9f6bea54a05912a1a4d6b7ff7e"
         }
       ],
       "rights": {
@@ -330,7 +330,7 @@
       "name": "Pocket Cosmos",
       "description": "Tiny fictional orbital worlds suspended in deep navy glass.",
       "category": "project-showcase",
-      "preview_path": "/themes/pocket-cosmos.png",
+      "preview_path": "/themes/pocket-cosmos.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "pocket-cosmos",
@@ -349,8 +349,8 @@
       "assets": [
         {
           "id": "pocket-cosmos",
-          "mime_type": "image/png",
-          "sha256": "77f40b7156c20ccc16f3fc08e240f376997d8f8368ffad1b99781c34973d5e9c"
+          "mime_type": "image/webp",
+          "sha256": "8fb290521e92c186b6837bba0eddbecfd44ce000d8e217170f8f14343aed2da2"
         }
       ],
       "rights": {
@@ -371,7 +371,7 @@
       "name": "Violet Afterdark",
       "description": "A fictional translucent skyline glowing through quiet indigo night.",
       "category": "project-showcase",
-      "preview_path": "/themes/violet-afterdark.png",
+      "preview_path": "/themes/violet-afterdark.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "violet-afterdark",
@@ -390,8 +390,8 @@
       "assets": [
         {
           "id": "violet-afterdark",
-          "mime_type": "image/png",
-          "sha256": "46dfa3862c593f8774be669fc963e233505da48fe79509b9a92bdb84178af192"
+          "mime_type": "image/webp",
+          "sha256": "26e1eeaf51f8f434f94c3146be82f389d02465bf81eef5de9f1a430ea704249b"
         }
       ],
       "rights": {
@@ -412,7 +412,7 @@
       "name": "Cyan Chorus",
       "description": "Synchronized cyan light waves around a calm teal center.",
       "category": "abstract",
-      "preview_path": "/themes/cyan-chorus.png",
+      "preview_path": "/themes/cyan-chorus.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "cyan-chorus",
@@ -431,8 +431,8 @@
       "assets": [
         {
           "id": "cyan-chorus",
-          "mime_type": "image/png",
-          "sha256": "92667b497e0ab9381a7306d6826a4899cc52534463cc60b1f907bfea2dedffaa"
+          "mime_type": "image/webp",
+          "sha256": "93606da13e104310e3258acc5d9605d51bfe495d3c7678e420c21f43e7ebde1f"
         }
       ],
       "rights": {
@@ -453,7 +453,7 @@
       "name": "Noir Stage",
       "description": "Minimal black drapery and warm spotlights framing a quiet center.",
       "category": "project-showcase",
-      "preview_path": "/themes/noir-stage.png",
+      "preview_path": "/themes/noir-stage.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "noir-stage",
@@ -472,8 +472,8 @@
       "assets": [
         {
           "id": "noir-stage",
-          "mime_type": "image/png",
-          "sha256": "d586ec1587f43877f798eb90dbdd1e574d356dc8f4446277b1c48b9aa5c1662d"
+          "mime_type": "image/webp",
+          "sha256": "7b5b554993b17fd33439bc00145d40915845ae3ac96d8ee42efed1586f8d4f9b"
         }
       ],
       "rights": {

@@ -54,8 +54,8 @@ test("removes starter metadata and keeps public/native capability boundaries exp
   assert.match(productDemo, /仅展示脱敏示例数据/);
   assert.match(productDemo, /控制本机 Codex 需要 Windows 桌面版/);
   assert.match(page, /\/downloads\/Codex-Assistant-0\.6\.0-x64-setup\.exe/);
-  assert.match(page, /40,466,919 bytes/);
-  assert.match(page, /c2c0e9ae4559/);
+  assert.match(page, /3,747,870 bytes/);
+  assert.match(page, /d88382969a45/);
   assert.match(page, /shared\/theme-catalog\.json/);
   assert.match(page, /\/images\/observatory-hero\.webp/);
   assert.match(homepageMotion, /IntersectionObserver/);
