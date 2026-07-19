@@ -11,13 +11,15 @@ const verifiedRights = {
   commercial_redistribution: true,
   attribution: "Original artwork created for Codex Assistant",
   reviewed_at: "2026-07-18",
+  manual_signoff: true,
   status: "verified",
 };
 
 const snapshot = {
-  contract_version: 1,
+  contract_version: 2,
   session_status: "ready",
-  active_theme_id: "aurora-grid",
+  selected_theme_id: "aurora-grid",
+  applied_theme_id: "aurora-grid",
   packs: [
     {
       schema_version: 1,
@@ -103,7 +105,7 @@ describe("theme snapshot boundary", () => {
   it.each([
     { ...snapshot, prompt: "CANARY_PRIVATE_PROMPT" },
     { ...snapshot, session_status: "unknown" },
-    { ...snapshot, active_theme_id: "missing-pack" },
+    { ...snapshot, applied_theme_id: "missing-pack" },
     { ...snapshot, packs: [{ ...snapshot.packs[0], category: "celebrity" }] },
     { ...snapshot, packs: [{ ...snapshot.packs[0], preview_path: "https://remote/theme.jpg" }] },
     {
@@ -128,24 +130,42 @@ describe("theme snapshot boundary", () => {
 describe("theme command surface", () => {
   beforeEach(() => vi.mocked(invoke).mockReset());
 
-  it("uses exactly four narrow commands and a bounded theme identifier", async () => {
+  it("uses exactly four narrow commands and one-click activation with a bounded identifier", async () => {
     vi.mocked(invoke)
       .mockResolvedValueOnce(snapshot)
       .mockResolvedValueOnce(receipt)
+      .mockResolvedValueOnce({
+        confirmation_ticket: "d2719d93-b823-4a7f-934f-23cbe01c8ab1",
+        intent: "activate-theme",
+        active_native_children: 2,
+        grace_period_ms: 5000,
+        expires_at_ms: 100000,
+      })
       .mockResolvedValueOnce(receipt)
       .mockResolvedValueOnce(receipt);
 
     await expect(themeApi.getSnapshot()).resolves.toEqual(snapshot);
     await expect(themeApi.startSession()).resolves.toEqual(receipt);
-    await expect(themeApi.apply("observatory-muse")).resolves.toEqual(receipt);
+    await expect(
+      themeApi.prepareForceRestart("activate-theme", "observatory-muse"),
+    ).resolves.toMatchObject({ active_native_children: 2 });
+    await expect(themeApi.activate("observatory-muse")).resolves.toEqual(receipt);
     await expect(themeApi.restore()).resolves.toEqual(receipt);
 
     expect(vi.mocked(invoke).mock.calls).toEqual([
       ["get_theme_snapshot"],
-      ["start_theme_session"],
-      ["apply_theme", { themeId: "observatory-muse" }],
+      ["start_theme_session", { restartMode: "safe", confirmationTicket: null }],
+      ["prepare_force_restart", { intent: "activate-theme", subject: "observatory-muse" }],
+      [
+        "activate_theme",
+        {
+          themeId: "observatory-muse",
+          restartMode: "safe",
+          confirmationTicket: null,
+        },
+      ],
       ["restore_theme"],
     ]);
-    await expect(themeApi.apply("../outside")).rejects.toThrow("Invalid theme identifier");
+    await expect(themeApi.activate("../outside")).rejects.toThrow("Invalid theme identifier");
   });
 });

@@ -24,6 +24,9 @@ import type {
   RoutingSetupReasonCode,
   RoutingOperationReceipt,
   RoutingOperationStatus,
+  ForceRestartImpact,
+  RestartIntent,
+  RestartMode,
 } from "../../shared/routing-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -127,6 +130,19 @@ const SETUP_REASONS = new Set<RoutingSetupReasonCode>([
   "unsupported-host",
   "cdp-unavailable",
   "routing-runtime-unavailable",
+  "confirmation-required",
+  "confirmation-expired",
+  "impact-changed",
+  "operation-conflict",
+  "identity-changed",
+  "graceful-stop-unsupported",
+  "termination-failed",
+  "old-tree-still-running",
+  "launch-failed",
+  "cdp-verification-failed",
+  "dom-incompatible",
+  "partial-apply-failed",
+  "terminal-partial-failure",
 ]);
 const OPERATION_STATUSES = new Set<RoutingOperationStatus>([
   "applied",
@@ -583,6 +599,59 @@ async function mutation(result: Promise<unknown>): Promise<RoutingOperationRecei
   return receipt;
 }
 
+const RESTART_INTENTS = new Set<RestartIntent>([
+  "routing-restart",
+  "theme-session",
+  "activate-theme",
+]);
+
+export function toForceRestartImpact(value: unknown): ForceRestartImpact | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, [
+      "confirmation_ticket",
+      "intent",
+      "active_native_children",
+      "grace_period_ms",
+      "expires_at_ms",
+    ])
+  )
+    return null;
+  const confirmationTicket = uuid(raw.confirmation_ticket);
+  const intent = string(raw.intent);
+  const activeNativeChildren = integer(raw.active_native_children);
+  const expiresAtMs = integer(raw.expires_at_ms);
+  if (
+    confirmationTicket === null ||
+    intent === null ||
+    !RESTART_INTENTS.has(intent as RestartIntent) ||
+    activeNativeChildren === null ||
+    activeNativeChildren === 0 ||
+    raw.grace_period_ms !== 5_000 ||
+    expiresAtMs === null
+  )
+    return null;
+  return {
+    confirmation_ticket: confirmationTicket,
+    intent: intent as RestartIntent,
+    active_native_children: activeNativeChildren,
+    grace_period_ms: 5_000,
+    expires_at_ms: expiresAtMs,
+  };
+}
+
+async function prepareForceRestart(
+  intent: RestartIntent,
+  subject?: string,
+): Promise<ForceRestartImpact> {
+  const impact = toForceRestartImpact(
+    await invoke("prepare_force_restart", { intent, subject: subject ?? null }),
+  );
+  if (impact === null) throw new Error("Malformed force restart impact");
+  return impact;
+}
+
 function validRelationships(snapshot: RoutingSnapshot): boolean {
   const eligibilityKeys = new Set<string>();
   for (const eligibilityRecord of snapshot.eligibility) {
@@ -712,7 +781,16 @@ export const routingApi = {
   },
   install: () => mutation(invoke("install_routing")),
   restore: () => mutation(invoke("restore_routing")),
-  requestCodexRestart: () => mutation(invoke("request_codex_restart")),
+  prepareForceRestart,
+  cancelForceRestart: (confirmationTicket: string) =>
+    invoke("cancel_force_restart", { confirmationTicket }).then((value) => value === true),
+  requestCodexRestart: (restartMode: RestartMode = "safe", confirmationTicket?: string) =>
+    mutation(
+      invoke("request_codex_restart", {
+        restartMode,
+        confirmationTicket: confirmationTicket ?? null,
+      }),
+    ),
   beginPreflight: (rootConversationId: string) =>
     mutation(invoke("begin_routing_preflight", { rootConversationId })),
   setRootEnabled: (rootConversationId: string, enabled: boolean) =>

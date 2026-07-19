@@ -10,7 +10,8 @@ use codex_assistant_lib::monitor::model::{
 };
 use codex_assistant_lib::routing::{EligibilityReasonCode, EligibilityStatus, RouteKind};
 use codex_assistant_lib::routing_app::{
-    OperationStatus, RoutingApplication, RoutingInstallationStatus, RoutingRestartStatus,
+    OperationStatus, RestartIntent, RoutingApplication, RoutingInstallationStatus,
+    RoutingRestartStatus, RoutingSetupReasonCode, VerifiedRootFingerprint,
 };
 use tempfile::tempdir;
 
@@ -135,6 +136,97 @@ fn restart_is_blocked_while_a_native_child_is_active() {
     assert_eq!(
         app.snapshot().setup.restart_status,
         RoutingRestartStatus::BlockedActiveChild
+    );
+}
+
+fn root_fingerprint() -> VerifiedRootFingerprint {
+    VerifiedRootFingerprint {
+        pid: 72_000,
+        created_at_ticks: 123_456,
+        owner_sid: "S-1-5-21-1000".into(),
+        canonical_executable: r"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe".into(),
+        package_version: "26.715.3651.0".into(),
+    }
+}
+
+#[test]
+fn force_restart_ticket_is_single_use_bound_to_impact_and_expires() {
+    let root = tempdir().expect("temporary root");
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().expect("test executable"),
+        root.path().join("state"),
+    )
+    .expect("routing application");
+    app.install();
+    let impact = app
+        .prepare_force_restart_with(RestartIntent::RoutingRestart, 2, 10_000, || {
+            Ok(root_fingerprint())
+        })
+        .expect("sanitized confirmation impact");
+    assert_eq!(impact.active_native_children, 2);
+    assert_eq!(impact.grace_period_ms, 5_000);
+    assert_eq!(impact.expires_at_ms, 70_000);
+
+    let changed = app.force_restart_with(
+        &impact.confirmation_ticket,
+        RestartIntent::RoutingRestart,
+        1,
+        10_001,
+        || Ok(root_fingerprint()),
+        |_, _| Ok(()),
+    );
+    assert_eq!(changed.status, OperationStatus::Blocked);
+    assert_eq!(
+        changed.reason_codes,
+        vec![RoutingSetupReasonCode::ImpactChanged]
+    );
+
+    let replay = app.force_restart_with(
+        &impact.confirmation_ticket,
+        RestartIntent::RoutingRestart,
+        2,
+        10_002,
+        || Ok(root_fingerprint()),
+        |_, _| Ok(()),
+    );
+    assert_eq!(
+        replay.reason_codes,
+        vec![RoutingSetupReasonCode::ConfirmationExpired]
+    );
+}
+
+#[test]
+fn force_restart_rejects_pid_reuse_before_entering_irreversible_work() {
+    let root = tempdir().expect("temporary root");
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().expect("test executable"),
+        root.path().join("state"),
+    )
+    .expect("routing application");
+    app.install();
+    let impact = app
+        .prepare_force_restart_with(RestartIntent::RoutingRestart, 1, 10_000, || {
+            Ok(root_fingerprint())
+        })
+        .unwrap();
+    let mut reused = root_fingerprint();
+    reused.created_at_ticks += 1;
+    let receipt = app.force_restart_with(
+        &impact.confirmation_ticket,
+        RestartIntent::RoutingRestart,
+        1,
+        10_001,
+        || Ok(reused),
+        |_, _| panic!("restart must not run after PID reuse"),
+    );
+    assert_eq!(receipt.status, OperationStatus::Blocked);
+    assert_eq!(
+        receipt.reason_codes,
+        vec![RoutingSetupReasonCode::IdentityChanged]
     );
 }
 

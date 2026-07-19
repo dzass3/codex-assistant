@@ -206,7 +206,8 @@ select:focus-visible {
 
 .icon-button,
 .button-secondary,
-.button-primary {
+.button-primary,
+.button-danger {
   min-height: 36px;
   border-radius: 9px;
   cursor: pointer;
@@ -214,6 +215,18 @@ select:focus-visible {
     border-color 160ms ease,
     background 160ms ease,
     transform 160ms ease;
+}
+
+.button-danger {
+  border: 1px solid rgba(255, 103, 119, 0.58);
+  color: #fff2f4;
+  background: linear-gradient(135deg, #bd3347, #8f2437);
+  font-weight: 680;
+}
+
+.button-danger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(189, 51, 71, 0.22);
 }
 
 .icon-button,
@@ -1327,6 +1340,36 @@ footer {
 .theme-card--active {
   border-color: rgba(100, 231, 255, 0.42);
   box-shadow: 0 0 0 1px rgba(100, 231, 255, 0.08);
+}
+
+.theme-card--selected:not(.theme-card--active) {
+  border-color: rgba(240, 189, 109, 0.4);
+}
+
+.force-restart-dialog {
+  width: min(560px, 100%);
+  border-color: rgba(255, 103, 119, 0.32);
+}
+
+.force-restart-warning,
+.operation-stage {
+  padding: 11px 13px;
+  border-radius: 9px;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.force-restart-warning {
+  border: 1px solid rgba(255, 103, 119, 0.22);
+  color: #ffc2ca;
+  background: rgba(189, 51, 71, 0.09);
+}
+
+.operation-stage {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  color: #b9c2d4;
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .theme-card__preview {

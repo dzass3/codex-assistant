@@ -11,6 +11,7 @@ vi.mock("../lib/routingApi", () => ({
     install: vi.fn(),
     restore: vi.fn(),
     requestCodexRestart: vi.fn(),
+    prepareForceRestart: vi.fn(),
     beginPreflight: vi.fn(),
     setRootEnabled: vi.fn(),
   },
@@ -44,6 +45,7 @@ describe("useRouting", () => {
     vi.mocked(routingApi.install).mockReset();
     vi.mocked(routingApi.restore).mockReset();
     vi.mocked(routingApi.requestCodexRestart).mockReset();
+    vi.mocked(routingApi.prepareForceRestart).mockReset();
     vi.mocked(routingApi.beginPreflight).mockReset();
     vi.mocked(routingApi.setRootEnabled).mockReset();
     vi.mocked(routingApi.subscribe).mockResolvedValue(() => undefined);
@@ -118,6 +120,13 @@ describe("useRouting", () => {
       reason_codes: ["active-child"],
       restart_required: true,
     });
+    vi.mocked(routingApi.prepareForceRestart).mockResolvedValue({
+      confirmation_ticket: "d2719d93-b823-4a7f-934f-23cbe01c8ab9",
+      intent: "routing-restart",
+      active_native_children: 1,
+      grace_period_ms: 5000,
+      expires_at_ms: 100000,
+    });
     const { result } = renderHook(() => useRouting());
     await waitFor(() => expect(result.current.snapshot).toEqual(validSnapshot));
 
@@ -125,6 +134,7 @@ describe("useRouting", () => {
 
     expect(routingApi.requestCodexRestart).toHaveBeenCalledOnce();
     expect(result.current.receipt?.reason_codes).toEqual(["active-child"]);
+    expect(result.current.pendingForce?.active_native_children).toBe(1);
   });
 
   it("begins native preflight for the selected visible root", async () => {

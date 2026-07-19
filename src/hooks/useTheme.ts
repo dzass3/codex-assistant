@@ -1,9 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeOperationReceipt, ThemeUiSnapshot } from "../../shared/theme-types";
+import type { ForceRestartImpact, RestartIntent } from "../../shared/routing-types";
 import { themeApi } from "../lib/themeApi";
 
-type ThemeOperation = "start-session" | "apply" | "restore";
+type ThemeOperation = "start-session" | "activate" | "restore";
 const REFRESH_MS = 5_000;
+const FAILURE_MESSAGES: Record<string, string> = {
+  "confirmation-expired": "确认票据已过期，请重新检查影响并再次确认。",
+  "impact-changed": "运行中的子代理或进程树已经变化，必须重新确认。",
+  "operation-conflict": "另一个生命周期操作正在进行，请等待其完成。",
+  "identity-changed": "Codex 进程身份或创建时间已变化，操作已关闭失败。",
+  "termination-failed": "部分进程无法终止；不会启动替代窗口或自动重试。",
+  "old-tree-still-running": "旧 Codex 进程树仍未完全退出，因此没有启动新实例。",
+  "terminal-partial-failure": "终止已开始但新会话未验证成功；不会自动循环重试。",
+  "cdp-verification-failed": "新 Codex 的回环端口或浏览器身份验证失败。",
+  "dom-incompatible": "当前 Codex 页面结构与该主题不兼容，已保留原外观。",
+  "partial-apply-failed": "并非所有 Codex 页面都兼容，主题未标记为已应用。",
+};
+
+function failureMessage(receipt: ThemeOperationReceipt): string {
+  return (
+    FAILURE_MESSAGES[receipt.reason_codes[0] ?? ""] ??
+    "主题操作未完成；请根据失败原因重试，已应用主题不会被误报。"
+  );
+}
 
 export function useTheme() {
   const [snapshot, setSnapshot] = useState<ThemeUiSnapshot | null>(null);
@@ -13,6 +33,8 @@ export function useTheme() {
   const [error, setError] = useState<string | null>(null);
   const [operation, setOperation] = useState<ThemeOperation | null>(null);
   const [receipt, setReceipt] = useState<ThemeOperationReceipt | null>(null);
+  const [pendingForce, setPendingForce] = useState<ForceRestartImpact | null>(null);
+  const [pendingThemeId, setPendingThemeId] = useState<string | null>(null);
   const operationActive = useRef(false);
   const polling = useRef(false);
 
@@ -41,13 +63,29 @@ export function useTheme() {
   }, [accept]);
 
   const mutate = useCallback(
-    async (kind: ThemeOperation, action: () => Promise<ThemeOperationReceipt>) => {
+    async (
+      kind: ThemeOperation,
+      action: () => Promise<ThemeOperationReceipt>,
+      forceIntent?: RestartIntent,
+      themeId?: string,
+    ) => {
       if (operationActive.current) return null;
       operationActive.current = true;
       setOperation(kind);
       try {
         const nextReceipt = await action();
         setReceipt(nextReceipt);
+        if (
+          nextReceipt.status === "blocked" &&
+          nextReceipt.reason_codes.includes("active-child") &&
+          forceIntent
+        ) {
+          const impact = await themeApi.prepareForceRestart(forceIntent, themeId);
+          setPendingForce(impact);
+          setPendingThemeId(themeId ?? null);
+        } else if (nextReceipt.status === "failed") {
+          setError(failureMessage(nextReceipt));
+        }
         accept(await themeApi.getSnapshot());
         return nextReceipt;
       } catch {
@@ -67,14 +105,54 @@ export function useTheme() {
   );
 
   const startSession = useCallback(
-    () => mutate("start-session", () => themeApi.startSession()),
+    () => mutate("start-session", () => themeApi.startSession(), "theme-session"),
     [mutate],
   );
-  const apply = useCallback(
-    (themeId: string) => mutate("apply", () => themeApi.apply(themeId)),
+  const activate = useCallback(
+    (themeId: string) =>
+      mutate("activate", () => themeApi.activate(themeId), "activate-theme", themeId),
     [mutate],
   );
   const restore = useCallback(() => mutate("restore", () => themeApi.restore()), [mutate]);
+
+  const cancelForceRestart = useCallback(() => {
+    if (pendingForce && operationActive.current) {
+      void themeApi.cancelForceRestart(pendingForce.confirmation_ticket);
+    }
+    setPendingForce(null);
+    setPendingThemeId(null);
+  }, [pendingForce]);
+
+  const confirmForceRestart = useCallback(async () => {
+    if (!pendingForce || operationActive.current) return null;
+    operationActive.current = true;
+    const kind = pendingForce.intent === "theme-session" ? "start-session" : "activate";
+    setOperation(kind);
+    try {
+      const nextReceipt =
+        pendingForce.intent === "activate-theme" && pendingThemeId
+          ? await themeApi.activate(
+              pendingThemeId,
+              "force-after-grace",
+              pendingForce.confirmation_ticket,
+            )
+          : await themeApi.startSession("force-after-grace", pendingForce.confirmation_ticket);
+      setReceipt(nextReceipt);
+      setPendingForce(null);
+      setPendingThemeId(null);
+      accept(await themeApi.getSnapshot());
+      if (nextReceipt.status !== "applied" && nextReceipt.status !== "noop") {
+        setError(failureMessage(nextReceipt));
+      }
+      return nextReceipt;
+    } catch {
+      setError("强制重启失败；不会自动循环重试，也不会显示为已恢复。");
+      return null;
+    } finally {
+      operationActive.current = false;
+      setOperation(null);
+    }
+  }, [accept, pendingForce, pendingThemeId]);
 
   useEffect(() => {
     let mounted = true;
@@ -121,9 +199,12 @@ export function useTheme() {
     connected: snapshot !== null && !degraded,
     operation,
     receipt,
+    pendingForce,
     refresh,
     startSession,
-    apply,
+    activate,
     restore,
+    confirmForceRestart,
+    cancelForceRestart,
   };
 }

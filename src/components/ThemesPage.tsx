@@ -1,5 +1,6 @@
 import type { ThemeCategory } from "../../shared/theme-types";
 import { useTheme } from "../hooks/useTheme";
+import { ForceRestartDialog } from "./ForceRestartDialog";
 
 const CATEGORY_LABELS: Record<ThemeCategory, string> = {
   abstract: "原创抽象",
@@ -35,7 +36,11 @@ export function ThemesPage() {
         </button>
       </div>
 
-      {themes.error ? <div className="global-error">{themes.error}</div> : null}
+      {themes.error ? (
+        <div className="global-error" role="alert">
+          {themes.error}
+        </div>
+      ) : null}
 
       <article className="theme-session-panel">
         <div>
@@ -43,7 +48,7 @@ export function ThemesPage() {
           <h3>{ready ? "主题会话已就绪" : "启动主题会话"}</h3>
           <p>
             首次启用会安全重启一次 Codex，以建立仅绑定本机、同一 Windows 用户和官方 Codex
-            进程的控制会话。运行中的原生子代理会阻止重启，任务不会被中断。
+            进程的控制会话。若运行中的原生子代理存在，会先要求确认；确认后可终止任务并强制重启。
           </p>
         </div>
         {!ready ? (
@@ -71,9 +76,13 @@ export function ThemesPage() {
 
       <div className="theme-gallery" aria-label="内置主题">
         {(snapshot?.packs ?? []).map((pack) => {
-          const active = snapshot?.active_theme_id === pack.id;
+          const active = snapshot?.applied_theme_id === pack.id;
+          const selected = snapshot?.selected_theme_id === pack.id;
           return (
-            <article className={`theme-card${active ? " theme-card--active" : ""}`} key={pack.id}>
+            <article
+              className={`theme-card${active ? " theme-card--active" : ""}${selected && !active ? " theme-card--selected" : ""}`}
+              key={pack.id}
+            >
               <div className="theme-card__preview">
                 <img src={pack.preview_path} alt={`${pack.name} 主题预览`} />
                 <span className="theme-rights-badge">版权已核验</span>
@@ -99,10 +108,14 @@ export function ThemesPage() {
                 </dl>
                 <button
                   className={active ? "button-secondary" : "button-primary"}
-                  onClick={() => void themes.apply(pack.id)}
-                  disabled={!ready || active || themes.operation !== null}
+                  onClick={() => void themes.activate(pack.id)}
+                  disabled={active || themes.operation !== null}
                 >
-                  {active ? "当前主题" : themes.operation === "apply" ? "正在应用…" : "应用主题"}
+                  {active
+                    ? "当前主题"
+                    : themes.operation === "activate"
+                      ? "正在启动并应用…"
+                      : "应用主题"}
                 </button>
               </div>
             </article>
@@ -119,11 +132,20 @@ export function ThemesPage() {
         <button
           className="button-secondary"
           onClick={() => void themes.restore()}
-          disabled={!snapshot?.active_theme_id || themes.operation !== null}
+          disabled={!snapshot?.applied_theme_id || themes.operation !== null}
         >
           {themes.operation === "restore" ? "正在恢复…" : "恢复官方外观"}
         </button>
       </article>
+
+      {themes.pendingForce ? (
+        <ForceRestartDialog
+          impact={themes.pendingForce}
+          busy={themes.operation !== null}
+          onCancel={themes.cancelForceRestart}
+          onConfirm={() => void themes.confirmForceRestart()}
+        />
+      ) : null}
     </section>
   );
 }

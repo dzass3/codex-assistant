@@ -8,12 +8,14 @@ permissions = [
   "allow-get-routing-snapshot",
   "allow-install-routing",
   "allow-restore-routing",
+  "allow-prepare-force-restart",
+  "allow-cancel-force-restart",
   "allow-request-codex-restart",
   "allow-begin-routing-preflight",
   "allow-set-root-routing-enabled",
   "allow-get-theme-snapshot",
   "allow-start-theme-session",
-  "allow-apply-theme",
+  "allow-activate-theme",
   "allow-restore-theme",
 ]
 
@@ -58,6 +60,16 @@ description = "Request the verified one-time Codex restart"
 commands.allow = ["request_codex_restart"]
 
 [[permission]]
+identifier = "allow-prepare-force-restart"
+description = "Prepare one sanitized single-use confirmation for a verified destructive restart"
+commands.allow = ["prepare_force_restart"]
+
+[[permission]]
+identifier = "allow-cancel-force-restart"
+description = "Cancel a confirmed destructive restart during its reversible grace period"
+commands.allow = ["cancel_force_restart"]
+
+[[permission]]
 identifier = "allow-begin-routing-preflight"
 description = "Begin native capability verification for one visible root task"
 commands.allow = ["begin_routing_preflight"]
@@ -78,9 +90,9 @@ description = "Start one verified Codex theme control session"
 commands.allow = ["start_theme_session"]
 
 [[permission]]
-identifier = "allow-apply-theme"
-description = "Apply one bundled rights-audited theme by identifier"
-commands.allow = ["apply_theme"]
+identifier = "allow-activate-theme"
+description = "Establish a verified session if needed and apply one bundled rights-audited theme"
+commands.allow = ["activate_theme"]
 
 [[permission]]
 identifier = "allow-restore-theme"

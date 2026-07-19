@@ -9,18 +9,28 @@ fn root() -> &'static Path {
 
 #[test]
 fn bundled_theme_rights_manifest_matches_the_shipped_assets() {
-    let manifest_path = root().join("resources/themes/rights.json");
+    let manifest_path = root().join("../shared/theme-catalog.json");
     let manifest: Value = serde_json::from_slice(
         &fs::read(&manifest_path).expect("bundled themes need a rights manifest"),
     )
     .expect("theme rights manifest must be valid JSON");
     assert_eq!(manifest["schema_version"], 1);
     let entries = manifest["themes"].as_array().expect("theme entries");
-    assert_eq!(entries.len(), 2);
+    assert_eq!(entries.len(), 12);
     for entry in entries {
         assert_eq!(entry["rights"]["status"], "verified");
         assert_eq!(entry["rights"]["commercial_redistribution"], true);
+        assert_eq!(entry["rights"]["manual_signoff"], true);
         assert!(entry["rights"]["reviewed_at"].as_str().is_some());
+        let preview = entry["preview_path"]
+            .as_str()
+            .expect("theme preview path")
+            .trim_start_matches('/');
+        assert!(
+            root().join("../public").join(preview).is_file(),
+            "missing preview for {}",
+            entry["id"]
+        );
     }
 
     let muse = entries
@@ -47,6 +57,10 @@ fn frontend_previews_and_theme_rights_ship_in_the_desktop_bundle() {
     assert!(
         config.contains("resources/themes/**/*"),
         "theme rights and engine assets must be included in the desktop bundle"
+    );
+    assert!(
+        config.contains("../shared/theme-catalog.json"),
+        "the single theme catalog must ship in the desktop bundle"
     );
 }
 

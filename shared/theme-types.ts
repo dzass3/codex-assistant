@@ -48,6 +48,7 @@ export interface ThemeRights {
   commercial_redistribution: boolean;
   attribution: string;
   reviewed_at: string;
+  manual_signoff: boolean;
   status: ThemeRightsStatus;
 }
 
@@ -67,9 +68,10 @@ export interface ThemePack {
 }
 
 export interface ThemeUiSnapshot {
-  contract_version: 1;
+  contract_version: 2;
   session_status: ThemeSessionStatus;
-  active_theme_id: string | null;
+  selected_theme_id: string | null;
+  applied_theme_id: string | null;
   packs: ThemePack[];
 }
 

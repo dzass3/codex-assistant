@@ -10,6 +10,8 @@ import type {
   ThemeSessionStatus,
   ThemeUiSnapshot,
 } from "../../shared/theme-types";
+import type { ForceRestartImpact, RestartIntent, RestartMode } from "../../shared/routing-types";
+import { toForceRestartImpact } from "./routingApi";
 import { invoke } from "./invoke";
 import { toRoutingOperationReceipt } from "./routingApi";
 
@@ -163,6 +165,7 @@ function rights(value: unknown): ThemeRights | null {
       "commercial_redistribution",
       "attribution",
       "reviewed_at",
+      "manual_signoff",
       "status",
     ])
   )
@@ -178,6 +181,7 @@ function rights(value: unknown): ThemeRights | null {
     raw.commercial_redistribution === true &&
     typeof raw.reviewed_at === "string" &&
     DATE.test(raw.reviewed_at) &&
+    raw.manual_signoff === true &&
     raw.status === "verified"
     ? {
         source,
@@ -186,6 +190,7 @@ function rights(value: unknown): ThemeRights | null {
         commercial_redistribution: true,
         attribution,
         reviewed_at: raw.reviewed_at,
+        manual_signoff: true,
         status: "verified",
       }
     : null;
@@ -273,7 +278,13 @@ export function toThemeUiSnapshot(value: unknown): ThemeUiSnapshot | null {
   const raw = record(value);
   if (
     raw === null ||
-    !exactKeys(raw, ["contract_version", "session_status", "active_theme_id", "packs"])
+    !exactKeys(raw, [
+      "contract_version",
+      "session_status",
+      "selected_theme_id",
+      "applied_theme_id",
+      "packs",
+    ])
   )
     return null;
   const sessionStatus =
@@ -281,12 +292,14 @@ export function toThemeUiSnapshot(value: unknown): ThemeUiSnapshot | null {
     SESSION_STATUSES.has(raw.session_status as ThemeSessionStatus)
       ? (raw.session_status as ThemeSessionStatus)
       : null;
-  const activeThemeId = raw.active_theme_id === null ? null : slug(raw.active_theme_id);
+  const selectedThemeId = raw.selected_theme_id === null ? null : slug(raw.selected_theme_id);
+  const appliedThemeId = raw.applied_theme_id === null ? null : slug(raw.applied_theme_id);
   const packs = Array.isArray(raw.packs) ? raw.packs.map(pack) : null;
   if (
-    raw.contract_version !== 1 ||
+    raw.contract_version !== 2 ||
     sessionStatus === null ||
-    (activeThemeId === null && raw.active_theme_id !== null) ||
+    (selectedThemeId === null && raw.selected_theme_id !== null) ||
+    (appliedThemeId === null && raw.applied_theme_id !== null) ||
     packs === null ||
     packs.some((entry) => entry === null)
   )
@@ -294,13 +307,15 @@ export function toThemeUiSnapshot(value: unknown): ThemeUiSnapshot | null {
   const parsedPacks = packs as ThemePack[];
   if (
     new Set(parsedPacks.map((entry) => entry.id)).size !== parsedPacks.length ||
-    (activeThemeId !== null && !parsedPacks.some((entry) => entry.id === activeThemeId))
+    (selectedThemeId !== null && !parsedPacks.some((entry) => entry.id === selectedThemeId)) ||
+    (appliedThemeId !== null && !parsedPacks.some((entry) => entry.id === appliedThemeId))
   )
     return null;
   return {
-    contract_version: 1,
+    contract_version: 2,
     session_status: sessionStatus,
-    active_theme_id: activeThemeId,
+    selected_theme_id: selectedThemeId,
+    applied_theme_id: appliedThemeId,
     packs: parsedPacks,
   };
 }
@@ -315,10 +330,31 @@ export const themeApi = {
   async getSnapshot(): Promise<ThemeUiSnapshot | null> {
     return toThemeUiSnapshot(await invoke("get_theme_snapshot"));
   },
-  startSession: () => mutation(invoke("start_theme_session")),
-  apply(themeId: string) {
+  async prepareForceRestart(intent: RestartIntent, themeId?: string): Promise<ForceRestartImpact> {
+    const impact = toForceRestartImpact(
+      await invoke("prepare_force_restart", { intent, subject: themeId ?? null }),
+    );
+    if (impact === null) throw new Error("Malformed force restart impact");
+    return impact;
+  },
+  cancelForceRestart: (confirmationTicket: string) =>
+    invoke("cancel_force_restart", { confirmationTicket }).then((value) => value === true),
+  startSession: (restartMode: RestartMode = "safe", confirmationTicket?: string) =>
+    mutation(
+      invoke("start_theme_session", {
+        restartMode,
+        confirmationTicket: confirmationTicket ?? null,
+      }),
+    ),
+  activate(themeId: string, restartMode: RestartMode = "safe", confirmationTicket?: string) {
     if (slug(themeId) === null) return Promise.reject(new Error("Invalid theme identifier"));
-    return mutation(invoke("apply_theme", { themeId }));
+    return mutation(
+      invoke("activate_theme", {
+        themeId,
+        restartMode,
+        confirmationTicket: confirmationTicket ?? null,
+      }),
+    );
   },
   restore: () => mutation(invoke("restore_theme")),
 };

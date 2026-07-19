@@ -13,6 +13,7 @@ const rights = {
   commercial_redistribution: true,
   attribution: "Original artwork created for Codex Assistant",
   reviewed_at: "2026-07-18",
+  manual_signoff: true,
   status: "verified" as const,
 };
 
@@ -70,10 +71,13 @@ function state(snapshot: ThemeUiSnapshot, overrides: Record<string, unknown> = {
     connected: true,
     operation: null,
     receipt: null,
+    pendingForce: null,
     refresh: vi.fn(),
     startSession: vi.fn(),
-    apply: vi.fn(),
+    activate: vi.fn(),
     restore: vi.fn(),
+    confirmForceRestart: vi.fn(),
+    cancelForceRestart: vi.fn(),
     ...overrides,
   };
 }
@@ -81,11 +85,12 @@ function state(snapshot: ThemeUiSnapshot, overrides: Record<string, unknown> = {
 describe("ThemesPage", () => {
   beforeEach(() => vi.mocked(useTheme).mockReset());
 
-  it("explains and starts the verified one-restart theme session before enabling apply", () => {
+  it("starts the verified session and applies a selected theme with one click", () => {
     const value = state({
-      contract_version: 1,
+      contract_version: 2,
       session_status: "inactive",
-      active_theme_id: null,
+      selected_theme_id: null,
+      applied_theme_id: null,
       packs: [aurora, muse],
     });
     vi.mocked(useTheme).mockReturnValue(value);
@@ -94,9 +99,10 @@ describe("ThemesPage", () => {
     expect(screen.getByRole("heading", { name: "主题管理" })).toBeInTheDocument();
     expect(screen.getByText(/安全重启一次 Codex/)).toBeInTheDocument();
     expect(screen.getByText(/运行中的原生子代理/)).toBeInTheDocument();
-    for (const button of screen.getAllByRole("button", { name: "应用主题" })) {
-      expect(button).toBeDisabled();
-    }
+    const applyButtons = screen.getAllByRole("button", { name: "应用主题" });
+    expect(applyButtons[0]).toBeEnabled();
+    fireEvent.click(applyButtons[0]);
+    expect(value.activate).toHaveBeenCalledWith("aurora-grid");
 
     fireEvent.click(screen.getByRole("button", { name: "启动主题会话" }));
     expect(value.startSession).toHaveBeenCalledOnce();
@@ -104,9 +110,10 @@ describe("ThemesPage", () => {
 
   it("shows only rights-verified bundled themes and applies one by its fixed identifier", () => {
     const value = state({
-      contract_version: 1,
+      contract_version: 2,
       session_status: "ready",
-      active_theme_id: null,
+      selected_theme_id: null,
+      applied_theme_id: null,
       packs: [aurora, muse],
     });
     vi.mocked(useTheme).mockReturnValue(value);
@@ -118,15 +125,16 @@ describe("ThemesPage", () => {
       "/themes/original-observatory-muse.jpg",
     );
     fireEvent.click(screen.getAllByRole("button", { name: "应用主题" })[1]);
-    expect(value.apply).toHaveBeenCalledWith("observatory-muse");
+    expect(value.activate).toHaveBeenCalledWith("observatory-muse");
     expect(screen.getByText(/名人、动漫\/IP 和第三方仓库截图不会随应用分发/)).toBeInTheDocument();
   });
 
   it("marks the active theme and restores the official Codex appearance", () => {
     const value = state({
-      contract_version: 1,
+      contract_version: 2,
       session_status: "ready",
-      active_theme_id: "aurora-grid",
+      selected_theme_id: "aurora-grid",
+      applied_theme_id: "aurora-grid",
       packs: [aurora, muse],
     });
     vi.mocked(useTheme).mockReturnValue(value);
@@ -135,5 +143,40 @@ describe("ThemesPage", () => {
     expect(screen.getByRole("button", { name: "当前主题" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "恢复官方外观" }));
     expect(value.restore).toHaveBeenCalledOnce();
+  });
+
+  it("requires an accessible destructive confirmation before force restarting", () => {
+    const confirmForceRestart = vi.fn();
+    const cancelForceRestart = vi.fn();
+    const value = state(
+      {
+        contract_version: 2,
+        session_status: "inactive",
+        selected_theme_id: "aurora-grid",
+        applied_theme_id: null,
+        packs: [aurora],
+      },
+      {
+        pendingForce: {
+          confirmation_ticket: "d2719d93-b823-4a7f-934f-23cbe01c8ab0",
+          intent: "activate-theme",
+          active_native_children: 2,
+          grace_period_ms: 5000,
+          expires_at_ms: 100_000,
+        },
+        confirmForceRestart,
+        cancelForceRestart,
+      },
+    );
+    vi.mocked(useTheme).mockReturnValue(value);
+    render(<ThemesPage />);
+
+    const dialog = screen.getByRole("alertdialog", { name: "终止子代理并强制重启？" });
+    expect(dialog).toHaveTextContent("当前有 2 个原生子代理");
+    expect(dialog).toHaveTextContent("等待 5 秒");
+    fireEvent.click(screen.getByRole("button", { name: "终止子代理并强制重启" }));
+    expect(confirmForceRestart).toHaveBeenCalledOnce();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(cancelForceRestart).toHaveBeenCalledOnce();
   });
 });

@@ -9,7 +9,26 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 #[test]
 fn bundled_themes_are_declarative_project_owned_and_pass_the_rights_gate() {
     let packs = bundled_theme_packs();
-    assert!(packs.len() >= 2);
+    assert_eq!(
+        packs
+            .iter()
+            .map(|pack| pack.id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "aurora-grid",
+            "observatory-muse",
+            "gothic-horizon",
+            "roseglass-atelier",
+            "blush-circuit",
+            "fortune-foundry",
+            "crimson-relay",
+            "crystal-daylight",
+            "pocket-cosmos",
+            "violet-afterdark",
+            "cyan-chorus",
+            "noir-stage",
+        ]
+    );
     assert!(packs
         .iter()
         .any(|pack| pack.category == ThemeCategory::Abstract));
@@ -135,6 +154,23 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
         drop(stream);
         let (stream, _) = listener.accept().await.unwrap();
         let mut socket = accept_async(stream).await.unwrap();
+        let compatibility = socket.next().await.unwrap().unwrap().into_text().unwrap();
+        let compatibility: serde_json::Value = serde_json::from_str(&compatibility).unwrap();
+        assert_eq!(compatibility["method"], "Runtime.evaluate");
+        socket
+            .send(Message::Text(
+                format!(
+                    r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                    compatibility["id"]
+                )
+                .into(),
+            ))
+            .await
+            .unwrap();
+        drop(socket);
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
         for index in 0..3 {
             let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
             let call: serde_json::Value = serde_json::from_str(&call).unwrap();
@@ -162,9 +198,14 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
                     continue;
                 }
             }
+            let result = if index == 1 {
+                r#"{"identifier":"theme-script-1"}"#
+            } else {
+                "{}"
+            };
             socket
                 .send(Message::Text(
-                    format!(r#"{{"id":{},"result":{{}}}}"#, call["id"]).into(),
+                    format!(r#"{{"id":{},"result":{result}}}"#, call["id"]).into(),
                 ))
                 .await
                 .unwrap();
@@ -172,9 +213,12 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
     });
     let pack = bundled_theme_packs().remove(0);
 
-    assert_eq!(
-        apply_theme_on_pages(&endpoint, &pack, 1_000).await.unwrap(),
-        1
-    );
+    let result = apply_theme_on_pages(&endpoint, &pack, &[], 1_000)
+        .await
+        .unwrap();
+    assert_eq!(result.applied_pages, 1);
+    assert_eq!(result.scripts.len(), 1);
+    assert_eq!(result.scripts[0].target_id, "page-1");
+    assert_eq!(result.scripts[0].identifier, "theme-script-1");
     server.await.unwrap();
 }

@@ -1,10 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RoutingUiSnapshot } from "../../shared/routing-types";
-import type { RoutingOperationReceipt } from "../../shared/routing-types";
+import type {
+  ForceRestartImpact,
+  RoutingOperationReceipt,
+  RoutingUiSnapshot,
+} from "../../shared/routing-types";
 import { ROUTING_REFRESH_MS } from "../config";
 import { routingApi } from "../lib/routingApi";
 
 const MALFORMED_MESSAGE = "路由状态异常，已保留上一次验证通过的快照并进入降级模式。";
+const RESTART_FAILURE_MESSAGES: Record<string, string> = {
+  "confirmation-expired": "确认票据已过期，请重新检查影响并再次确认。",
+  "impact-changed": "运行中的子代理或进程树已经变化，必须重新确认。",
+  "operation-conflict": "另一个生命周期操作正在进行，请等待其完成。",
+  "identity-changed": "Codex 进程身份或创建时间已变化，操作已关闭失败。",
+  "termination-failed": "部分进程无法终止；不会启动替代窗口或自动重试。",
+  "old-tree-still-running": "旧 Codex 进程树仍未完全退出，因此没有启动新实例。",
+  "terminal-partial-failure": "终止已开始但新会话未验证成功；不会自动循环重试。",
+  "cdp-verification-failed": "新 Codex 的回环端口或浏览器身份验证失败。",
+};
 
 export function useRouting() {
   const [snapshot, setSnapshot] = useState<RoutingUiSnapshot | null>(null);
@@ -16,6 +29,7 @@ export function useRouting() {
     "install" | "restore" | "restart" | "preflight" | "toggle" | null
   >(null);
   const [receipt, setReceipt] = useState<RoutingOperationReceipt | null>(null);
+  const [pendingForce, setPendingForce] = useState<ForceRestartImpact | null>(null);
   const polling = useRef(false);
   const operationActive = useRef(false);
 
@@ -88,6 +102,9 @@ export function useRouting() {
     try {
       const nextReceipt = await routingApi.requestCodexRestart();
       setReceipt(nextReceipt);
+      if (nextReceipt.status === "blocked" && nextReceipt.reason_codes.includes("active-child")) {
+        setPendingForce(await routingApi.prepareForceRestart("routing-restart"));
+      }
       accept(await routingApi.getSnapshot());
       return nextReceipt;
     } catch {
@@ -99,6 +116,41 @@ export function useRouting() {
       setOperation(null);
     }
   }, [accept]);
+
+  const cancelForceRestart = useCallback(() => {
+    if (pendingForce && operationActive.current) {
+      void routingApi.cancelForceRestart(pendingForce.confirmation_ticket);
+    }
+    setPendingForce(null);
+  }, [pendingForce]);
+
+  const confirmForceRestart = useCallback(async () => {
+    if (!pendingForce || operationActive.current) return null;
+    operationActive.current = true;
+    setOperation("restart");
+    try {
+      const nextReceipt = await routingApi.requestCodexRestart(
+        "force-after-grace",
+        pendingForce.confirmation_ticket,
+      );
+      setReceipt(nextReceipt);
+      setPendingForce(null);
+      accept(await routingApi.getSnapshot());
+      if (nextReceipt.status !== "applied" && nextReceipt.status !== "noop") {
+        setError(
+          RESTART_FAILURE_MESSAGES[nextReceipt.reason_codes[0] ?? ""] ??
+            "强制重启未完成；不会自动循环重试，请重新检查影响后再确认。",
+        );
+      }
+      return nextReceipt;
+    } catch {
+      setError("强制重启失败；不会自动循环重试，也不会错误显示为已恢复。");
+      return null;
+    } finally {
+      operationActive.current = false;
+      setOperation(null);
+    }
+  }, [accept, pendingForce]);
 
   const beginPreflight = useCallback(
     async (rootConversationId: string) => {
@@ -198,10 +250,13 @@ export function useRouting() {
     connected: snapshot !== null && !degraded,
     operation,
     receipt,
+    pendingForce,
     refresh,
     install,
     restore,
     requestRestart,
+    confirmForceRestart,
+    cancelForceRestart,
     beginPreflight,
     setRootEnabled,
   };

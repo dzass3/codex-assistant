@@ -253,6 +253,30 @@ pub async fn insert_preflight_directive_on_pages_detailed(
     Ok(None)
 }
 
+pub async fn request_visible_agent_stop(
+    endpoint: &BrowserEndpoint,
+    timeout_ms: u64,
+) -> Result<usize, VisiblePreflightError> {
+    const EXPRESSION: &str = r#"(()=>{const labels=["stop","cancel","停止","取消"];let count=0;for(const button of document.querySelectorAll("button")){const label=`${button.getAttribute("aria-label")||""} ${button.getAttribute("title")||""} ${button.textContent||""}`.trim().toLowerCase();if(labels.some(token=>label===token||label.includes(token))&&!button.disabled&&button.getClientRects().length){button.click();count+=1}}return count>0})()"#;
+    let targets = fetch_page_targets(endpoint, timeout_ms)
+        .await
+        .map_err(VisiblePreflightError::Discovery)?;
+    let mut stopped = 0;
+    for target in targets {
+        let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
+            .await
+            .map_err(VisiblePreflightError::Cdp)?;
+        if client
+            .evaluate_boolean(EXPRESSION)
+            .await
+            .map_err(VisiblePreflightError::Cdp)?
+        {
+            stopped += 1;
+        }
+    }
+    Ok(stopped)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SubmitShortcut {

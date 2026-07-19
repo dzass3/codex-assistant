@@ -30,8 +30,9 @@ fn theme_session_apply_and_restore_are_independent_from_routing_installation() {
     .unwrap();
     let initial = app.theme_snapshot();
     assert_eq!(initial.session_status, ThemeSessionStatus::Inactive);
-    assert_eq!(initial.packs.len(), 2);
-    assert!(initial.active_theme_id.is_none());
+    assert_eq!(initial.packs.len(), 12);
+    assert!(initial.selected_theme_id.is_none());
+    assert!(initial.applied_theme_id.is_none());
 
     let started = app.start_theme_session_with(0, || Ok(session()));
 
@@ -46,12 +47,74 @@ fn theme_session_apply_and_restore_are_independent_from_routing_installation() {
     });
     assert_eq!(applied.status, OperationStatus::Applied);
     assert_eq!(
-        app.theme_snapshot().active_theme_id.as_deref(),
+        app.theme_snapshot().applied_theme_id.as_deref(),
         Some("aurora-grid")
     );
     let restored = app.restore_theme_with(|| Ok(1));
     assert_eq!(restored.status, OperationStatus::Applied);
-    assert!(app.theme_snapshot().active_theme_id.is_none());
+    assert!(app.theme_snapshot().applied_theme_id.is_none());
+}
+
+#[test]
+fn inactive_theme_activation_restarts_once_and_applies_the_selected_theme() {
+    let root = tempdir().unwrap();
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().unwrap(),
+        root.path().join("state"),
+    )
+    .unwrap();
+    let mut restarted = false;
+
+    let receipt = app.activate_theme_with(
+        "gothic-horizon",
+        0,
+        || {
+            restarted = true;
+            Ok(session())
+        },
+        |pack| {
+            assert_eq!(pack.id, "gothic-horizon");
+            Ok(1)
+        },
+    );
+
+    assert!(restarted);
+    assert_eq!(receipt.status, OperationStatus::Applied);
+    assert_eq!(
+        app.theme_snapshot().applied_theme_id.as_deref(),
+        Some("gothic-horizon")
+    );
+}
+
+#[test]
+fn failed_theme_switch_keeps_selected_and_applied_state_distinct() {
+    let root = tempdir().unwrap();
+    let app = RoutingApplication::for_paths(
+        root.path().join("codex"),
+        root.path().join("skills"),
+        std::env::current_exe().unwrap(),
+        root.path().join("state"),
+    )
+    .unwrap();
+    app.start_theme_session_with(0, || Ok(session()));
+    assert_eq!(
+        app.apply_theme_with("aurora-grid", |_| Ok(1)).status,
+        OperationStatus::Applied
+    );
+
+    let failed = app.apply_theme_with("gothic-horizon", |_| {
+        Err(RoutingSetupReasonCode::DomIncompatible)
+    });
+
+    assert_eq!(failed.status, OperationStatus::Failed);
+    let snapshot = app.theme_snapshot();
+    assert_eq!(
+        snapshot.selected_theme_id.as_deref(),
+        Some("gothic-horizon")
+    );
+    assert_eq!(snapshot.applied_theme_id.as_deref(), Some("aurora-grid"));
 }
 
 #[test]

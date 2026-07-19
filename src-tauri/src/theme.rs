@@ -1,6 +1,5 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::control_layer::cdp::{
     fetch_page_targets, BrowserEndpoint, CdpClient, CdpClientError, CdpDiscoveryError,
@@ -8,6 +7,17 @@ use crate::control_layer::cdp::{
 
 const ENGINE_VERSION: u32 = 1;
 const OBSERVATORY_MUSE: &[u8] = include_bytes!("../resources/themes/original-observatory-muse.jpg");
+const GOTHIC_HORIZON: &[u8] = include_bytes!("../../public/themes/gothic-horizon.png");
+const ROSEGLASS_ATELIER: &[u8] = include_bytes!("../../public/themes/roseglass-atelier.png");
+const BLUSH_CIRCUIT: &[u8] = include_bytes!("../../public/themes/blush-circuit.png");
+const FORTUNE_FOUNDRY: &[u8] = include_bytes!("../../public/themes/fortune-foundry.png");
+const CRIMSON_RELAY: &[u8] = include_bytes!("../../public/themes/crimson-relay.png");
+const CRYSTAL_DAYLIGHT: &[u8] = include_bytes!("../../public/themes/crystal-daylight.png");
+const POCKET_COSMOS: &[u8] = include_bytes!("../../public/themes/pocket-cosmos.png");
+const VIOLET_AFTERDARK: &[u8] = include_bytes!("../../public/themes/violet-afterdark.png");
+const CYAN_CHORUS: &[u8] = include_bytes!("../../public/themes/cyan-chorus.png");
+const NOIR_STAGE: &[u8] = include_bytes!("../../public/themes/noir-stage.png");
+const THEME_CATALOG: &str = include_str!("../../shared/theme-catalog.json");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -73,6 +83,7 @@ pub struct ThemeRights {
     pub commercial_redistribution: bool,
     pub attribution: String,
     pub reviewed_at: String,
+    pub manual_signoff: bool,
     pub status: RightsStatus,
 }
 
@@ -105,10 +116,42 @@ pub enum ThemeEngineError {
     InvalidPack(ThemeValidationError),
     Discovery(CdpDiscoveryError),
     Cdp(CdpClientError),
+    DomIncompatible,
+    PartialApplication,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ThemeScriptRegistration {
+    pub target_id: String,
+    pub identifier: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ThemeApplyResult {
+    pub applied_pages: usize,
+    pub scripts: Vec<ThemeScriptRegistration>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ThemeCatalog {
+    schema_version: u32,
+    themes: Vec<ThemePack>,
 }
 
 pub fn bundled_theme_packs() -> Vec<ThemePack> {
-    vec![abstract_aurora(), observatory_muse()]
+    let Ok(catalog) = serde_json::from_str::<ThemeCatalog>(THEME_CATALOG) else {
+        return Vec::new();
+    };
+    if catalog.schema_version != 1
+        || catalog
+            .themes
+            .iter()
+            .any(|pack| validate_theme_pack(pack, true).is_err())
+    {
+        return Vec::new();
+    }
+    catalog.themes
 }
 
 pub fn validate_theme_pack(pack: &ThemePack, bundled: bool) -> Result<(), ThemeValidationError> {
@@ -174,7 +217,8 @@ pub fn validate_theme_pack(pack: &ThemePack, bundled: bool) -> Result<(), ThemeV
         && safe_text(&pack.rights.rightsholder, 120)
         && safe_text(&pack.rights.license, 120)
         && safe_text(&pack.rights.attribution, 240)
-        && valid_date(&pack.rights.reviewed_at);
+        && valid_date(&pack.rights.reviewed_at)
+        && pack.rights.manual_signoff;
     if !rights_valid
         || (bundled
             && (pack.rights.status != RightsStatus::Verified
@@ -198,10 +242,16 @@ pub fn theme_application_source(pack: &ThemePack) -> Result<String, ThemeValidat
             focal_x,
             focal_y,
         } => {
+            let asset = pack
+                .assets
+                .iter()
+                .find(|asset| asset.id == *asset_id)
+                .ok_or(ThemeValidationError::InvalidAsset)?;
             let bytes = asset_bytes(asset_id).ok_or(ThemeValidationError::InvalidAsset)?;
             let encoded = STANDARD.encode(bytes);
             format!(
-                "linear-gradient({overlay}99, {overlay}99), url(\\\"data:image/jpeg;base64,{encoded}\\\") {focal_x}% {focal_y}% / cover no-repeat fixed"
+                "linear-gradient({overlay}99, {overlay}99), url(\\\"data:{mime};base64,{encoded}\\\") {focal_x}% {focal_y}% / cover no-repeat fixed",
+                mime = asset.mime_type,
             )
         }
     };
@@ -231,13 +281,36 @@ pub fn theme_application_source(pack: &ThemePack) -> Result<String, ThemeValidat
 pub async fn apply_theme_on_pages(
     endpoint: &BrowserEndpoint,
     pack: &ThemePack,
+    previous_scripts: &[ThemeScriptRegistration],
     timeout_ms: u64,
-) -> Result<usize, ThemeEngineError> {
+) -> Result<ThemeApplyResult, ThemeEngineError> {
     let source = theme_application_source(pack).map_err(ThemeEngineError::InvalidPack)?;
     let targets = fetch_page_targets(endpoint, timeout_ms)
         .await
         .map_err(ThemeEngineError::Discovery)?;
+    let mut compatible = 0_usize;
+    for target in &targets {
+        let mut client = CdpClient::connect_target(target, endpoint.port(), timeout_ms)
+            .await
+            .map_err(ThemeEngineError::Cdp)?;
+        if client
+            .evaluate_boolean(
+                r#"(()=>Boolean(document.querySelector("main.main-surface")&&document.querySelector("aside.app-shell-left-panel")))()"#,
+            )
+            .await
+            .map_err(ThemeEngineError::Cdp)?
+        {
+            compatible += 1;
+        }
+    }
+    if compatible == 0 {
+        return Err(ThemeEngineError::DomIncompatible);
+    }
+    if compatible != targets.len() {
+        return Err(ThemeEngineError::PartialApplication);
+    }
     let mut applied = 0;
+    let mut scripts = Vec::new();
     for target in targets {
         let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
             .await
@@ -246,11 +319,20 @@ pub async fn apply_theme_on_pages(
             .call("Page.enable", serde_json::json!({}))
             .await
             .map_err(ThemeEngineError::Cdp)?;
-        client
-            .call(
-                "Page.addScriptToEvaluateOnNewDocument",
-                serde_json::json!({"source": source}),
-            )
+        if let Some(previous) = previous_scripts
+            .iter()
+            .find(|script| script.target_id == target.target_id)
+        {
+            client
+                .call(
+                    "Page.removeScriptToEvaluateOnNewDocument",
+                    serde_json::json!({"identifier": previous.identifier}),
+                )
+                .await
+                .map_err(ThemeEngineError::Cdp)?;
+        }
+        let identifier = client
+            .register_script(&source)
             .await
             .map_err(ThemeEngineError::Cdp)?;
         if client
@@ -259,13 +341,21 @@ pub async fn apply_theme_on_pages(
             .map_err(ThemeEngineError::Cdp)?
         {
             applied += 1;
+            scripts.push(ThemeScriptRegistration {
+                target_id: target.target_id,
+                identifier,
+            });
         }
     }
-    Ok(applied)
+    Ok(ThemeApplyResult {
+        applied_pages: applied,
+        scripts,
+    })
 }
 
 pub async fn restore_theme_on_pages(
     endpoint: &BrowserEndpoint,
+    scripts: &[ThemeScriptRegistration],
     timeout_ms: u64,
 ) -> Result<usize, ThemeEngineError> {
     let targets = fetch_page_targets(endpoint, timeout_ms)
@@ -276,6 +366,18 @@ pub async fn restore_theme_on_pages(
         let mut client = CdpClient::connect_target(&target, endpoint.port(), timeout_ms)
             .await
             .map_err(ThemeEngineError::Cdp)?;
+        if let Some(script) = scripts
+            .iter()
+            .find(|script| script.target_id == target.target_id)
+        {
+            client
+                .call(
+                    "Page.removeScriptToEvaluateOnNewDocument",
+                    serde_json::json!({"identifier": script.identifier}),
+                )
+                .await
+                .map_err(ThemeEngineError::Cdp)?;
+        }
         if client
             .evaluate_boolean(theme_restore_source())
             .await
@@ -291,92 +393,19 @@ pub fn theme_restore_source() -> &'static str {
     r#"(()=>{"use strict";const NAME="__codexAssistantThemeV1";const current=globalThis[NAME];if(current&&typeof current.destroy==="function")current.destroy();const owned=document.querySelector("style[data-codex-assistant-theme]");if(owned)owned.remove();return true})()"#
 }
 
-fn abstract_aurora() -> ThemePack {
-    ThemePack {
-        schema_version: 1,
-        minimum_engine_version: ENGINE_VERSION,
-        id: "aurora-grid".into(),
-        name: "Aurora Grid".into(),
-        description: "Project-owned abstract aurora with restrained glass surfaces.".into(),
-        category: ThemeCategory::Abstract,
-        preview_path: "/themes/aurora-grid.svg".into(),
-        backdrop: ThemeBackdrop::Gradient {
-            angle: 135,
-            colors: ["#07111f".into(), "#18204b".into(), "#0b4d5f".into()],
-        },
-        palette: ThemePalette {
-            surface: "#101827".into(),
-            surface_strong: "#111b2d".into(),
-            text: "#eef7ff".into(),
-            accent: "#64e7ff".into(),
-            border: "#6fdcf0".into(),
-        },
-        effects: ThemeEffects {
-            surface_opacity: 78,
-            blur_px: 22,
-            contrast_percent: 108,
-            motion: true,
-        },
-        assets: Vec::new(),
-        rights: project_rights("Original abstract theme authored for Codex Assistant"),
-    }
-}
-
-fn observatory_muse() -> ThemePack {
-    let hash = format!("{:x}", Sha256::digest(OBSERVATORY_MUSE));
-    ThemePack {
-        schema_version: 1,
-        minimum_engine_version: ENGINE_VERSION,
-        id: "observatory-muse".into(),
-        name: "Observatory Muse".into(),
-        description: "Original fictional technologist in a quiet violet observatory.".into(),
-        category: ThemeCategory::OriginalCharacter,
-        preview_path: "/themes/original-observatory-muse.jpg".into(),
-        backdrop: ThemeBackdrop::Image {
-            asset_id: "original-observatory-muse".into(),
-            overlay: "#071326".into(),
-            focal_x: 50,
-            focal_y: 50,
-        },
-        palette: ThemePalette {
-            surface: "#0c1730".into(),
-            surface_strong: "#101a35".into(),
-            text: "#f4f2ff".into(),
-            accent: "#a990ff".into(),
-            border: "#7f8cff".into(),
-        },
-        effects: ThemeEffects {
-            surface_opacity: 76,
-            blur_px: 24,
-            contrast_percent: 105,
-            motion: false,
-        },
-        assets: vec![ThemeAsset {
-            id: "original-observatory-muse".into(),
-            mime_type: "image/jpeg".into(),
-            sha256: hash,
-        }],
-        rights: project_rights(
-            "Original fictional character generated for Codex Assistant on 2026-07-18",
-        ),
-    }
-}
-
-fn project_rights(source: &str) -> ThemeRights {
-    ThemeRights {
-        source: source.into(),
-        rightsholder: "Codex Assistant project".into(),
-        license: "Project-owned distribution asset".into(),
-        commercial_redistribution: true,
-        attribution: "Original artwork created for Codex Assistant".into(),
-        reviewed_at: "2026-07-18".into(),
-        status: RightsStatus::Verified,
-    }
-}
-
 fn asset_bytes(asset_id: &str) -> Option<&'static [u8]> {
     match asset_id {
         "original-observatory-muse" => Some(OBSERVATORY_MUSE),
+        "gothic-horizon" => Some(GOTHIC_HORIZON),
+        "roseglass-atelier" => Some(ROSEGLASS_ATELIER),
+        "blush-circuit" => Some(BLUSH_CIRCUIT),
+        "fortune-foundry" => Some(FORTUNE_FOUNDRY),
+        "crimson-relay" => Some(CRIMSON_RELAY),
+        "crystal-daylight" => Some(CRYSTAL_DAYLIGHT),
+        "pocket-cosmos" => Some(POCKET_COSMOS),
+        "violet-afterdark" => Some(VIOLET_AFTERDARK),
+        "cyan-chorus" => Some(CYAN_CHORUS),
+        "noir-stage" => Some(NOIR_STAGE),
         _ => None,
     }
 }

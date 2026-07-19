@@ -1,6 +1,7 @@
 use std::{
     net::{IpAddr, Ipv4Addr, TcpListener},
     path::PathBuf,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use serde::Deserialize;
@@ -60,6 +61,15 @@ pub struct VerifiedProcess {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedRootFingerprint {
+    pub pid: u32,
+    pub created_at_ticks: u64,
+    pub owner_sid: String,
+    pub canonical_executable: PathBuf,
+    pub package_version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListenerProbe {
     pub address: IpAddr,
     pub port: u16,
@@ -104,6 +114,224 @@ pub enum IdentityError {
     ProcessQuery,
     ListenerMissing,
     AmbiguousListener,
+    ProcessTreeIncomplete,
+    ProcessIdentityChanged,
+    TerminationFailed,
+    TreeStillRunning,
+    OperationCancelled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProcessTreeEntry {
+    pub pid: u32,
+    pub parent_pid: u32,
+}
+
+pub fn plan_leaf_first_termination(
+    root_pid: u32,
+    entries: &[ProcessTreeEntry],
+) -> Result<Vec<u32>, IdentityError> {
+    if root_pid == 0 || entries.iter().filter(|entry| entry.pid == root_pid).count() != 1 {
+        return Err(IdentityError::ProcessTreeIncomplete);
+    }
+    let mut descendants = std::collections::BTreeMap::new();
+    descendants.insert(root_pid, 0_usize);
+    loop {
+        let mut changed = false;
+        for entry in entries {
+            if descendants.contains_key(&entry.pid) {
+                continue;
+            }
+            if let Some(parent_depth) = descendants.get(&entry.parent_pid).copied() {
+                descendants.insert(entry.pid, parent_depth + 1);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let mut plan = descendants.into_iter().collect::<Vec<_>>();
+    plan.sort_by(|(left_pid, left_depth), (right_pid, right_depth)| {
+        right_depth.cmp(left_depth).then(left_pid.cmp(right_pid))
+    });
+    Ok(plan.into_iter().map(|(pid, _)| pid).collect())
+}
+
+#[cfg(windows)]
+pub fn query_process_creation_time(pid: u32) -> Result<u64, IdentityError> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, FILETIME},
+        System::Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    if pid == 0 {
+        return Err(IdentityError::ProcessId);
+    }
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return Err(IdentityError::ProcessQuery);
+    }
+    let mut creation = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut exit = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut kernel = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut user = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let result =
+        unsafe { GetProcessTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user) };
+    unsafe { CloseHandle(handle) };
+    if result == 0 {
+        return Err(IdentityError::ProcessQuery);
+    }
+    Ok((u64::from(creation.dwHighDateTime) << 32) | u64::from(creation.dwLowDateTime))
+}
+
+#[cfg(not(windows))]
+pub fn query_process_creation_time(_pid: u32) -> Result<u64, IdentityError> {
+    Err(IdentityError::ProcessQuery)
+}
+
+pub fn root_fingerprint(
+    process: &VerifiedProcess,
+) -> Result<VerifiedRootFingerprint, IdentityError> {
+    let identity = query_process_identity(process.pid)?;
+    if identity.owner_sid != process.owner_sid
+        || !same_windows_path(&identity.canonical_image_path, &process.image_path)
+        || identity.package_family.as_deref() != Some(CODEX_PACKAGE_FAMILY)
+    {
+        return Err(IdentityError::ProcessIdentityChanged);
+    }
+    Ok(VerifiedRootFingerprint {
+        pid: process.pid,
+        created_at_ticks: query_process_creation_time(process.pid)?,
+        owner_sid: process.owner_sid.clone(),
+        canonical_executable: process.image_path.clone(),
+        package_version: process.package_version.clone(),
+    })
+}
+
+#[cfg(windows)]
+fn snapshot_process_tree() -> Result<Vec<ProcessTreeEntry>, IdentityError> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+        System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        },
+    };
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == INVALID_HANDLE_VALUE {
+        return Err(IdentityError::ProcessQuery);
+    }
+    let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+    entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+    let mut entries = Vec::new();
+    let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry) } != 0;
+    while has_entry {
+        if entry.th32ProcessID != 0 {
+            entries.push(ProcessTreeEntry {
+                pid: entry.th32ProcessID,
+                parent_pid: entry.th32ParentProcessID,
+            });
+        }
+        has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
+    }
+    unsafe { CloseHandle(snapshot) };
+    if entries.is_empty() {
+        return Err(IdentityError::ProcessQuery);
+    }
+    Ok(entries)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TerminationFingerprint {
+    pid: u32,
+    created_at_ticks: u64,
+    owner_sid: String,
+    canonical_executable: PathBuf,
+}
+
+fn termination_fingerprint(
+    pid: u32,
+    expected_owner_sid: &str,
+) -> Result<TerminationFingerprint, IdentityError> {
+    let identity = query_process_identity(pid)?;
+    if identity.owner_sid != expected_owner_sid || !identity.canonical_image_path.is_absolute() {
+        return Err(IdentityError::ProcessIdentityChanged);
+    }
+    Ok(TerminationFingerprint {
+        pid,
+        created_at_ticks: query_process_creation_time(pid)?,
+        owner_sid: identity.owner_sid,
+        canonical_executable: identity.canonical_image_path,
+    })
+}
+
+#[cfg(windows)]
+fn process_has_exited(fingerprint: &TerminationFingerprint) -> Result<bool, IdentityError> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, WAIT_OBJECT_0},
+        System::Threading::{OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE},
+    };
+    let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, fingerprint.pid) };
+    if handle.is_null() {
+        return Ok(true);
+    }
+    let exited = unsafe { WaitForSingleObject(handle, 0) } == WAIT_OBJECT_0;
+    unsafe { CloseHandle(handle) };
+    if exited {
+        return Ok(true);
+    }
+    let current = termination_fingerprint(fingerprint.pid, &fingerprint.owner_sid)?;
+    if current != *fingerprint {
+        return Err(IdentityError::ProcessIdentityChanged);
+    }
+    Ok(false)
+}
+
+#[cfg(windows)]
+fn terminate_verified_process(fingerprint: &TerminationFingerprint) -> Result<(), IdentityError> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, WAIT_OBJECT_0},
+        System::Threading::{
+            OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_QUERY_LIMITED_INFORMATION,
+            PROCESS_SYNCHRONIZE, PROCESS_TERMINATE,
+        },
+    };
+    if process_has_exited(fingerprint)? {
+        return Ok(());
+    }
+    let current = termination_fingerprint(fingerprint.pid, &fingerprint.owner_sid)?;
+    if current != *fingerprint {
+        return Err(IdentityError::ProcessIdentityChanged);
+    }
+    let handle = unsafe {
+        OpenProcess(
+            PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            0,
+            fingerprint.pid,
+        )
+    };
+    if handle.is_null() {
+        return Err(IdentityError::TerminationFailed);
+    }
+    let terminated = unsafe { TerminateProcess(handle, 1) } != 0;
+    let waited = terminated && unsafe { WaitForSingleObject(handle, 5_000) } == WAIT_OBJECT_0;
+    unsafe { CloseHandle(handle) };
+    if !waited {
+        return Err(IdentityError::TerminationFailed);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -356,11 +584,118 @@ pub fn restart_verified_codex(
     Ok(RestartedSession { process, port })
 }
 
+#[cfg(windows)]
+pub fn restart_verified_codex_force(
+    guard: RestartGuard,
+    package: &VerifiedPackage,
+    current_process: &VerifiedProcess,
+    expected_root: &VerifiedRootFingerprint,
+    cancellation: &AtomicBool,
+    reservation: PortReservation,
+    timeout_ms: u32,
+) -> Result<RestartedSession, IdentityError> {
+    if guard.setup_phase != SetupPhase::Committed || guard.verified_ui_processes != 1 {
+        return Err(if guard.setup_phase != SetupPhase::Committed {
+            IdentityError::SetupPending
+        } else {
+            IdentityError::AmbiguousUiProcess
+        });
+    }
+    if !(1_000..=30_000).contains(&timeout_ms) {
+        return Err(IdentityError::ExitTimeout);
+    }
+    let fresh_package = discover_store_package()?;
+    if fresh_package.version != package.version
+        || !same_windows_path(&fresh_package.root, &package.root)
+        || !same_windows_path(&fresh_package.executable, &package.executable)
+    {
+        return Err(IdentityError::PackageVersion);
+    }
+    if root_fingerprint(current_process)? != *expected_root {
+        return Err(IdentityError::ProcessIdentityChanged);
+    }
+
+    let initial_entries = snapshot_process_tree()?;
+    let initial_plan = plan_leaf_first_termination(current_process.pid, &initial_entries)?;
+    let mut fingerprints = initial_plan
+        .iter()
+        .map(|pid| termination_fingerprint(*pid, &current_process.owner_sid))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let graceful = close_verified_ui_process(package, current_process, 5_000);
+    match graceful {
+        Ok(()) | Err(IdentityError::ExitTimeout) | Err(IdentityError::CloseFailed) => {}
+        Err(error) => return Err(error),
+    }
+    if cancellation.load(Ordering::SeqCst) && !matches!(graceful, Ok(())) {
+        return Err(IdentityError::OperationCancelled);
+    }
+
+    if !fingerprints
+        .iter()
+        .map(process_has_exited)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .all(|exited| exited)
+    {
+        let fresh_entries = snapshot_process_tree()?;
+        if fresh_entries
+            .iter()
+            .any(|entry| entry.pid == current_process.pid)
+        {
+            if root_fingerprint(current_process)? != *expected_root {
+                return Err(IdentityError::ProcessIdentityChanged);
+            }
+            let fresh_plan = plan_leaf_first_termination(current_process.pid, &fresh_entries)?;
+            fingerprints = fresh_plan
+                .iter()
+                .map(|pid| termination_fingerprint(*pid, &current_process.owner_sid))
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        for fingerprint in &fingerprints {
+            terminate_verified_process(fingerprint)?;
+        }
+    }
+    if fingerprints
+        .iter()
+        .map(process_has_exited)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .any(|exited| !exited)
+    {
+        return Err(IdentityError::TreeStillRunning);
+    }
+
+    let port = reservation.release();
+    let launched_pid = launch_cdp_replacement(package, port)?;
+    let process = wait_for_exact_replacement(
+        package,
+        current_process.pid,
+        launched_pid,
+        &current_process.owner_sid,
+        timeout_ms,
+    )?;
+    Ok(RestartedSession { process, port })
+}
+
 #[cfg(not(windows))]
 pub fn restart_verified_codex(
     _guard: RestartGuard,
     _package: &VerifiedPackage,
     _current_process: &VerifiedProcess,
+    _reservation: PortReservation,
+    _timeout_ms: u32,
+) -> Result<RestartedSession, IdentityError> {
+    Err(IdentityError::LaunchFailed)
+}
+
+#[cfg(not(windows))]
+pub fn restart_verified_codex_force(
+    _guard: RestartGuard,
+    _package: &VerifiedPackage,
+    _current_process: &VerifiedProcess,
+    _expected_root: &VerifiedRootFingerprint,
+    _cancellation: &AtomicBool,
     _reservation: PortReservation,
     _timeout_ms: u32,
 ) -> Result<RestartedSession, IdentityError> {

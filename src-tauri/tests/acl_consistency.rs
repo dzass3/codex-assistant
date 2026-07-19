@@ -134,11 +134,13 @@ fn monitor_commands_are_acl_granted() {
 }
 
 #[test]
-fn smart_routing_exposes_only_the_six_narrow_commands_end_to_end() {
+fn smart_routing_exposes_only_the_narrow_commands_end_to_end() {
     let expected = BTreeSet::from([
         "get_routing_snapshot".to_owned(),
         "install_routing".to_owned(),
         "restore_routing".to_owned(),
+        "prepare_force_restart".to_owned(),
+        "cancel_force_restart".to_owned(),
         "request_codex_restart".to_owned(),
         "begin_routing_preflight".to_owned(),
         "set_root_routing_enabled".to_owned(),
@@ -149,6 +151,8 @@ fn smart_routing_exposes_only_the_six_narrow_commands_end_to_end() {
         "get_routing_snapshot",
         "install_routing",
         "restore_routing",
+        "prepare_force_restart",
+        "cancel_force_restart",
         "request_codex_restart",
         "begin_routing_preflight",
         "set_root_routing_enabled",
@@ -185,11 +189,13 @@ fn smart_routing_exposes_only_the_six_narrow_commands_end_to_end() {
 }
 
 #[test]
-fn themes_expose_only_four_narrow_commands_end_to_end() {
+fn themes_expose_only_narrow_commands_end_to_end() {
     let expected = BTreeSet::from([
         "get_theme_snapshot".to_owned(),
         "start_theme_session".to_owned(),
-        "apply_theme".to_owned(),
+        "prepare_force_restart".to_owned(),
+        "cancel_force_restart".to_owned(),
+        "activate_theme".to_owned(),
         "restore_theme".to_owned(),
     ]);
     let granted = acl_granted_commands();
@@ -197,7 +203,9 @@ fn themes_expose_only_four_narrow_commands_end_to_end() {
     let frontend = [
         "get_theme_snapshot",
         "start_theme_session",
-        "apply_theme",
+        "prepare_force_restart",
+        "cancel_force_restart",
+        "activate_theme",
         "restore_theme",
     ]
     .into_iter()

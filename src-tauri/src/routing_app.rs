@@ -1,10 +1,14 @@
 use std::{
+    collections::HashMap,
     path::PathBuf,
-    sync::{Mutex, MutexGuard},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, MutexGuard,
+    },
 };
 
 use chrono::Local;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
@@ -15,18 +19,22 @@ use crate::{
     },
     control_layer::injector::{
         insert_preflight_directive_on_pages_detailed, receive_control_event,
-        set_control_routing_ready, sync_control_routing_enabled, ControlEvent, ControlReceiveError,
-        VisibleControlBinding, VisiblePreflightRequest,
+        request_visible_agent_stop, set_control_routing_ready, sync_control_routing_enabled,
+        ControlEvent, ControlReceiveError, VisibleControlBinding, VisiblePreflightRequest,
     },
     control_layer::windows_package::{
         discover_store_package, discover_verified_ui_processes, query_process_identity,
-        query_tcp_listener, reserve_loopback_port, restart_verified_codex, verify_listener,
-        IdentityError, RestartGuard, SetupPhase,
+        query_tcp_listener, reserve_loopback_port, restart_verified_codex,
+        restart_verified_codex_force, root_fingerprint, verify_listener, IdentityError,
+        RestartGuard, SetupPhase,
     },
     monitor::model::MonitorSnapshot,
     preflight::{EligibilityKey, PreflightCoordinator, PreflightPhase, PreflightSignal},
     routing::{state::RoutingStateStore, RouteKind, RoutingRuntime, RoutingSnapshot},
-    theme::{apply_theme_on_pages, bundled_theme_packs, restore_theme_on_pages, ThemePack},
+    theme::{
+        apply_theme_on_pages, bundled_theme_packs, restore_theme_on_pages, ThemeEngineError,
+        ThemePack, ThemeScriptRegistration,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -80,6 +88,64 @@ pub enum RoutingSetupReasonCode {
     UnsupportedHost,
     CdpUnavailable,
     RoutingRuntimeUnavailable,
+    ConfirmationRequired,
+    ConfirmationExpired,
+    ImpactChanged,
+    OperationConflict,
+    IdentityChanged,
+    GracefulStopUnsupported,
+    TerminationFailed,
+    OldTreeStillRunning,
+    LaunchFailed,
+    CdpVerificationFailed,
+    DomIncompatible,
+    PartialApplyFailed,
+    TerminalPartialFailure,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RestartMode {
+    Safe,
+    ForceAfterGrace,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RestartIntent {
+    RoutingRestart,
+    ThemeSession,
+    ActivateTheme,
+}
+
+pub use crate::control_layer::windows_package::VerifiedRootFingerprint;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ForceRestartImpact {
+    pub confirmation_ticket: String,
+    pub intent: RestartIntent,
+    pub active_native_children: usize,
+    pub grace_period_ms: u32,
+    pub expires_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+struct ForceRestartTicket {
+    intent: RestartIntent,
+    subject: Option<String>,
+    active_native_children: usize,
+    expires_at_ms: i64,
+    fingerprint: VerifiedRootFingerprint,
+    cancellation: Arc<AtomicBool>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ForceRestartExecution<'a> {
+    pub confirmation_ticket: &'a str,
+    pub intent: RestartIntent,
+    pub subject: Option<&'a str>,
+    pub active_native_children: usize,
+    pub now_ms: i64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -133,7 +199,8 @@ pub struct RoutingUiSnapshot {
 pub struct ThemeUiSnapshot {
     pub contract_version: u32,
     pub session_status: ThemeSessionStatus,
-    pub active_theme_id: Option<String>,
+    pub selected_theme_id: Option<String>,
+    pub applied_theme_id: Option<String>,
     pub packs: Vec<ThemePack>,
 }
 
@@ -176,10 +243,33 @@ pub struct RoutingApplication {
     control_ready: Mutex<bool>,
     control_synced_enabled: Mutex<Option<bool>>,
     theme_status: Mutex<ThemeSessionStatus>,
-    active_theme_id: Mutex<Option<String>>,
+    selected_theme_id: Mutex<Option<String>>,
+    applied_theme_id: Mutex<Option<String>>,
+    theme_scripts: Mutex<Vec<ThemeScriptRegistration>>,
+    theme_reconcile_at_ms: Mutex<i64>,
+    force_restart_tickets: Mutex<HashMap<String, ForceRestartTicket>>,
+    force_restart_cancellations: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    lifecycle_active: Mutex<bool>,
+}
+
+struct LifecycleLease<'a>(&'a Mutex<bool>);
+
+impl Drop for LifecycleLease<'_> {
+    fn drop(&mut self) {
+        *lock(self.0) = false;
+    }
 }
 
 impl RoutingApplication {
+    fn try_lifecycle(&self) -> Option<LifecycleLease<'_>> {
+        let mut active = lock(&self.lifecycle_active);
+        if *active {
+            return None;
+        }
+        *active = true;
+        drop(active);
+        Some(LifecycleLease(&self.lifecycle_active))
+    }
     pub fn default_location() -> Result<Self, String> {
         let user_home = dirs::home_dir()
             .ok_or_else(|| "Smart Routing user directory is unavailable".to_owned())?;
@@ -225,8 +315,384 @@ impl RoutingApplication {
             control_ready: Mutex::new(false),
             control_synced_enabled: Mutex::new(None),
             theme_status: Mutex::new(ThemeSessionStatus::Inactive),
-            active_theme_id: Mutex::new(None),
+            selected_theme_id: Mutex::new(None),
+            applied_theme_id: Mutex::new(None),
+            theme_scripts: Mutex::new(Vec::new()),
+            theme_reconcile_at_ms: Mutex::new(0),
+            force_restart_tickets: Mutex::new(HashMap::new()),
+            force_restart_cancellations: Mutex::new(HashMap::new()),
+            lifecycle_active: Mutex::new(false),
         })
+    }
+
+    pub fn prepare_force_restart_with<F>(
+        &self,
+        intent: RestartIntent,
+        active_native_children: usize,
+        now_ms: i64,
+        fingerprint: F,
+    ) -> Result<ForceRestartImpact, RoutingSetupReasonCode>
+    where
+        F: FnOnce() -> Result<VerifiedRootFingerprint, RoutingSetupReasonCode>,
+    {
+        self.prepare_force_restart_for_with(
+            intent,
+            None,
+            active_native_children,
+            now_ms,
+            fingerprint,
+        )
+    }
+
+    pub fn prepare_force_restart_for_with<F>(
+        &self,
+        intent: RestartIntent,
+        subject: Option<String>,
+        active_native_children: usize,
+        now_ms: i64,
+        fingerprint: F,
+    ) -> Result<ForceRestartImpact, RoutingSetupReasonCode>
+    where
+        F: FnOnce() -> Result<VerifiedRootFingerprint, RoutingSetupReasonCode>,
+    {
+        if active_native_children == 0 {
+            return Err(RoutingSetupReasonCode::ConfirmationRequired);
+        }
+        if *lock(&self.lifecycle_active) {
+            return Err(RoutingSetupReasonCode::OperationConflict);
+        }
+        let fingerprint = fingerprint()?;
+        let confirmation_ticket = Uuid::new_v4().to_string();
+        let expires_at_ms = now_ms.saturating_add(60_000);
+        let cancellation = Arc::new(AtomicBool::new(false));
+        lock(&self.force_restart_tickets).insert(
+            confirmation_ticket.clone(),
+            ForceRestartTicket {
+                intent,
+                subject,
+                active_native_children,
+                expires_at_ms,
+                fingerprint,
+                cancellation: Arc::clone(&cancellation),
+            },
+        );
+        lock(&self.force_restart_cancellations).insert(confirmation_ticket.clone(), cancellation);
+        Ok(ForceRestartImpact {
+            confirmation_ticket,
+            intent,
+            active_native_children,
+            grace_period_ms: 5_000,
+            expires_at_ms,
+        })
+    }
+
+    pub fn force_restart_with<F, R>(
+        &self,
+        confirmation_ticket: &str,
+        intent: RestartIntent,
+        active_native_children: usize,
+        now_ms: i64,
+        fingerprint: F,
+        restart: R,
+    ) -> OperationReceipt
+    where
+        F: FnOnce() -> Result<VerifiedRootFingerprint, RoutingSetupReasonCode>,
+        R: FnOnce(&VerifiedRootFingerprint, &AtomicBool) -> Result<(), RoutingSetupReasonCode>,
+    {
+        self.force_restart_for_with(
+            ForceRestartExecution {
+                confirmation_ticket,
+                intent,
+                subject: None,
+                active_native_children,
+                now_ms,
+            },
+            fingerprint,
+            restart,
+        )
+    }
+
+    pub fn force_restart_for_with<F, R>(
+        &self,
+        execution: ForceRestartExecution<'_>,
+        fingerprint: F,
+        restart: R,
+    ) -> OperationReceipt
+    where
+        F: FnOnce() -> Result<VerifiedRootFingerprint, RoutingSetupReasonCode>,
+        R: FnOnce(&VerifiedRootFingerprint, &AtomicBool) -> Result<(), RoutingSetupReasonCode>,
+    {
+        let operation_id = Uuid::new_v4().to_string();
+        let Some(ticket) = lock(&self.force_restart_tickets).remove(execution.confirmation_ticket)
+        else {
+            return blocked_receipt(
+                operation_id,
+                RoutingSetupReasonCode::ConfirmationExpired,
+                *lock(&self.restart_required),
+            );
+        };
+        if execution.now_ms > ticket.expires_at_ms
+            || ticket.intent != execution.intent
+            || ticket.subject.as_deref() != execution.subject
+        {
+            lock(&self.force_restart_cancellations).remove(execution.confirmation_ticket);
+            return blocked_receipt(
+                operation_id,
+                RoutingSetupReasonCode::ConfirmationExpired,
+                *lock(&self.restart_required),
+            );
+        }
+        if ticket.active_native_children != execution.active_native_children {
+            lock(&self.force_restart_cancellations).remove(execution.confirmation_ticket);
+            return blocked_receipt(
+                operation_id,
+                RoutingSetupReasonCode::ImpactChanged,
+                *lock(&self.restart_required),
+            );
+        }
+        let current = match fingerprint() {
+            Ok(current) => current,
+            Err(reason) => {
+                lock(&self.force_restart_cancellations).remove(execution.confirmation_ticket);
+                return blocked_receipt(operation_id, reason, *lock(&self.restart_required));
+            }
+        };
+        if current != ticket.fingerprint {
+            lock(&self.force_restart_cancellations).remove(execution.confirmation_ticket);
+            return blocked_receipt(
+                operation_id,
+                RoutingSetupReasonCode::IdentityChanged,
+                *lock(&self.restart_required),
+            );
+        }
+        {
+            let mut active = lock(&self.lifecycle_active);
+            if *active {
+                lock(&self.force_restart_cancellations).remove(execution.confirmation_ticket);
+                return blocked_receipt(
+                    operation_id,
+                    RoutingSetupReasonCode::OperationConflict,
+                    *lock(&self.restart_required),
+                );
+            }
+            *active = true;
+        }
+        let result = restart(&ticket.fingerprint, &ticket.cancellation);
+        *lock(&self.lifecycle_active) = false;
+        lock(&self.force_restart_cancellations).remove(execution.confirmation_ticket);
+        match result {
+            Ok(()) => {
+                *lock(&self.restart_required) = false;
+                *lock(&self.restart_blocked) = false;
+                OperationReceipt {
+                    operation_id,
+                    status: OperationStatus::Applied,
+                    reason_codes: Vec::new(),
+                    restart_required: false,
+                }
+            }
+            Err(reason) => OperationReceipt {
+                operation_id,
+                status: OperationStatus::Failed,
+                reason_codes: vec![reason],
+                restart_required: *lock(&self.restart_required),
+            },
+        }
+    }
+
+    pub fn cancel_force_restart(&self, confirmation_ticket: &str) -> bool {
+        let cancellation = lock(&self.force_restart_cancellations)
+            .get(confirmation_ticket)
+            .cloned();
+        if let Some(cancellation) = cancellation {
+            cancellation.store(true, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn prepare_force_restart(
+        &self,
+        intent: RestartIntent,
+        subject: Option<String>,
+        active_native_children: usize,
+    ) -> Result<ForceRestartImpact, RoutingSetupReasonCode> {
+        self.prepare_force_restart_for_with(
+            intent,
+            subject,
+            active_native_children,
+            chrono::Utc::now().timestamp_millis().max(0),
+            current_verified_root_fingerprint,
+        )
+    }
+
+    pub fn request_restart_mode(
+        &self,
+        mode: RestartMode,
+        confirmation_ticket: Option<&str>,
+        active_native_children: usize,
+    ) -> OperationReceipt {
+        if mode == RestartMode::Safe {
+            return self.request_restart(active_native_children);
+        }
+        let Some(ticket) = confirmation_ticket else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::ConfirmationRequired,
+                *lock(&self.restart_required),
+            );
+        };
+        let next_session = Mutex::new(None);
+        let receipt = self.force_restart_for_with(
+            ForceRestartExecution {
+                confirmation_ticket: ticket,
+                intent: RestartIntent::RoutingRestart,
+                subject: None,
+                active_native_children,
+                now_ms: chrono::Utc::now().timestamp_millis().max(0),
+            },
+            current_verified_root_fingerprint,
+            |expected, cancellation| {
+                self.attempt_graceful_agent_stop();
+                *lock(&next_session) = Some(restart_verified_host_force(expected, cancellation)?);
+                Ok(())
+            },
+        );
+        if receipt.status == OperationStatus::Applied {
+            if let Some(record) = lock(&next_session).take() {
+                if self.session_store.save(&record).is_err() {
+                    return failed_receipt(
+                        receipt.operation_id,
+                        RoutingSetupReasonCode::TerminalPartialFailure,
+                        false,
+                    );
+                }
+                *lock(&self.control_session) = Some(record);
+                *lock(&self.cdp_status) = RoutingCdpStatus::Ready;
+            }
+        }
+        receipt
+    }
+
+    pub fn start_theme_session_mode(
+        &self,
+        mode: RestartMode,
+        confirmation_ticket: Option<&str>,
+        active_native_children: usize,
+    ) -> OperationReceipt {
+        if mode == RestartMode::Safe {
+            return self.start_theme_session(active_native_children);
+        }
+        let Some(ticket) = confirmation_ticket else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::ConfirmationRequired,
+                false,
+            );
+        };
+        let next_session = Mutex::new(None);
+        let receipt = self.force_restart_for_with(
+            ForceRestartExecution {
+                confirmation_ticket: ticket,
+                intent: RestartIntent::ThemeSession,
+                subject: None,
+                active_native_children,
+                now_ms: chrono::Utc::now().timestamp_millis().max(0),
+            },
+            current_verified_root_fingerprint,
+            |expected, cancellation| {
+                self.attempt_graceful_agent_stop();
+                *lock(&next_session) = Some(restart_verified_host_force(expected, cancellation)?);
+                Ok(())
+            },
+        );
+        self.commit_theme_session_receipt(receipt, &next_session)
+    }
+
+    pub fn activate_theme_mode(
+        &self,
+        theme_id: &str,
+        mode: RestartMode,
+        confirmation_ticket: Option<&str>,
+        active_native_children: usize,
+    ) -> OperationReceipt {
+        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
+        if mode == RestartMode::Safe {
+            return self.activate_theme(theme_id, active_native_children);
+        }
+        let Some(ticket) = confirmation_ticket else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::ConfirmationRequired,
+                false,
+            );
+        };
+        let next_session = Mutex::new(None);
+        let restarted = self.force_restart_for_with(
+            ForceRestartExecution {
+                confirmation_ticket: ticket,
+                intent: RestartIntent::ActivateTheme,
+                subject: Some(theme_id),
+                active_native_children,
+                now_ms: chrono::Utc::now().timestamp_millis().max(0),
+            },
+            current_verified_root_fingerprint,
+            |expected, cancellation| {
+                self.attempt_graceful_agent_stop();
+                *lock(&next_session) = Some(restart_verified_host_force(expected, cancellation)?);
+                Ok(())
+            },
+        );
+        let started = self.commit_theme_session_receipt(restarted, &next_session);
+        if started.status != OperationStatus::Applied {
+            return started;
+        }
+        self.apply_theme(theme_id)
+    }
+
+    fn commit_theme_session_receipt(
+        &self,
+        receipt: OperationReceipt,
+        next_session: &Mutex<Option<OwnedSessionRecord>>,
+    ) -> OperationReceipt {
+        if receipt.status != OperationStatus::Applied {
+            return receipt;
+        }
+        let Some(record) = lock(next_session).take() else {
+            return failed_receipt(
+                receipt.operation_id,
+                RoutingSetupReasonCode::TerminalPartialFailure,
+                false,
+            );
+        };
+        if self.session_store.save(&record).is_err() {
+            return failed_receipt(
+                receipt.operation_id,
+                RoutingSetupReasonCode::TerminalPartialFailure,
+                false,
+            );
+        }
+        *lock(&self.control_session) = Some(record);
+        *lock(&self.cdp_status) = RoutingCdpStatus::Ready;
+        *lock(&self.theme_status) = ThemeSessionStatus::Ready;
+        receipt
+    }
+
+    fn attempt_graceful_agent_stop(&self) {
+        let Some(session) = lock(&self.control_session).clone() else {
+            return;
+        };
+        let Ok(endpoint) = verified_control_endpoint(&session) else {
+            return;
+        };
+        let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        else {
+            return;
+        };
+        let _ = runtime.block_on(request_visible_agent_stop(&endpoint, 1_500));
     }
 
     pub fn snapshot(&self) -> RoutingUiSnapshot {
@@ -287,14 +753,55 @@ impl RoutingApplication {
 
     pub fn theme_snapshot(&self) -> ThemeUiSnapshot {
         ThemeUiSnapshot {
-            contract_version: 1,
+            contract_version: 2,
             session_status: *lock(&self.theme_status),
-            active_theme_id: lock(&self.active_theme_id).clone(),
+            selected_theme_id: lock(&self.selected_theme_id).clone(),
+            applied_theme_id: lock(&self.applied_theme_id).clone(),
             packs: bundled_theme_packs(),
         }
     }
 
+    pub fn reconcile_active_theme(&self) {
+        if *lock(&self.theme_status) != ThemeSessionStatus::Ready || *lock(&self.lifecycle_active) {
+            return;
+        }
+        let now_ms = chrono::Utc::now().timestamp_millis().max(0);
+        {
+            let mut last = lock(&self.theme_reconcile_at_ms);
+            if now_ms.saturating_sub(*last) < 5_000 {
+                return;
+            }
+            *last = now_ms;
+        }
+        let Some(theme_id) = lock(&self.applied_theme_id).clone() else {
+            return;
+        };
+        let selected = lock(&self.selected_theme_id).clone();
+        let _ = self.apply_theme(&theme_id);
+        *lock(&self.selected_theme_id) = selected;
+    }
+
     pub fn start_theme_session(&self, active_native_children: usize) -> OperationReceipt {
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::OperationConflict,
+                false,
+            );
+        };
+        if let Some(record) = recover_verified_host_session(&self.session_store) {
+            *lock(&self.control_session) = Some(record);
+            *lock(&self.cdp_status) = RoutingCdpStatus::Ready;
+            *lock(&self.theme_status) = ThemeSessionStatus::Ready;
+            return OperationReceipt {
+                operation_id: Uuid::new_v4().to_string(),
+                status: OperationStatus::Noop,
+                reason_codes: Vec::new(),
+                restart_required: false,
+            };
+        }
+        *lock(&self.control_session) = None;
+        *lock(&self.theme_status) = ThemeSessionStatus::Inactive;
         self.start_theme_session_with(active_native_children, restart_verified_host)
     }
 
@@ -353,7 +860,9 @@ impl RoutingApplication {
     }
 
     pub fn apply_theme(&self, theme_id: &str) -> OperationReceipt {
-        self.apply_theme_with(theme_id, |pack| {
+        let previous_scripts = lock(&self.theme_scripts).clone();
+        let next_scripts = std::sync::Mutex::new(None);
+        let receipt = self.apply_theme_with(theme_id, |pack| {
             let session = lock(&self.control_session)
                 .clone()
                 .ok_or(RoutingSetupReasonCode::CdpUnavailable)?;
@@ -362,10 +871,91 @@ impl RoutingApplication {
                 .enable_all()
                 .build()
                 .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)?;
-            runtime
-                .block_on(apply_theme_on_pages(&endpoint, pack, 2_000))
-                .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)
-        })
+            let result = runtime
+                .block_on(apply_theme_on_pages(
+                    &endpoint,
+                    pack,
+                    &previous_scripts,
+                    2_000,
+                ))
+                .map_err(theme_engine_reason)?;
+            *lock(&next_scripts) = Some(result.scripts);
+            Ok(result.applied_pages)
+        });
+        if receipt.status == OperationStatus::Applied {
+            if let Some(scripts) = lock(&next_scripts).take() {
+                *lock(&self.theme_scripts) = scripts;
+            }
+        } else if receipt
+            .reason_codes
+            .contains(&RoutingSetupReasonCode::CdpUnavailable)
+        {
+            *lock(&self.control_session) = None;
+            *lock(&self.theme_status) = ThemeSessionStatus::Degraded;
+        }
+        receipt
+    }
+
+    pub fn activate_theme(
+        &self,
+        theme_id: &str,
+        active_native_children: usize,
+    ) -> OperationReceipt {
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::OperationConflict,
+                false,
+            );
+        };
+        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
+        if *lock(&self.theme_status) != ThemeSessionStatus::Ready {
+            if let Some(record) = recover_verified_host_session(&self.session_store) {
+                *lock(&self.control_session) = Some(record);
+                *lock(&self.theme_status) = ThemeSessionStatus::Ready;
+            }
+            let started = if *lock(&self.theme_status) == ThemeSessionStatus::Ready {
+                OperationReceipt {
+                    operation_id: Uuid::new_v4().to_string(),
+                    status: OperationStatus::Noop,
+                    reason_codes: Vec::new(),
+                    restart_required: false,
+                }
+            } else {
+                self.start_theme_session_with(active_native_children, restart_verified_host)
+            };
+            if !matches!(
+                started.status,
+                OperationStatus::Applied | OperationStatus::Noop
+            ) {
+                return started;
+            }
+        }
+        self.apply_theme(theme_id)
+    }
+
+    pub fn activate_theme_with<R, A>(
+        &self,
+        theme_id: &str,
+        active_native_children: usize,
+        restart: R,
+        apply: A,
+    ) -> OperationReceipt
+    where
+        R: FnOnce() -> Result<OwnedSessionRecord, RoutingSetupReasonCode>,
+        A: FnOnce(&ThemePack) -> Result<usize, RoutingSetupReasonCode>,
+    {
+        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
+        if *lock(&self.theme_status) != ThemeSessionStatus::Ready {
+            let started = self.start_theme_session_with(active_native_children, restart);
+            if !matches!(
+                started.status,
+                OperationStatus::Applied | OperationStatus::Noop
+            ) {
+                return started;
+            }
+        }
+        self.apply_theme_with(theme_id, apply)
     }
 
     pub fn apply_theme_with<F>(&self, theme_id: &str, apply: F) -> OperationReceipt
@@ -373,6 +963,7 @@ impl RoutingApplication {
         F: FnOnce(&ThemePack) -> Result<usize, RoutingSetupReasonCode>,
     {
         let operation_id = Uuid::new_v4().to_string();
+        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
         if *lock(&self.theme_status) != ThemeSessionStatus::Ready {
             return blocked_receipt(operation_id, RoutingSetupReasonCode::CdpUnavailable, false);
         }
@@ -384,7 +975,7 @@ impl RoutingApplication {
         };
         match apply(&pack) {
             Ok(count) if count != 0 => {
-                *lock(&self.active_theme_id) = Some(pack.id);
+                *lock(&self.applied_theme_id) = Some(pack.id);
                 OperationReceipt {
                     operation_id,
                     status: OperationStatus::Applied,
@@ -408,7 +999,15 @@ impl RoutingApplication {
     }
 
     pub fn restore_theme(&self) -> OperationReceipt {
-        self.restore_theme_with(|| {
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::OperationConflict,
+                false,
+            );
+        };
+        let scripts = lock(&self.theme_scripts).clone();
+        let receipt = self.restore_theme_with(|| {
             let session = lock(&self.control_session)
                 .clone()
                 .ok_or(RoutingSetupReasonCode::CdpUnavailable)?;
@@ -418,9 +1017,13 @@ impl RoutingApplication {
                 .build()
                 .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)?;
             runtime
-                .block_on(restore_theme_on_pages(&endpoint, 2_000))
+                .block_on(restore_theme_on_pages(&endpoint, &scripts, 2_000))
                 .map_err(|_| RoutingSetupReasonCode::CdpUnavailable)
-        })
+        });
+        if receipt.status == OperationStatus::Applied {
+            lock(&self.theme_scripts).clear();
+        }
+        receipt
     }
 
     pub fn restore_theme_with<F>(&self, restore: F) -> OperationReceipt
@@ -428,7 +1031,7 @@ impl RoutingApplication {
         F: FnOnce() -> Result<usize, RoutingSetupReasonCode>,
     {
         let operation_id = Uuid::new_v4().to_string();
-        if lock(&self.active_theme_id).is_none() {
+        if lock(&self.applied_theme_id).is_none() {
             return OperationReceipt {
                 operation_id,
                 status: OperationStatus::Noop,
@@ -438,7 +1041,8 @@ impl RoutingApplication {
         }
         match restore() {
             Ok(count) if count != 0 => {
-                *lock(&self.active_theme_id) = None;
+                *lock(&self.selected_theme_id) = None;
+                *lock(&self.applied_theme_id) = None;
                 OperationReceipt {
                     operation_id,
                     status: OperationStatus::Applied,
@@ -1249,6 +1853,13 @@ impl RoutingApplication {
     }
 
     pub fn request_restart(&self, active_native_children: usize) -> OperationReceipt {
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked_receipt(
+                Uuid::new_v4().to_string(),
+                RoutingSetupReasonCode::OperationConflict,
+                *lock(&self.restart_required),
+            );
+        };
         self.request_restart_with_session(active_native_children, restart_verified_host)
     }
 
@@ -1398,6 +2009,30 @@ fn verified_control_endpoint(
 }
 
 #[cfg(windows)]
+fn recover_verified_host_session(store: &OwnedSessionStore) -> Option<OwnedSessionRecord> {
+    let package = discover_store_package().ok()?;
+    let current_user = query_process_identity(std::process::id()).ok()?;
+    let processes = discover_verified_ui_processes(&package, &current_user.owner_sid).ok()?;
+    let [current_process] = processes.as_slice() else {
+        return None;
+    };
+    let record = store
+        .load(
+            current_process.pid,
+            &package.version,
+            chrono::Utc::now().timestamp_millis().max(0),
+        )
+        .ok()??;
+    verified_control_endpoint(&record).ok()?;
+    Some(record)
+}
+
+#[cfg(not(windows))]
+fn recover_verified_host_session(_store: &OwnedSessionStore) -> Option<OwnedSessionRecord> {
+    None
+}
+
+#[cfg(windows)]
 fn restart_verified_host() -> Result<OwnedSessionRecord, RoutingSetupReasonCode> {
     let package = discover_store_package().map_err(restart_reason)?;
     let current_user = query_process_identity(std::process::id()).map_err(restart_reason)?;
@@ -1445,6 +2080,86 @@ fn restart_verified_host() -> Result<OwnedSessionRecord, RoutingSetupReasonCode>
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+}
+
+#[cfg(windows)]
+fn current_verified_root_fingerprint() -> Result<VerifiedRootFingerprint, RoutingSetupReasonCode> {
+    let package = discover_store_package().map_err(restart_reason)?;
+    let current_user = query_process_identity(std::process::id()).map_err(restart_reason)?;
+    let processes = discover_verified_ui_processes(&package, &current_user.owner_sid)
+        .map_err(restart_reason)?;
+    let [current_process] = processes.as_slice() else {
+        return Err(RoutingSetupReasonCode::IdentityChanged);
+    };
+    root_fingerprint(current_process).map_err(restart_reason)
+}
+
+#[cfg(not(windows))]
+fn current_verified_root_fingerprint() -> Result<VerifiedRootFingerprint, RoutingSetupReasonCode> {
+    Err(RoutingSetupReasonCode::UnsupportedHost)
+}
+
+#[cfg(windows)]
+fn restart_verified_host_force(
+    expected_root: &VerifiedRootFingerprint,
+    cancellation: &AtomicBool,
+) -> Result<OwnedSessionRecord, RoutingSetupReasonCode> {
+    let package = discover_store_package().map_err(restart_reason)?;
+    let current_user = query_process_identity(std::process::id()).map_err(restart_reason)?;
+    let processes = discover_verified_ui_processes(&package, &current_user.owner_sid)
+        .map_err(restart_reason)?;
+    let [current_process] = processes.as_slice() else {
+        return Err(RoutingSetupReasonCode::IdentityChanged);
+    };
+    let reservation = reserve_loopback_port().map_err(restart_reason)?;
+    let restarted = restart_verified_codex_force(
+        RestartGuard {
+            verified_ui_processes: 1,
+            active_native_children: 1,
+            setup_phase: SetupPhase::Committed,
+        },
+        &package,
+        current_process,
+        expected_root,
+        cancellation,
+        reservation,
+        15_000,
+    )
+    .map_err(restart_reason)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| RoutingSetupReasonCode::CdpVerificationFailed)?;
+    loop {
+        let listener_verified = query_tcp_listener(restarted.port)
+            .and_then(|listener| verify_listener(&restarted.process, listener, restarted.port))
+            .is_ok();
+        let endpoint = runtime.block_on(fetch_browser_endpoint(restarted.port, 1_000));
+        if listener_verified {
+            if let Ok(endpoint) = endpoint {
+                return create_owned_session_record(
+                    &endpoint,
+                    restarted.process.pid,
+                    &package.version,
+                    chrono::Utc::now().timestamp_millis().max(0),
+                )
+                .map_err(|_| RoutingSetupReasonCode::CdpVerificationFailed);
+            }
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(RoutingSetupReasonCode::CdpVerificationFailed);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+#[cfg(not(windows))]
+fn restart_verified_host_force(
+    _expected_root: &VerifiedRootFingerprint,
+    _cancellation: &AtomicBool,
+) -> Result<OwnedSessionRecord, RoutingSetupReasonCode> {
+    Err(RoutingSetupReasonCode::UnsupportedHost)
 }
 
 #[cfg(windows)]
@@ -1525,7 +2240,24 @@ fn restart_reason(error: IdentityError) -> RoutingSetupReasonCode {
         | IdentityError::ProcessOwner
         | IdentityError::ProcessImage
         | IdentityError::ProcessPackage => RoutingSetupReasonCode::UnsupportedHost,
+        IdentityError::ProcessIdentityChanged => RoutingSetupReasonCode::IdentityChanged,
+        IdentityError::ProcessTreeIncomplete => RoutingSetupReasonCode::ImpactChanged,
+        IdentityError::TerminationFailed => RoutingSetupReasonCode::TerminationFailed,
+        IdentityError::TreeStillRunning => RoutingSetupReasonCode::OldTreeStillRunning,
+        IdentityError::OperationCancelled => RoutingSetupReasonCode::ConfirmationRequired,
+        IdentityError::LaunchFailed => RoutingSetupReasonCode::TerminalPartialFailure,
         _ => RoutingSetupReasonCode::CdpUnavailable,
+    }
+}
+
+fn theme_engine_reason(error: ThemeEngineError) -> RoutingSetupReasonCode {
+    match error {
+        ThemeEngineError::DomIncompatible => RoutingSetupReasonCode::DomIncompatible,
+        ThemeEngineError::PartialApplication => RoutingSetupReasonCode::PartialApplyFailed,
+        ThemeEngineError::InvalidPack(_) => RoutingSetupReasonCode::UnsupportedHost,
+        ThemeEngineError::Discovery(_) | ThemeEngineError::Cdp(_) => {
+            RoutingSetupReasonCode::CdpUnavailable
+        }
     }
 }
 
@@ -1543,6 +2275,19 @@ fn blocked_receipt(
     OperationReceipt {
         operation_id,
         status: OperationStatus::Blocked,
+        reason_codes: vec![reason],
+        restart_required,
+    }
+}
+
+fn failed_receipt(
+    operation_id: String,
+    reason: RoutingSetupReasonCode,
+    restart_required: bool,
+) -> OperationReceipt {
+    OperationReceipt {
+        operation_id,
+        status: OperationStatus::Failed,
         reason_codes: vec![reason],
         restart_required,
     }

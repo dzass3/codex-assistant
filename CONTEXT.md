@@ -163,6 +163,7 @@ The observer rule that conversation bodies, reasoning text, tool arguments, tool
 - Every bundled theme pack must pass the theme rights gate and ship with its rights manifest and required attribution.
 - User-imported local theme assets are not uploaded, published, or redistributed by Codex Assistant.
 - Enabling the theme engine may restart Codex once; subsequent theme switches operate in the existing Codex window and must not open a second Codex window.
+- Safe restart never terminates active native agents. A user-confirmed force restart is a destructive exception: it uses a 60-second single-use ticket bound to the exact verified root process identity and current impact, offers a five-second cancellable grace period, terminates only the revalidated descendant tree leaf-first, and never retries after an irreversible partial failure.
 - The theme engine uses a random loopback-only CDP port, verifies official Codex process identity, and closes the endpoint when restoring the official appearance.
 - Codex updates trigger a compatibility check; an incompatible or failed theme must fall back to the official appearance without modifying official application files.
 - The selected architecture is a native-agent configurator plus a conversation control layer; detached execution and official application patching are excluded.

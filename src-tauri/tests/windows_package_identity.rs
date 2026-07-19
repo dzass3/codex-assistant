@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use codex_assistant_lib::control_layer::windows_package::{
     authorize_restart, cdp_launch_arguments, discover_store_package, parse_package_query,
-    query_process_identity, query_tcp_listener, reserve_loopback_port, validate_replacement_set,
-    verify_listener, verify_package, verify_process, IdentityError, ListenerProbe, PackageProbe,
-    ProcessProbe, RestartGuard, SetupPhase, SignatureStatus, VerifiedProcess, CODEX_PACKAGE_FAMILY,
+    plan_leaf_first_termination, query_process_identity, query_tcp_listener, reserve_loopback_port,
+    validate_replacement_set, verify_listener, verify_package, verify_process, IdentityError,
+    ListenerProbe, PackageProbe, ProcessProbe, ProcessTreeEntry, RestartGuard, SetupPhase,
+    SignatureStatus, VerifiedProcess, CODEX_PACKAGE_FAMILY,
 };
 
 fn package() -> PackageProbe {
@@ -20,6 +21,73 @@ fn package() -> PackageProbe {
         ),
         signature: SignatureStatus::TrustedStore,
     }
+}
+
+#[test]
+fn force_termination_plan_is_leaf_first_and_root_last() {
+    let entries = [
+        ProcessTreeEntry {
+            pid: 10,
+            parent_pid: 1,
+        },
+        ProcessTreeEntry {
+            pid: 11,
+            parent_pid: 10,
+        },
+        ProcessTreeEntry {
+            pid: 12,
+            parent_pid: 10,
+        },
+        ProcessTreeEntry {
+            pid: 13,
+            parent_pid: 11,
+        },
+        ProcessTreeEntry {
+            pid: 20,
+            parent_pid: 1,
+        },
+    ];
+    let plan = plan_leaf_first_termination(10, &entries).expect("complete process tree");
+    assert_eq!(plan.last(), Some(&10));
+    assert!(
+        plan.iter().position(|pid| *pid == 13).unwrap()
+            < plan.iter().position(|pid| *pid == 11).unwrap()
+    );
+    assert!(
+        plan.iter().position(|pid| *pid == 11).unwrap()
+            < plan.iter().position(|pid| *pid == 10).unwrap()
+    );
+    assert_eq!(plan.len(), 4);
+}
+
+#[test]
+fn force_termination_plan_fails_closed_for_missing_or_duplicate_root() {
+    assert_eq!(
+        plan_leaf_first_termination(
+            10,
+            &[ProcessTreeEntry {
+                pid: 11,
+                parent_pid: 10
+            }]
+        ),
+        Err(IdentityError::ProcessTreeIncomplete)
+    );
+    assert_eq!(
+        plan_leaf_first_termination(
+            10,
+            &[
+                ProcessTreeEntry {
+                    pid: 10,
+                    parent_pid: 1
+                },
+                ProcessTreeEntry {
+                    pid: 10,
+                    parent_pid: 2
+                },
+            ],
+        ),
+        Err(IdentityError::ProcessTreeIncomplete)
+    );
 }
 
 #[test]

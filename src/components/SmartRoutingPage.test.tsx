@@ -39,10 +39,13 @@ describe("SmartRoutingPage", () => {
       connected: true,
       operation: null,
       receipt: null,
+      pendingForce: null,
       refresh: vi.fn(),
       install: vi.fn(),
       restore: vi.fn(),
       requestRestart: vi.fn(),
+      confirmForceRestart: vi.fn(),
+      cancelForceRestart: vi.fn(),
       beginPreflight: vi.fn(),
       setRootEnabled: vi.fn(),
     });
@@ -131,10 +134,13 @@ describe("SmartRoutingPage", () => {
       connected: true,
       operation: null,
       receipt: null,
+      pendingForce: null,
       refresh: vi.fn(),
       install: vi.fn(),
       restore,
       requestRestart: vi.fn(),
+      confirmForceRestart: vi.fn(),
+      cancelForceRestart: vi.fn(),
       beginPreflight: vi.fn(),
       setRootEnabled,
     });
@@ -204,10 +210,13 @@ describe("SmartRoutingPage", () => {
       connected: true,
       operation: null,
       receipt: null,
+      pendingForce: null,
       refresh: vi.fn(),
       install: vi.fn(),
       restore: vi.fn(),
       requestRestart,
+      confirmForceRestart: vi.fn(),
+      cancelForceRestart: vi.fn(),
       beginPreflight: vi.fn(),
       setRootEnabled: vi.fn(),
     });
@@ -217,6 +226,63 @@ describe("SmartRoutingPage", () => {
 
     expect(requestRestart).toHaveBeenCalledOnce();
     expect(screen.getByText(/仅在没有运行中的原生子代理时/)).toBeInTheDocument();
+  });
+
+  it("keeps the blocked restart actionable and shows the force confirmation impact", () => {
+    const requestRestart = vi.fn();
+    const confirmForceRestart = vi.fn();
+    vi.mocked(useRouting).mockReturnValue({
+      snapshot: {
+        contract_version: 1,
+        setup: {
+          installation_status: "restart-required",
+          restart_status: "blocked-active-child",
+          preflight_status: "not-started",
+          cdp_status: "inactive",
+          backup_label: "routing-backup-20260718",
+          config_changes: [],
+          reason_codes: ["active-child"],
+        },
+        routing: {
+          schema_version: 1,
+          profile_version: "routing-v1",
+          routes: [],
+          eligibility: [],
+          activity: [],
+          quality: [],
+        },
+      },
+      loading: false,
+      refreshing: false,
+      degraded: false,
+      error: null,
+      connected: true,
+      operation: null,
+      receipt: null,
+      pendingForce: {
+        confirmation_ticket: "d2719d93-b823-4a7f-934f-23cbe01c8ab0",
+        intent: "routing-restart",
+        active_native_children: 1,
+        grace_period_ms: 5000,
+        expires_at_ms: 100_000,
+      },
+      refresh: vi.fn(),
+      install: vi.fn(),
+      restore: vi.fn(),
+      requestRestart,
+      confirmForceRestart,
+      cancelForceRestart: vi.fn(),
+      beginPreflight: vi.fn(),
+      setRootEnabled: vi.fn(),
+    });
+    render(<SmartRoutingPage />);
+
+    const trigger = screen.getByRole("button", { name: "查看强制重启选项" });
+    expect(trigger).toBeEnabled();
+    fireEvent.click(trigger);
+    expect(requestRestart).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "终止子代理并强制重启" }));
+    expect(confirmForceRestart).toHaveBeenCalledOnce();
   });
 
   it("starts native preflight for the selected visible root task", () => {
@@ -249,10 +315,13 @@ describe("SmartRoutingPage", () => {
       connected: true,
       operation: null,
       receipt: null,
+      pendingForce: null,
       refresh: vi.fn(),
       install: vi.fn(),
       restore: vi.fn(),
       requestRestart: vi.fn(),
+      confirmForceRestart: vi.fn(),
+      cancelForceRestart: vi.fn(),
       beginPreflight,
       setRootEnabled: vi.fn(),
     });

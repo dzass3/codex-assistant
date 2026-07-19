@@ -1,6 +1,6 @@
 {
   "productName": "Codex Assistant",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "identifier": "com.codexagentmonitor.desktop",
   "build": {
     "devUrl": "http://localhost:1420",
@@ -30,7 +30,8 @@
       "resources/routing/**/*",
       "resources/control/routing-control.js",
       "resources/control/routing-control.css",
-      "resources/themes/**/*"
+      "resources/themes/**/*",
+      "../shared/theme-catalog.json"
     ],
     "icon": [
       "icons/32x32.png",

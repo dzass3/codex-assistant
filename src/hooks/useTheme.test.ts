@@ -8,15 +8,17 @@ vi.mock("../lib/themeApi", () => ({
   themeApi: {
     getSnapshot: vi.fn(),
     startSession: vi.fn(),
-    apply: vi.fn(),
+    prepareForceRestart: vi.fn(),
+    activate: vi.fn(),
     restore: vi.fn(),
   },
 }));
 
 const validSnapshot: ThemeUiSnapshot = {
-  contract_version: 1,
+  contract_version: 2,
   session_status: "ready",
-  active_theme_id: null,
+  selected_theme_id: null,
+  applied_theme_id: null,
   packs: [],
 };
 
@@ -31,7 +33,8 @@ describe("useTheme", () => {
   beforeEach(() => {
     vi.mocked(themeApi.getSnapshot).mockReset();
     vi.mocked(themeApi.startSession).mockReset();
-    vi.mocked(themeApi.apply).mockReset();
+    vi.mocked(themeApi.prepareForceRestart).mockReset();
+    vi.mocked(themeApi.activate).mockReset();
     vi.mocked(themeApi.restore).mockReset();
   });
 
@@ -57,7 +60,7 @@ describe("useTheme", () => {
         finishStart = resolve;
       }),
     );
-    vi.mocked(themeApi.apply).mockResolvedValue(receipt);
+    vi.mocked(themeApi.activate).mockResolvedValue(receipt);
     const { result } = renderHook(() => useTheme());
     await waitFor(() => expect(result.current.snapshot).toEqual(validSnapshot));
 
@@ -66,17 +69,17 @@ describe("useTheme", () => {
       starting = result.current.startSession();
     });
     expect(result.current.operation).toBe("start-session");
-    await expect(result.current.apply("aurora-grid")).resolves.toBeNull();
-    expect(themeApi.apply).not.toHaveBeenCalled();
+    await expect(result.current.activate("aurora-grid")).resolves.toBeNull();
+    expect(themeApi.activate).not.toHaveBeenCalled();
 
     await act(async () => {
       finishStart?.(receipt);
       await starting;
     });
-    await act(() => result.current.apply("aurora-grid"));
+    await act(() => result.current.activate("aurora-grid"));
 
     expect(themeApi.startSession).toHaveBeenCalledOnce();
-    expect(themeApi.apply).toHaveBeenCalledWith("aurora-grid");
+    expect(themeApi.activate).toHaveBeenCalledWith("aurora-grid");
     expect(themeApi.getSnapshot).toHaveBeenCalledTimes(3);
     expect(result.current.operation).toBeNull();
   });

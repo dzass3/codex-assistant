@@ -1,0 +1,491 @@
+{
+  "schema_version": 1,
+  "themes": [
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "aurora-grid",
+      "name": "Aurora Grid",
+      "description": "Project-owned abstract aurora with restrained glass surfaces.",
+      "category": "abstract",
+      "preview_path": "/themes/aurora-grid.png",
+      "backdrop": { "kind": "gradient", "angle": 135, "colors": ["#07111f", "#18204b", "#0b4d5f"] },
+      "palette": {
+        "surface": "#101827",
+        "surface_strong": "#111b2d",
+        "text": "#eef7ff",
+        "accent": "#64e7ff",
+        "border": "#6fdcf0"
+      },
+      "effects": { "surface_opacity": 78, "blur_px": 22, "contrast_percent": 108, "motion": true },
+      "assets": [
+        {
+          "id": "aurora-grid-preview",
+          "mime_type": "image/png",
+          "sha256": "63df155c5dcb72c5c572e5e9c0253be8d72dc2d5f367c17754def8474dbc6a69"
+        }
+      ],
+      "rights": {
+        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "observatory-muse",
+      "name": "Observatory Muse",
+      "description": "Original fictional technologist in a quiet violet observatory.",
+      "category": "original-character",
+      "preview_path": "/themes/original-observatory-muse.jpg",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "original-observatory-muse",
+        "overlay": "#071326",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#0c1730",
+        "surface_strong": "#101a35",
+        "text": "#f4f2ff",
+        "accent": "#a990ff",
+        "border": "#7f8cff"
+      },
+      "effects": { "surface_opacity": 76, "blur_px": 24, "contrast_percent": 105, "motion": false },
+      "assets": [
+        {
+          "id": "original-observatory-muse",
+          "mime_type": "image/jpeg",
+          "sha256": "a486add3d4c8efb5c8f9b28c453291c0ed2192d415565f0bec1dc6f9bdc78c3a"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional character generated for Codex Assistant on 2026-07-18",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "gothic-horizon",
+      "name": "Gothic Horizon",
+      "description": "A fictional graphite horizon framed by monumental teal-lit forms.",
+      "category": "project-showcase",
+      "preview_path": "/themes/gothic-horizon.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "gothic-horizon",
+        "overlay": "#071015",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#0b1118",
+        "surface_strong": "#101923",
+        "text": "#eafcff",
+        "accent": "#67e8f9",
+        "border": "#155e75"
+      },
+      "effects": { "surface_opacity": 82, "blur_px": 20, "contrast_percent": 110, "motion": false },
+      "assets": [
+        {
+          "id": "gothic-horizon",
+          "mime_type": "image/png",
+          "sha256": "635824e3103e8c0036bb4a7af8e0ec7d921426a3e7f388a4f9b72e8899700aa2"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "roseglass-atelier",
+      "name": "Roseglass Atelier",
+      "description": "Layered rose glass and quiet champagne light for a bright workspace.",
+      "category": "abstract",
+      "preview_path": "/themes/roseglass-atelier.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "roseglass-atelier",
+        "overlay": "#5b2635",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#4a2330",
+        "surface_strong": "#5d2b3a",
+        "text": "#fff8f6",
+        "accent": "#ffb4c3",
+        "border": "#f29aac"
+      },
+      "effects": { "surface_opacity": 72, "blur_px": 28, "contrast_percent": 98, "motion": false },
+      "assets": [
+        {
+          "id": "roseglass-atelier",
+          "mime_type": "image/png",
+          "sha256": "7796eeb9ad8f9cf32322086fe2eb3bf82976fb4990f67b738edf03d952fd1411"
+        }
+      ],
+      "rights": {
+        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "blush-circuit",
+      "name": "Blush Circuit",
+      "description": "Fine coral signal paths around a calm plum workspace.",
+      "category": "abstract",
+      "preview_path": "/themes/blush-circuit.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "blush-circuit",
+        "overlay": "#2b0d24",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#2d1328",
+        "surface_strong": "#3a1731",
+        "text": "#fff1f5",
+        "accent": "#fb7185",
+        "border": "#f472b6"
+      },
+      "effects": { "surface_opacity": 80, "blur_px": 20, "contrast_percent": 104, "motion": true },
+      "assets": [
+        {
+          "id": "blush-circuit",
+          "mime_type": "image/png",
+          "sha256": "b3674018a500798258279a7bf74931f99ead7b307fe6465dd582d4c0b50e9682"
+        }
+      ],
+      "rights": {
+        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "fortune-foundry",
+      "name": "Fortune Foundry",
+      "description": "Warm geometric metals and amber rings in a restrained fictional foundry.",
+      "category": "project-showcase",
+      "preview_path": "/themes/fortune-foundry.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "fortune-foundry",
+        "overlay": "#221408",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#25170c",
+        "surface_strong": "#33200f",
+        "text": "#fff7df",
+        "accent": "#fbbf24",
+        "border": "#d97706"
+      },
+      "effects": { "surface_opacity": 82, "blur_px": 18, "contrast_percent": 108, "motion": false },
+      "assets": [
+        {
+          "id": "fortune-foundry",
+          "mime_type": "image/png",
+          "sha256": "a5790aa043355755c8eec370854aa0452a8cb66609f48714cf439417b16fa29c"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "crimson-relay",
+      "name": "Crimson Relay",
+      "description": "Fast crimson light ribbons crossing a precise graphite field.",
+      "category": "abstract",
+      "preview_path": "/themes/crimson-relay.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "crimson-relay",
+        "overlay": "#12080a",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#1b0d10",
+        "surface_strong": "#251014",
+        "text": "#fff5f5",
+        "accent": "#ef4444",
+        "border": "#dc2626"
+      },
+      "effects": { "surface_opacity": 84, "blur_px": 16, "contrast_percent": 112, "motion": true },
+      "assets": [
+        {
+          "id": "crimson-relay",
+          "mime_type": "image/png",
+          "sha256": "259367a00dd4b7118a20abc190abb0362d19a111a567568847d90f50241764d6"
+        }
+      ],
+      "rights": {
+        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "crystal-daylight",
+      "name": "Crystal Daylight",
+      "description": "Frosted blue prisms and open daylight for a clear, quiet workspace.",
+      "category": "project-showcase",
+      "preview_path": "/themes/crystal-daylight.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "crystal-daylight",
+        "overlay": "#c7e7f2",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#dceff5",
+        "surface_strong": "#eef9fc",
+        "text": "#082f49",
+        "accent": "#0891b2",
+        "border": "#22d3ee"
+      },
+      "effects": { "surface_opacity": 78, "blur_px": 22, "contrast_percent": 94, "motion": false },
+      "assets": [
+        {
+          "id": "crystal-daylight",
+          "mime_type": "image/png",
+          "sha256": "2a48f4e75b4bc84530b7b555bc0957756763550955e91f9ccf91dcb913b8137c"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "pocket-cosmos",
+      "name": "Pocket Cosmos",
+      "description": "Tiny fictional orbital worlds suspended in deep navy glass.",
+      "category": "project-showcase",
+      "preview_path": "/themes/pocket-cosmos.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "pocket-cosmos",
+        "overlay": "#07152c",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#0b1730",
+        "surface_strong": "#101d3b",
+        "text": "#eef5ff",
+        "accent": "#60a5fa",
+        "border": "#8b5cf6"
+      },
+      "effects": { "surface_opacity": 80, "blur_px": 20, "contrast_percent": 106, "motion": true },
+      "assets": [
+        {
+          "id": "pocket-cosmos",
+          "mime_type": "image/png",
+          "sha256": "77f40b7156c20ccc16f3fc08e240f376997d8f8368ffad1b99781c34973d5e9c"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "violet-afterdark",
+      "name": "Violet Afterdark",
+      "description": "A fictional translucent skyline glowing through quiet indigo night.",
+      "category": "project-showcase",
+      "preview_path": "/themes/violet-afterdark.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "violet-afterdark",
+        "overlay": "#0c0b2d",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#171238",
+        "surface_strong": "#21184b",
+        "text": "#f5f3ff",
+        "accent": "#a78bfa",
+        "border": "#7c3aed"
+      },
+      "effects": { "surface_opacity": 80, "blur_px": 24, "contrast_percent": 106, "motion": false },
+      "assets": [
+        {
+          "id": "violet-afterdark",
+          "mime_type": "image/png",
+          "sha256": "46dfa3862c593f8774be669fc963e233505da48fe79509b9a92bdb84178af192"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "cyan-chorus",
+      "name": "Cyan Chorus",
+      "description": "Synchronized cyan light waves around a calm teal center.",
+      "category": "abstract",
+      "preview_path": "/themes/cyan-chorus.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "cyan-chorus",
+        "overlay": "#063445",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#073849",
+        "surface_strong": "#0a465a",
+        "text": "#ecfeff",
+        "accent": "#22d3ee",
+        "border": "#06b6d4"
+      },
+      "effects": { "surface_opacity": 76, "blur_px": 22, "contrast_percent": 104, "motion": true },
+      "assets": [
+        {
+          "id": "cyan-chorus",
+          "mime_type": "image/png",
+          "sha256": "92667b497e0ab9381a7306d6826a4899cc52534463cc60b1f907bfea2dedffaa"
+        }
+      ],
+      "rights": {
+        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "noir-stage",
+      "name": "Noir Stage",
+      "description": "Minimal black drapery and warm spotlights framing a quiet center.",
+      "category": "project-showcase",
+      "preview_path": "/themes/noir-stage.png",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "noir-stage",
+        "overlay": "#080808",
+        "focal_x": 50,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#111111",
+        "surface_strong": "#191919",
+        "text": "#fffaf0",
+        "accent": "#e5c07b",
+        "border": "#8f6f3e"
+      },
+      "effects": { "surface_opacity": 86, "blur_px": 18, "contrast_percent": 112, "motion": false },
+      "assets": [
+        {
+          "id": "noir-stage",
+          "mime_type": "image/png",
+          "sha256": "d586ec1587f43877f798eb90dbdd1e574d356dc8f4446277b1c48b9aa5c1662d"
+        }
+      ],
+      "rights": {
+        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
+        "rightsholder": "Codex Assistant project",
+        "license": "Project-owned distribution asset",
+        "commercial_redistribution": true,
+        "attribution": "Original artwork created for Codex Assistant",
+        "reviewed_at": "2026-07-19",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    }
+  ]
+}

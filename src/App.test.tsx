@@ -36,7 +36,13 @@ vi.mock("./hooks/useRouting", () => ({
 
 vi.mock("./hooks/useTheme", () => ({
   useTheme: () => ({
-    snapshot: { contract_version: 1, session_status: "inactive", active_theme_id: null, packs: [] },
+    snapshot: {
+      contract_version: 2,
+      session_status: "inactive",
+      selected_theme_id: null,
+      applied_theme_id: null,
+      packs: [],
+    },
     loading: false,
     refreshing: false,
     degraded: false,

@@ -125,7 +125,20 @@ export type RoutingSetupReasonCode =
   | "preflight-required"
   | "unsupported-host"
   | "cdp-unavailable"
-  | "routing-runtime-unavailable";
+  | "routing-runtime-unavailable"
+  | "confirmation-required"
+  | "confirmation-expired"
+  | "impact-changed"
+  | "operation-conflict"
+  | "identity-changed"
+  | "graceful-stop-unsupported"
+  | "termination-failed"
+  | "old-tree-still-running"
+  | "launch-failed"
+  | "cdp-verification-failed"
+  | "dom-incompatible"
+  | "partial-apply-failed"
+  | "terminal-partial-failure";
 export type RoutingConfigChange =
   | "agents.max_depth"
   | "agents.codex_assistant_spark"
@@ -152,6 +165,16 @@ export interface RoutingUiSnapshot {
 }
 
 export type RoutingOperationStatus = "applied" | "noop" | "blocked" | "failed";
+export type RestartMode = "safe" | "force-after-grace";
+export type RestartIntent = "routing-restart" | "theme-session" | "activate-theme";
+
+export interface ForceRestartImpact {
+  confirmation_ticket: string;
+  intent: RestartIntent;
+  active_native_children: number;
+  grace_period_ms: 5000;
+  expires_at_ms: number;
+}
 
 export interface RoutingOperationReceipt {
   operation_id: string;

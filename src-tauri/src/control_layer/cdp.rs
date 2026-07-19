@@ -573,6 +573,7 @@ pub struct OutboundRequest {
 pub enum IncomingMessage {
     Response { id: u64 },
     BooleanResponse { id: u64, value: bool },
+    StringResponse { id: u64, value: String },
     BindingCalled { payload: String },
     Event { method: String },
 }
@@ -592,6 +593,7 @@ pub struct CdpProtocol {
     next_id: u64,
     pending: HashSet<u64>,
     boolean_pending: HashSet<u64>,
+    string_pending: HashSet<u64>,
 }
 
 impl Default for CdpProtocol {
@@ -606,6 +608,7 @@ impl CdpProtocol {
             next_id: 1,
             pending: HashSet::new(),
             boolean_pending: HashSet::new(),
+            string_pending: HashSet::new(),
         }
     }
 
@@ -652,6 +655,24 @@ impl CdpProtocol {
         Ok(outbound)
     }
 
+    pub fn script_registration(
+        &mut self,
+        params: Value,
+    ) -> Result<OutboundRequest, CdpProtocolError> {
+        let object = params.as_object().ok_or(CdpProtocolError::InvalidParams)?;
+        if !keys_are(object, &["source"])
+            || object
+                .get("source")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+        {
+            return Err(CdpProtocolError::InvalidParams);
+        }
+        let outbound = self.request("Page.addScriptToEvaluateOnNewDocument", params)?;
+        self.string_pending.insert(outbound.id);
+        Ok(outbound)
+    }
+
     pub fn accept(&mut self, frame: &str) -> Result<IncomingMessage, CdpProtocolError> {
         if frame.len() > MAX_CDP_FRAME_BYTES {
             return Err(CdpProtocolError::FrameTooLarge);
@@ -684,6 +705,7 @@ impl CdpProtocol {
         }
         if object.contains_key("error") {
             self.boolean_pending.remove(&id);
+            self.string_pending.remove(&id);
             return Err(CdpProtocolError::RemoteFailure);
         }
         if self.boolean_pending.remove(&id) {
@@ -708,6 +730,24 @@ impl CdpProtocol {
                 .and_then(Value::as_bool)
                 .ok_or(CdpProtocolError::MalformedEnvelope)?;
             return Ok(IncomingMessage::BooleanResponse { id, value });
+        }
+        if self.string_pending.remove(&id) {
+            let result = object
+                .get("result")
+                .and_then(Value::as_object)
+                .ok_or(CdpProtocolError::MalformedEnvelope)?;
+            if !keys_are(result, &["identifier"]) {
+                return Err(CdpProtocolError::MalformedEnvelope);
+            }
+            let value = result
+                .get("identifier")
+                .and_then(Value::as_str)
+                .filter(|value| safe_script_identifier(value))
+                .ok_or(CdpProtocolError::MalformedEnvelope)?;
+            return Ok(IncomingMessage::StringResponse {
+                id,
+                value: value.to_owned(),
+            });
         }
         Ok(IncomingMessage::Response { id })
     }
@@ -762,11 +802,20 @@ fn allowed_method(method: &str) -> bool {
             | "Page.enable"
             | "Runtime.addBinding"
             | "Page.addScriptToEvaluateOnNewDocument"
+            | "Page.removeScriptToEvaluateOnNewDocument"
             | "Runtime.evaluate"
             | "Target.setDiscoverTargets"
             | "Target.attachToTarget"
             | "Target.detachFromTarget"
     )
+}
+
+fn safe_script_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
 }
 
 fn allowed_event(method: &str) -> bool {
@@ -1000,11 +1049,64 @@ impl CdpClient {
                     IncomingMessage::Response { .. } => {
                         return Err(CdpClientError::ProtocolViolation)
                     }
-                    IncomingMessage::BooleanResponse { .. } => {
+                    IncomingMessage::BooleanResponse { .. }
+                    | IncomingMessage::StringResponse { .. } => {
                         return Err(CdpClientError::ProtocolViolation)
                     }
                     IncomingMessage::BindingCalled { .. } => {}
                     IncomingMessage::Event { .. } => {}
+                },
+                Message::Ping(payload) => {
+                    timeout(self.timeout, self.socket.send(Message::Pong(payload)))
+                        .await
+                        .map_err(|_| CdpClientError::TimedOut)?
+                        .map_err(|_| CdpClientError::WriteFailed)?;
+                }
+                Message::Pong(_) => {}
+                Message::Close(_) => return Err(CdpClientError::ConnectionClosed),
+                Message::Binary(_) | Message::Frame(_) => {
+                    return Err(CdpClientError::ProtocolViolation)
+                }
+            }
+        }
+    }
+
+    pub async fn register_script(&mut self, source: &str) -> Result<String, CdpClientError> {
+        let outbound = self
+            .protocol
+            .script_registration(json!({ "source": source }))
+            .map_err(map_protocol_error)?;
+        timeout(
+            self.timeout,
+            self.socket.send(Message::Text(outbound.text.into())),
+        )
+        .await
+        .map_err(|_| CdpClientError::TimedOut)?
+        .map_err(|_| CdpClientError::WriteFailed)?;
+        loop {
+            let incoming = timeout(self.timeout, self.socket.next())
+                .await
+                .map_err(|_| CdpClientError::TimedOut)?
+                .ok_or(CdpClientError::ConnectionClosed)?
+                .map_err(|_| CdpClientError::ReadFailed)?;
+            if incoming.len() > MAX_CDP_FRAME_BYTES {
+                return Err(CdpClientError::FrameTooLarge);
+            }
+            match incoming {
+                Message::Text(text) => match self
+                    .protocol
+                    .accept(text.as_str())
+                    .map_err(map_protocol_error)?
+                {
+                    IncomingMessage::StringResponse { id, value } if id == outbound.id => {
+                        return Ok(value)
+                    }
+                    IncomingMessage::Response { .. }
+                    | IncomingMessage::BooleanResponse { .. }
+                    | IncomingMessage::StringResponse { .. } => {
+                        return Err(CdpClientError::ProtocolViolation)
+                    }
+                    IncomingMessage::BindingCalled { .. } | IncomingMessage::Event { .. } => {}
                 },
                 Message::Ping(payload) => {
                     timeout(self.timeout, self.socket.send(Message::Pong(payload)))
@@ -1054,7 +1156,9 @@ impl CdpClient {
                     IncomingMessage::BooleanResponse { id, value } if id == outbound.id => {
                         return Ok(value)
                     }
-                    IncomingMessage::Response { .. } | IncomingMessage::BooleanResponse { .. } => {
+                    IncomingMessage::Response { .. }
+                    | IncomingMessage::BooleanResponse { .. }
+                    | IncomingMessage::StringResponse { .. } => {
                         return Err(CdpClientError::ProtocolViolation)
                     }
                     IncomingMessage::BindingCalled { .. } => {}
@@ -1093,7 +1197,9 @@ impl CdpClient {
                 {
                     IncomingMessage::BindingCalled { payload } => return Ok(payload),
                     IncomingMessage::Event { .. } => {}
-                    IncomingMessage::Response { .. } | IncomingMessage::BooleanResponse { .. } => {
+                    IncomingMessage::Response { .. }
+                    | IncomingMessage::BooleanResponse { .. }
+                    | IncomingMessage::StringResponse { .. } => {
                         return Err(CdpClientError::ProtocolViolation)
                     }
                 },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouting } from "../hooks/useRouting";
+import { ForceRestartDialog } from "./ForceRestartDialog";
 
 const CHANGE_LABELS: Record<string, string> = {
   "agents.max_depth": "允许两层原生子代理",
@@ -82,7 +83,11 @@ export function SmartRoutingPage({ roots = EMPTY_ROOTS }: { roots?: RoutingRootO
         </button>
       </div>
 
-      {routing.error && <div className="global-error">{routing.error}</div>}
+      {routing.error && (
+        <div className="global-error" role="alert">
+          {routing.error}
+        </div>
+      )}
 
       <div className="routing-grid">
         <article className="routing-panel routing-panel--setup">
@@ -132,11 +137,13 @@ export function SmartRoutingPage({ roots = EMPTY_ROOTS }: { roots?: RoutingRootO
               <button
                 className="button-primary"
                 onClick={() => void routing.requestRestart()}
-                disabled={
-                  setup.restart_status === "blocked-active-child" || routing.operation !== null
-                }
+                disabled={routing.operation !== null}
               >
-                {routing.operation === "restart" ? "正在检查并重启…" : "安全重启 Codex 一次"}
+                {routing.operation === "restart"
+                  ? "正在检查并重启…"
+                  : setup.restart_status === "blocked-active-child"
+                    ? "查看强制重启选项"
+                    : "安全重启 Codex 一次"}
               </button>
             </div>
           ) : null}
@@ -340,6 +347,14 @@ export function SmartRoutingPage({ roots = EMPTY_ROOTS }: { roots?: RoutingRootO
             </div>
           </div>
         </div>
+      ) : null}
+      {routing.pendingForce ? (
+        <ForceRestartDialog
+          impact={routing.pendingForce}
+          busy={routing.operation !== null}
+          onCancel={routing.cancelForceRestart}
+          onConfirm={() => void routing.confirmForceRestart()}
+        />
       ) : null}
     </section>
   );

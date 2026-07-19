@@ -89,7 +89,7 @@ The frontend gains four product areas: **Live Agents**, **Smart Routing**, **Sav
 
 ## Rename and upgrade migration
 
-The first Codex Assistant release is planned as `0.5.0` while the new capabilities remain compatibility-sensitive.
+Codex Assistant `0.6.0` ships the compatibility-sensitive routing, verified lifecycle, and rights-audited theme capabilities behind fail-closed local checks.
 
 - Change product name, window title, UI text, Start menu label, installer display name, README, public site, and release artifact names to Codex Assistant.
 - Preserve Tauri identifier `com.codexagentmonitor.desktop`, installer upgrade identity, and existing data directory so the upgrade replaces version `0.4.0` instead of installing beside it.
@@ -256,7 +256,7 @@ The port must not include repository assets excluded by its NOTICE, including th
 ### Engine lifecycle
 
 - Discover and verify the official Microsoft Store Codex package and executable identity dynamically.
-- Require Codex to be idle before the one-time themed-session restart; do not kill active routed agents.
+- Safe mode still requires Codex to be idle. As an explicit destructive exception, a user may confirm a 60-second single-use force ticket bound to the verified root PID, creation time, package identity, intent, and active-child impact. The coordinator first requests Stop/Cancel through the verified CDP surface, sends the normal window-close request, and waits five seconds. Only then may it terminate the revalidated descendant tree leaf-first and the root last. Identity drift, PID reuse, multiple roots, or an incomplete tree fails closed.
 - Launch the same official Codex application with a random available loopback-only CDP port.
 - Verify browser identity, process ownership, package identity, and expected Codex version before injection.
 - Apply a compatibility probe before inserting controls or styles.
@@ -328,7 +328,7 @@ Theme catalog networking is opt-in or limited to signed public metadata and asse
 - **Theme apply failure:** remove partial injected nodes/styles and restore the last known good or official appearance.
 - **App/injector crash:** official files remain unchanged; next launch detects stale state, closes orphaned owned processes when identity is proven, and offers Restore.
 - **Catalog/signature failure:** reject the remote pack and continue with verified local themes.
-- **Active agent during restart/restore:** postpone the action and explain which native agents are still running.
+- **Active agent during restart/restore:** safe mode postpones the action and reports the impact. A separately confirmed force mode may stop and terminate only the revalidated same-user official Codex descendant tree. Cancellation remains available during the five-second grace period; after termination begins, launch or CDP failure is terminal-partial-failure and is never automatically retried or reported as recovered.
 
 ## Testing strategy
 
