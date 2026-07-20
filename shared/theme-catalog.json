@@ -9,7 +9,13 @@
       "description": "Project-owned abstract aurora with restrained glass surfaces.",
       "category": "abstract",
       "preview_path": "/themes/aurora-grid.webp",
-      "backdrop": { "kind": "gradient", "angle": 135, "colors": ["#07111f", "#18204b", "#0b4d5f"] },
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "aurora-grid-preview",
+        "overlay": "#07111f",
+        "focal_x": 50,
+        "focal_y": 48
+      },
       "palette": {
         "surface": "#101827",
         "surface_strong": "#111b2d",

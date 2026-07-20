@@ -149,12 +149,12 @@ export default function Home() {
           <a
             className="download-action"
             data-spotlight
-            href="/downloads/Codex-Assistant-0.7.0-x64-setup.exe"
+            href="/downloads/Codex-Assistant-0.7.3-x64-setup.exe"
             download
           >
-            下载 Windows 安装包 <span>3.59 MiB</span>
+            下载 Windows 安装包 <span>3.63 MiB</span>
           </a>
-          <p>0.7.0 · 3,765,482 bytes · SHA-256 · bd282f25c4d3…81ea7462</p>
+          <p>0.7.3 · 3,803,674 bytes · SHA-256 · 10321fb01959…9a31d97</p>
         </div>
       </section>
 

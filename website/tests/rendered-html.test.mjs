@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 const siteRoot = new URL("../", import.meta.url);
@@ -53,14 +54,21 @@ test("removes starter metadata and keeps public/native capability boundaries exp
   assert.match(productDemo, /aria-selected/);
   assert.match(productDemo, /仅展示脱敏示例数据/);
   assert.match(productDemo, /控制本机 Codex 需要 Windows 桌面版/);
-  assert.match(page, /\/downloads\/Codex-Assistant-0\.7\.0-x64-setup\.exe/);
-  assert.match(page, /3,765,482 bytes/);
-  assert.match(page, /bd282f25c4d3/);
+  assert.match(page, /\/downloads\/Codex-Assistant-0\.7\.3-x64-setup\.exe/);
+  assert.match(page, /3,803,674 bytes/);
+  assert.match(page, /10321fb01959/);
   assert.match(page, /shared\/theme-catalog\.json/);
   assert.match(page, /\/images\/observatory-hero\.webp/);
   assert.match(homepageMotion, /IntersectionObserver/);
   assert.match(homepageMotion, /prefers-reduced-motion/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  const latestInstaller = new URL("public/downloads/Codex-Assistant-0.7.3-x64-setup.exe", siteRoot);
+  const latestInstallerBytes = await readFile(latestInstaller);
+  assert.equal((await stat(latestInstaller)).size, 3_803_674);
+  assert.equal(
+    createHash("sha256").update(latestInstallerBytes).digest("hex"),
+    "10321fb0195991e337c0d7994a861b531cbc8d8dbaed2dedf8ab661629a31d97",
+  );
   await access(new URL("public/downloads/Codex-Assistant-0.7.0-x64-setup.exe", siteRoot));
   await access(new URL("public/downloads/Codex-Assistant-0.6.0-x64-setup.exe", siteRoot));
   await access(new URL("public/downloads/Codex-Assistant-0.5.0-x64-setup.exe", siteRoot));
