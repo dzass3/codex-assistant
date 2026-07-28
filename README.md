@@ -36,15 +36,15 @@ Smart Routing 不属于当前产品。Codex Assistant 不创建、控制、改�
 
 | 架构  | 推荐安装包                               | MSI                                      |
 | ----- | ---------------------------------------- | ---------------------------------------- |
-| x64   | `Codex Assistant_0.11.8_x64-setup.exe`   | `Codex Assistant_0.11.8_x64_en-US.msi`   |
-| ARM64 | `Codex Assistant_0.11.8_arm64-setup.exe` | `Codex Assistant_0.11.8_arm64_en-US.msi` |
+| x64   | `Codex.Assistant_0.11.8_x64-setup.exe`   | `Codex.Assistant_0.11.8_x64_en-US.msi`   |
+| ARM64 | `Codex.Assistant_0.11.8_arm64-setup.exe` | `Codex.Assistant_0.11.8_arm64_en-US.msi` |
 
 > **未签名提示：** 0.11.8 安装包尚未购买代码签名证书，Windows 可能显示 SmartScreen 或“未知发布者”提示。请只从本仓库 Release 或官网进入下载，并使用 Release 中的 `SHA256SUMS.txt` 校验文件。
 
 PowerShell 校验示例：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath '.\Codex Assistant_0.11.8_x64-setup.exe'
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\Codex.Assistant_0.11.8_x64-setup.exe'
 ```
 
 ### 应用与恢复主题
