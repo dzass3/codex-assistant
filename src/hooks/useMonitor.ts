@@ -16,7 +16,7 @@ export function useMonitor() {
     Promise.all([
       monitorApi.getSnapshot(),
       monitorApi.getSettings(),
-      monitorApi.subscribe(setSnapshot),
+      monitorApi.subscribe((next) => mounted && setSnapshot(next)),
     ])
       .then(([initial, currentSettings, stop]) => {
         if (!mounted) {
@@ -28,8 +28,12 @@ export function useMonitor() {
         unsubscribe = stop;
         setError(null);
       })
-      .catch(() => mounted && setError("无法连接本地监控服务，请重新打开应用。"))
-      .finally(() => mounted && setLoading(false));
+      .catch(() => {
+        if (mounted) setError("无法连接本地监控服务，请重新打开应用。");
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
 
     return () => {
       mounted = false;

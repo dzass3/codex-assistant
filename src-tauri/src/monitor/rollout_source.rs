@@ -40,7 +40,6 @@ pub struct RolloutFacts {
 struct PendingSpawn {
     requested_model: Option<String>,
     requested_effort: Option<String>,
-    task_name: Option<String>,
     occurred_at_ms: Option<i64>,
 }
 
@@ -174,7 +173,6 @@ enum WhitelistRecord {
         child_thread_id: String,
         requested_model: Option<String>,
         requested_effort: Option<String>,
-        task_name: Option<String>,
         occurred_at_ms: Option<i64>,
     },
     SpawnRequested,
@@ -224,7 +222,6 @@ struct FunctionOutputPayload {
 
 #[derive(Deserialize)]
 struct SpawnArguments {
-    task_name: Option<String>,
     model: Option<String>,
     reasoning_effort: Option<String>,
 }
@@ -300,7 +297,6 @@ fn parse_line(
             PendingSpawn {
                 requested_model: clean(arguments.model),
                 requested_effort: clean(arguments.reasoning_effort),
-                task_name: clean(arguments.task_name),
                 occurred_at_ms: parse_timestamp_ms(envelope.timestamp.as_deref()),
             },
         );
@@ -323,7 +319,6 @@ fn parse_line(
             child_thread_id,
             requested_model: request.requested_model,
             requested_effort: request.requested_effort,
-            task_name: request.task_name,
             occurred_at_ms: request
                 .occurred_at_ms
                 .or_else(|| parse_timestamp_ms(envelope.timestamp.as_deref())),
@@ -383,13 +378,11 @@ fn apply_record(facts: &mut RolloutFacts, thread_id: &str, record: WhitelistReco
             child_thread_id,
             requested_model,
             requested_effort,
-            task_name,
             occurred_at_ms,
         } => facts.spawns.push(SpawnFact {
             child_thread_id,
             requested_model,
             requested_effort,
-            task_name,
             occurred_at_ms,
         }),
         WhitelistRecord::SpawnRequested => {}

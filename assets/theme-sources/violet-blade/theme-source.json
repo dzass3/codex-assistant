@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "violet-blade",
+  "name": "紫夜剑影",
+  "description": "紫色刀光、月夜与暗影构成的高对比主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月25日 00_06_48.png",
+    "mime_type": "image/png",
+    "sha256": "3e8e2e1827124dce3cf04b735def72c4c1589c4745ce884f815a81dd474af8e9",
+    "width": 941,
+    "height": 1672,
+    "bytes": 2324008
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/violet-blade.webp",
+    "max_width": 941,
+    "max_height": 1672,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/violet-blade.webp",
+    "max_width": 405,
+    "max_height": 720,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/violet-blade.webp",
+    "overlay": "#160d35",
+    "focal_x": 50,
+    "focal_y": 55,
+    "palette": {
+      "surface": "#211b36",
+      "surface_strong": "#2c2347",
+      "text": "#f8f3ff",
+      "accent": "#9b6df0",
+      "border": "#7054a8"
+    },
+    "effects": {
+      "surface_opacity": 84,
+      "blur_px": 20,
+      "contrast_percent": 112,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_48.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

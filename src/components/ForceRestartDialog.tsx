@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import type { ForceRestartImpact } from "../../shared/routing-types";
+import type { ForceRestartImpact } from "../../shared/theme-types";
 
 export function ForceRestartDialog({
   impact,
   busy,
   onCancel,
   onConfirm,
+  returnFocus,
 }: {
   impact: ForceRestartImpact;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  returnFocus?: HTMLElement | null;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const returnFocus = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(5);
 
   useEffect(() => {
@@ -30,8 +32,12 @@ export function ForceRestartDialog({
   }, [busy]);
 
   useEffect(() => {
-    returnFocus.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    returnFocusRef.current =
+      returnFocus?.isConnected === true
+        ? returnFocus
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
     cancelRef.current?.focus();
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -57,9 +63,9 @@ export function ForceRestartDialog({
     document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("keydown", handleKey);
-      returnFocus.current?.focus();
+      if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
     };
-  }, [onCancel]);
+  }, [onCancel, returnFocus]);
 
   return (
     <div className="dialog-backdrop force-restart-backdrop">
@@ -72,10 +78,14 @@ export function ForceRestartDialog({
         aria-describedby="force-restart-description"
       >
         <span className="eyebrow">DESTRUCTIVE EXCEPTION</span>
-        <h2 id="force-restart-title">终止子代理并强制重启？</h2>
+        <h2 id="force-restart-title">
+          {impact.monitor_confident ? "结束运行中的任务并重启？" : "监控状态不确定，仍要重启？"}
+        </h2>
         <p id="force-restart-description" className="dialog-copy">
-          当前有 {impact.active_native_children} 个原生子代理仍在运行。确认后会先尝试停止任务并等待
-          5 秒；仍未退出的已验证后代进程将被终止，未完成工作可能丢失。
+          {impact.monitor_confident
+            ? `当前有 ${impact.active_work_count} 个 Codex 任务仍在运行。`
+            : "当前无法可靠确认是否仍有任务运行。"}
+          确认后会等待 5 秒，再结束已验证的 Codex 进程树；未完成工作可能丢失。
         </p>
         <div className="force-restart-warning" role="alert">
           票据仅在 60 秒内有效，进程、身份或影响数量变化后必须重新确认。终止开始后不会自动循环重试。
@@ -83,7 +93,7 @@ export function ForceRestartDialog({
         <div className="operation-stage" aria-live="polite" aria-atomic="true">
           {busy
             ? remainingSeconds > 0
-              ? `正在请求子代理停止，强制终止前还会等待 ${remainingSeconds} 秒…`
+              ? `正在等待任务停止，强制终止前还会等待 ${remainingSeconds} 秒…`
               : "正在重新验证进程树；操作可能已进入不可逆阶段…"
             : "等待你的明确确认"}
         </div>
@@ -92,7 +102,7 @@ export function ForceRestartDialog({
             {busy ? "取消等待" : "取消"}
           </button>
           <button className="button-danger" onClick={onConfirm} disabled={busy}>
-            {busy ? "正在执行…" : "终止子代理并强制重启"}
+            {busy ? "正在执行…" : "结束任务并强制重启"}
           </button>
         </div>
       </div>

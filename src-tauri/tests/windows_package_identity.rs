@@ -3,9 +3,11 @@ use std::path::PathBuf;
 use codex_assistant_lib::control_layer::windows_package::{
     authorize_restart, cdp_launch_arguments, discover_store_package, parse_package_query,
     plan_leaf_first_termination, query_process_identity, query_tcp_listener, reserve_loopback_port,
-    validate_replacement_set, verify_listener, verify_package, verify_process, IdentityError,
-    ListenerProbe, PackageProbe, ProcessProbe, ProcessTreeEntry, RestartGuard, SetupPhase,
-    SignatureStatus, VerifiedProcess, CODEX_PACKAGE_FAMILY,
+    store_activation_arguments, validate_app_server_set, validate_no_owned_runtime_processes,
+    validate_replacement_set, validate_stable_pid_samples, validate_tree_drain, verify_listener,
+    verify_package, verify_process, IdentityError, ListenerProbe, PackageProbe, ProcessProbe,
+    ProcessTreeEntry, RestartGuard, RuntimeProcessProbe, SetupPhase, SignatureStatus,
+    VerifiedProcess, CODEX_APP_USER_MODEL_ID, CODEX_PACKAGE_FAMILY,
 };
 
 fn package() -> PackageProbe {
@@ -91,6 +93,79 @@ fn force_termination_plan_fails_closed_for_missing_or_duplicate_root() {
 }
 
 #[test]
+fn safe_restart_requires_every_original_descendant_to_exit_before_activation() {
+    let plan = vec![13, 11, 12, 10];
+
+    assert_eq!(validate_tree_drain(&plan, &[]), Ok(()));
+    assert_eq!(
+        validate_tree_drain(&plan, &[13]),
+        Err(IdentityError::TreeStillRunning)
+    );
+    assert_eq!(
+        validate_tree_drain(&plan, &[11, 12]),
+        Err(IdentityError::TreeStillRunning)
+    );
+}
+
+#[test]
+fn theme_session_requires_a_stable_direct_official_app_server() {
+    let verified_package = verify_package(package()).expect("official package");
+    let root = VerifiedProcess {
+        pid: 42_000,
+        owner_sid: "S-1-5-21-1000".into(),
+        image_path: verified_package.executable.clone(),
+        package_version: verified_package.version.clone(),
+    };
+    let app_server = RuntimeProcessProbe {
+        pid: 42_100,
+        parent_pid: root.pid,
+        owner_sid: root.owner_sid.clone(),
+        canonical_image_path: verified_package
+            .root
+            .join("app")
+            .join("resources")
+            .join("codex.exe"),
+    };
+
+    assert_eq!(
+        validate_app_server_set(&verified_package, &root, std::slice::from_ref(&app_server)),
+        Ok(app_server.pid)
+    );
+    assert_eq!(validate_no_owned_runtime_processes(&[]), Ok(()));
+    assert_eq!(
+        validate_no_owned_runtime_processes(std::slice::from_ref(&app_server)),
+        Err(IdentityError::TreeStillRunning)
+    );
+
+    let mut orphan = app_server.clone();
+    orphan.parent_pid = 41_999;
+    assert_eq!(
+        validate_app_server_set(&verified_package, &root, &[orphan]),
+        Err(IdentityError::AppServerUnavailable)
+    );
+
+    let mut wrong_owner = app_server.clone();
+    wrong_owner.owner_sid = "S-1-5-21-2000".into();
+    assert_eq!(
+        validate_app_server_set(&verified_package, &root, &[wrong_owner]),
+        Err(IdentityError::AppServerUnavailable)
+    );
+
+    assert_eq!(
+        validate_stable_pid_samples(&[42_100, 42_100, 42_100], 3),
+        Ok(42_100)
+    );
+    assert_eq!(
+        validate_stable_pid_samples(&[42_100, 42_100, 42_101], 3),
+        Err(IdentityError::AppServerUnavailable)
+    );
+    assert_eq!(
+        validate_stable_pid_samples(&[42_100, 42_100], 3),
+        Err(IdentityError::AppServerUnavailable)
+    );
+}
+
+#[test]
 fn restart_requires_one_verified_ui_process_and_no_active_or_unsent_work() {
     let ready = RestartGuard {
         verified_ui_processes: 1,
@@ -131,11 +206,11 @@ fn replacement_proof_requires_one_new_verified_ui_process() {
         package_version: "26.715.3651.0".into(),
     };
     assert_eq!(
-        validate_replacement_set(41_000, 42_000, &[replacement.clone()]),
+        validate_replacement_set(41_000, 42_000, std::slice::from_ref(&replacement)),
         Ok(replacement.clone())
     );
     assert_eq!(
-        validate_replacement_set(41_000, 41_000, &[replacement.clone()]),
+        validate_replacement_set(41_000, 41_000, std::slice::from_ref(&replacement)),
         Err(IdentityError::ReplacementIdentity)
     );
     assert_eq!(
@@ -165,6 +240,19 @@ fn cdp_launch_is_random_loopback_only_and_never_shell_encoded() {
     assert!(args
         .iter()
         .all(|arg| !arg.contains('&') && !arg.contains('|')));
+}
+
+#[test]
+fn store_activation_uses_the_official_aumid_and_one_bounded_argument_string() {
+    assert_eq!(CODEX_APP_USER_MODEL_ID, "OpenAI.Codex_2p2nqsd0c76g0!App");
+    assert_eq!(
+        store_activation_arguments(41_237).expect("activation arguments"),
+        "--remote-debugging-address=127.0.0.1 --remote-debugging-port=41237"
+    );
+    assert_eq!(
+        store_activation_arguments(0),
+        Err(IdentityError::InvalidPort)
+    );
 }
 
 #[test]

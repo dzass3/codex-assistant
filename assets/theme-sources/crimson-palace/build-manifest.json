@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "crimson-palace",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 17_57_29 (2).png",
+    "mime_type": "image/png",
+    "sha256": "d85226ef5a90465050ed9b1b0aee2ecdb98578904eda6dbd6294c78a969e72f1",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2567723
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/crimson-palace.webp",
+    "mime_type": "image/webp",
+    "sha256": "75c364aa2de5fe6528c1052d0665e6438634e15d164e80a404491a139eedd9dd",
+    "width": 1672,
+    "height": 941,
+    "bytes": 316170,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/crimson-palace.webp",
+    "mime_type": "image/webp",
+    "sha256": "7a10400d1ff0225fa1e8e14c7606cfa35af33370c25cfac84baf8183d835bf32",
+    "width": 720,
+    "height": 405,
+    "bytes": 46636,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_29 (2).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

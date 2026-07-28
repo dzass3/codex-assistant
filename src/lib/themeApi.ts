@@ -1,32 +1,90 @@
 import type {
+  ForceRestartImpact,
   ThemeAsset,
   ThemeBackdrop,
   ThemeCategory,
   ThemeEffects,
+  ThemeEnvironmentCheck,
+  ThemeEnvironmentCheckCode,
+  ThemeEnvironmentCheckState,
+  ThemeEnvironmentReport,
+  ThemeEnvironmentStatus,
+  ThemeImportReceipt,
   ThemeOperationReceipt,
   ThemePack,
   ThemePalette,
+  ThemeReasonCode,
+  ThemeRestartIntent,
+  ThemeRestartMode,
   ThemeRights,
   ThemeSessionStatus,
+  ThemeNextAction,
   ThemeUiSnapshot,
 } from "../../shared/theme-types";
-import type { ForceRestartImpact, RestartIntent, RestartMode } from "../../shared/routing-types";
-import { toForceRestartImpact } from "./routingApi";
 import { invoke } from "./invoke";
-import { toRoutingOperationReceipt } from "./routingApi";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORBIDDEN_FIELD = /prompt|response|reasoning|command|patch|token|cookie|secret/i;
 const SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const LOCAL_PREVIEW = /^\/themes\/[a-z0-9][a-z0-9./-]{0,150}$/;
+const BUNDLED_PREVIEW = /^\/themes\/[a-z0-9][a-z0-9./-]{0,150}$/;
+const LOCAL_PREVIEW = /^local-theme:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const IMAGE_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SESSION_STATUSES = new Set<ThemeSessionStatus>(["inactive", "paused", "ready", "degraded"]);
+const OPERATION_STATUSES = new Set(["applied", "noop", "blocked", "failed"] as const);
+const RESTART_INTENTS = new Set<ThemeRestartIntent>(["theme-session", "activate-theme"]);
+const REASON_CODES = new Set<ThemeReasonCode>([
+  "active-work",
+  "monitor-uncertain",
+  "unsupported-host",
+  "cdp-unavailable",
+  "theme-state-unavailable",
+  "confirmation-required",
+  "confirmation-expired",
+  "impact-changed",
+  "operation-conflict",
+  "identity-changed",
+  "termination-failed",
+  "old-tree-still-running",
+  "cdp-verification-failed",
+  "dom-incompatible",
+  "multiple-windows",
+  "partial-apply-failed",
+  "terminal-partial-failure",
+]);
 const CATEGORIES = new Set<ThemeCategory>([
   "abstract",
   "original-character",
   "project-showcase",
   "local-import",
+]);
+const ENVIRONMENT_STATUSES = new Set<ThemeEnvironmentStatus>([
+  "ready",
+  "codex-not-running",
+  "restart-required",
+  "unsupported",
+]);
+const ENVIRONMENT_CHECK_CODES = new Set<ThemeEnvironmentCheckCode>([
+  "supported-windows",
+  "supported-architecture",
+  "official-store-codex",
+  "compatible-adapter",
+  "single-codex-window",
+  "verified-theme-session",
+  "saved-theme",
+]);
+const ENVIRONMENT_CHECK_STATES = new Set<ThemeEnvironmentCheckState>(["pass", "action", "fail"]);
+const THEME_NEXT_ACTIONS = new Set<ThemeNextAction>([
+  "apply-now",
+  "launch-codex-for-theme",
+  "confirm-restart",
+  "update-assistant",
+  "use-supported-windows",
+  "install-codex",
+  "close-extra-windows",
+  "none",
 ]);
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -75,6 +133,10 @@ function color(value: unknown): string | null {
   return typeof value === "string" && HEX.test(value) ? value : null;
 }
 
+function uuid(value: unknown): string | null {
+  return typeof value === "string" && UUID.test(value) ? value : null;
+}
+
 function backdrop(value: unknown): ThemeBackdrop | null {
   const raw = record(value);
   if (raw === null || typeof raw.kind !== "string") return null;
@@ -98,7 +160,13 @@ function backdrop(value: unknown): ThemeBackdrop | null {
     const focalX = integer(raw.focal_x, 0, 100);
     const focalY = integer(raw.focal_y, 0, 100);
     return assetId !== null && overlay !== null && focalX !== null && focalY !== null
-      ? { kind: "image", asset_id: assetId, overlay, focal_x: focalX, focal_y: focalY }
+      ? {
+          kind: "image",
+          asset_id: assetId,
+          overlay,
+          focal_x: focalX,
+          focal_y: focalY,
+        }
       : null;
   }
   return null;
@@ -154,7 +222,7 @@ function asset(value: unknown): ThemeAsset | null {
     : null;
 }
 
-function rights(value: unknown): ThemeRights | null {
+function rights(value: unknown, category: ThemeCategory): ThemeRights | null {
   const raw = record(value);
   if (
     raw === null ||
@@ -174,24 +242,31 @@ function rights(value: unknown): ThemeRights | null {
   const rightsholder = boundedText(raw.rightsholder, 120);
   const license = boundedText(raw.license, 120);
   const attribution = boundedText(raw.attribution, 240);
+  const verifiedBundled =
+    category !== "local-import" &&
+    raw.commercial_redistribution === true &&
+    raw.status === "verified";
+  const localOnly =
+    category === "local-import" &&
+    raw.commercial_redistribution === false &&
+    raw.status === "local-only";
   return source !== null &&
     rightsholder !== null &&
     license !== null &&
     attribution !== null &&
-    raw.commercial_redistribution === true &&
     typeof raw.reviewed_at === "string" &&
     DATE.test(raw.reviewed_at) &&
     raw.manual_signoff === true &&
-    raw.status === "verified"
+    (verifiedBundled || localOnly)
     ? {
         source,
         rightsholder,
         license,
-        commercial_redistribution: true,
+        commercial_redistribution: raw.commercial_redistribution as boolean,
         attribution,
         reviewed_at: raw.reviewed_at,
         manual_signoff: true,
-        status: "verified",
+        status: raw.status as ThemeRights["status"],
       }
     : null;
 }
@@ -224,16 +299,20 @@ function pack(value: unknown): ThemePack | null {
       ? (raw.category as ThemeCategory)
       : null;
   const previewPath =
-    typeof raw.preview_path === "string" &&
-    LOCAL_PREVIEW.test(raw.preview_path) &&
-    !raw.preview_path.includes("..")
-      ? raw.preview_path
+    typeof raw.preview_path === "string" && category !== null
+      ? category === "local-import"
+        ? LOCAL_PREVIEW.test(raw.preview_path) && raw.preview_path === `local-theme:${id}`
+          ? raw.preview_path
+          : null
+        : BUNDLED_PREVIEW.test(raw.preview_path) && !raw.preview_path.includes("..")
+          ? raw.preview_path
+          : null
       : null;
   const parsedBackdrop = backdrop(raw.backdrop);
   const parsedPalette = palette(raw.palette);
   const parsedEffects = effects(raw.effects);
   const assets = Array.isArray(raw.assets) ? raw.assets.map(asset) : null;
-  const parsedRights = rights(raw.rights);
+  const parsedRights = category === null ? null : rights(raw.rights, category);
   const minimumEngineVersion = integer(raw.minimum_engine_version, 1, 1);
   if (
     raw.schema_version !== 1 ||
@@ -278,13 +357,23 @@ export function toThemeUiSnapshot(value: unknown): ThemeUiSnapshot | null {
   const raw = record(value);
   if (
     raw === null ||
-    !exactKeys(raw, [
-      "contract_version",
-      "session_status",
-      "selected_theme_id",
-      "applied_theme_id",
-      "packs",
-    ])
+    !(
+      exactKeys(raw, [
+        "contract_version",
+        "session_status",
+        "selected_theme_id",
+        "applied_theme_id",
+        "packs",
+      ]) ||
+      exactKeys(raw, [
+        "contract_version",
+        "session_status",
+        "selected_theme_id",
+        "applied_theme_id",
+        "catalog_notice",
+        "packs",
+      ])
+    )
   )
     return null;
   const sessionStatus =
@@ -294,12 +383,17 @@ export function toThemeUiSnapshot(value: unknown): ThemeUiSnapshot | null {
       : null;
   const selectedThemeId = raw.selected_theme_id === null ? null : slug(raw.selected_theme_id);
   const appliedThemeId = raw.applied_theme_id === null ? null : slug(raw.applied_theme_id);
+  const catalogNotice =
+    raw.catalog_notice === undefined || raw.catalog_notice === null
+      ? null
+      : boundedText(raw.catalog_notice, 80);
   const packs = Array.isArray(raw.packs) ? raw.packs.map(pack) : null;
   if (
     raw.contract_version !== 2 ||
     sessionStatus === null ||
     (selectedThemeId === null && raw.selected_theme_id !== null) ||
     (appliedThemeId === null && raw.applied_theme_id !== null) ||
+    (catalogNotice === null && raw.catalog_notice !== undefined && raw.catalog_notice !== null) ||
     packs === null ||
     packs.some((entry) => entry === null)
   )
@@ -316,37 +410,233 @@ export function toThemeUiSnapshot(value: unknown): ThemeUiSnapshot | null {
     session_status: sessionStatus,
     selected_theme_id: selectedThemeId,
     applied_theme_id: appliedThemeId,
+    catalog_notice: catalogNotice,
     packs: parsedPacks,
   };
 }
 
+export function toThemeEnvironmentReport(value: unknown): ThemeEnvironmentReport | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, [
+      "contract_version",
+      "status",
+      "checks",
+      "os_build",
+      "architecture",
+      "codex_version",
+      "verified_process_count",
+      "session_reachable",
+      "selected_theme_id",
+      "next_action",
+      "can_apply_now",
+    ])
+  ) {
+    return null;
+  }
+  const status =
+    typeof raw.status === "string" && ENVIRONMENT_STATUSES.has(raw.status as ThemeEnvironmentStatus)
+      ? (raw.status as ThemeEnvironmentStatus)
+      : null;
+  const codexVersion = raw.codex_version === null ? null : boundedVersion(raw.codex_version);
+  const osBuild = raw.os_build === null ? null : integer(raw.os_build, 1, 999_999);
+  const architecture = ["x64", "arm64", "unsupported"].includes(String(raw.architecture))
+    ? (raw.architecture as ThemeEnvironmentReport["architecture"])
+    : null;
+  const processCount = integer(raw.verified_process_count, 0, 16);
+  const selectedThemeId = raw.selected_theme_id === null ? null : slug(raw.selected_theme_id);
+  const nextAction =
+    typeof raw.next_action === "string" &&
+    THEME_NEXT_ACTIONS.has(raw.next_action as ThemeNextAction)
+      ? (raw.next_action as ThemeNextAction)
+      : null;
+  const checks = Array.isArray(raw.checks) ? raw.checks.map(environmentCheck) : null;
+  if (
+    raw.contract_version !== 2 ||
+    status === null ||
+    (codexVersion === null && raw.codex_version !== null) ||
+    (osBuild === null && raw.os_build !== null) ||
+    architecture === null ||
+    processCount === null ||
+    typeof raw.session_reachable !== "boolean" ||
+    (selectedThemeId === null && raw.selected_theme_id !== null) ||
+    nextAction === null ||
+    typeof raw.can_apply_now !== "boolean" ||
+    checks === null ||
+    checks.some((check) => check === null) ||
+    checks.length !== ENVIRONMENT_CHECK_CODES.size ||
+    new Set(checks.map((check) => check?.code)).size !== checks.length
+  ) {
+    return null;
+  }
+  return {
+    contract_version: 2,
+    status,
+    checks: checks as ThemeEnvironmentCheck[],
+    os_build: osBuild,
+    architecture,
+    codex_version: codexVersion,
+    verified_process_count: processCount,
+    session_reachable: raw.session_reachable,
+    selected_theme_id: selectedThemeId,
+    next_action: nextAction,
+    can_apply_now: raw.can_apply_now,
+  };
+}
+
+function boundedVersion(value: unknown): string | null {
+  return typeof value === "string" && /^\d{1,6}(?:\.\d{1,6}){3}$/.test(value) ? value : null;
+}
+
+function environmentCheck(value: unknown): ThemeEnvironmentCheck | null {
+  const raw = record(value);
+  if (raw === null || !exactKeys(raw, ["code", "state"])) return null;
+  const code =
+    typeof raw.code === "string" &&
+    ENVIRONMENT_CHECK_CODES.has(raw.code as ThemeEnvironmentCheckCode)
+      ? (raw.code as ThemeEnvironmentCheckCode)
+      : null;
+  const state =
+    typeof raw.state === "string" &&
+    ENVIRONMENT_CHECK_STATES.has(raw.state as ThemeEnvironmentCheckState)
+      ? (raw.state as ThemeEnvironmentCheckState)
+      : null;
+  return code !== null && state !== null ? { code, state } : null;
+}
+
 async function mutation(result: Promise<unknown>): Promise<ThemeOperationReceipt> {
-  const receipt = toRoutingOperationReceipt(await result);
+  const receipt = toThemeOperationReceipt(await result);
   if (receipt === null) throw new Error("Theme engine returned a malformed operation receipt");
   return receipt;
 }
 
+export function toThemeOperationReceipt(value: unknown): ThemeOperationReceipt | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, ["operation_id", "status", "reason_codes", "restart_required"])
+  ) {
+    return null;
+  }
+  const operationId = uuid(raw.operation_id);
+  const status = typeof raw.status === "string" ? raw.status : null;
+  const reasonCodes = Array.isArray(raw.reason_codes) ? raw.reason_codes : null;
+  if (
+    operationId === null ||
+    status === null ||
+    !OPERATION_STATUSES.has(status as "applied" | "noop" | "blocked" | "failed") ||
+    reasonCodes === null ||
+    reasonCodes.some(
+      (reason) => typeof reason !== "string" || !REASON_CODES.has(reason as ThemeReasonCode),
+    ) ||
+    new Set(reasonCodes).size !== reasonCodes.length ||
+    typeof raw.restart_required !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    operation_id: operationId,
+    status: status as ThemeOperationReceipt["status"],
+    reason_codes: reasonCodes as ThemeReasonCode[],
+    restart_required: raw.restart_required,
+  };
+}
+
+export function toForceRestartImpact(value: unknown): ForceRestartImpact | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, [
+      "confirmation_ticket",
+      "intent",
+      "active_work_count",
+      "monitor_confident",
+      "grace_period_ms",
+      "expires_at_ms",
+    ])
+  ) {
+    return null;
+  }
+  const confirmationTicket = uuid(raw.confirmation_ticket);
+  const intent = typeof raw.intent === "string" ? raw.intent : null;
+  const activeWorkCount = integer(raw.active_work_count, 0, 10_000);
+  const expiresAtMs = integer(raw.expires_at_ms, 0, Number.MAX_SAFE_INTEGER);
+  if (
+    confirmationTicket === null ||
+    intent === null ||
+    !RESTART_INTENTS.has(intent as ThemeRestartIntent) ||
+    activeWorkCount === null ||
+    typeof raw.monitor_confident !== "boolean" ||
+    (activeWorkCount === 0 && raw.monitor_confident !== false) ||
+    raw.grace_period_ms !== 5_000 ||
+    expiresAtMs === null
+  ) {
+    return null;
+  }
+  return {
+    confirmation_ticket: confirmationTicket,
+    intent: intent as ThemeRestartIntent,
+    active_work_count: activeWorkCount,
+    monitor_confident: raw.monitor_confident,
+    grace_period_ms: 5_000,
+    expires_at_ms: expiresAtMs,
+  };
+}
+
 export const themeApi = {
+  async getEnvironment(): Promise<ThemeEnvironmentReport | null> {
+    return toThemeEnvironmentReport(await invoke("get_theme_environment"));
+  },
   async getSnapshot(): Promise<ThemeUiSnapshot | null> {
     return toThemeUiSnapshot(await invoke("get_theme_snapshot"));
   },
-  async prepareForceRestart(intent: RestartIntent, themeId?: string): Promise<ForceRestartImpact> {
+  async getPreviewDataUrl(themeId: string): Promise<string | null> {
+    if (slug(themeId) === null) throw new Error("Invalid theme identifier");
+    const value = await invoke("get_theme_preview_data_url", { themeId });
+    return typeof value === "string" && value.length <= 2_800_000 && IMAGE_DATA_URL.test(value)
+      ? value
+      : null;
+  },
+  async importLocalImage(name: string, imageDataUrl: string): Promise<ThemeImportReceipt> {
+    const safeName = boundedText(name, 80);
+    if (
+      safeName === null ||
+      imageDataUrl.length > 2_100_000 ||
+      !IMAGE_DATA_URL.test(imageDataUrl)
+    ) {
+      throw new Error("Invalid local theme image");
+    }
+    const value = record(await invoke("import_local_theme", { name: safeName, imageDataUrl }));
+    const themeId = value === null || !exactKeys(value, ["theme_id"]) ? null : slug(value.theme_id);
+    if (themeId === null || !themeId.startsWith("local-")) {
+      throw new Error("Malformed local theme import receipt");
+    }
+    return { theme_id: themeId };
+  },
+  async prepareForceRestart(
+    intent: ThemeRestartIntent,
+    themeId?: string,
+  ): Promise<ForceRestartImpact> {
     const impact = toForceRestartImpact(
-      await invoke("prepare_force_restart", { intent, subject: themeId ?? null }),
+      await invoke("prepare_force_restart", {
+        intent,
+        subject: themeId ?? null,
+      }),
     );
     if (impact === null) throw new Error("Malformed force restart impact");
     return impact;
   },
   cancelForceRestart: (confirmationTicket: string) =>
     invoke("cancel_force_restart", { confirmationTicket }).then((value) => value === true),
-  startSession: (restartMode: RestartMode = "safe", confirmationTicket?: string) =>
+  startSession: (restartMode: ThemeRestartMode = "safe", confirmationTicket?: string) =>
     mutation(
       invoke("start_theme_session", {
         restartMode,
         confirmationTicket: confirmationTicket ?? null,
       }),
     ),
-  activate(themeId: string, restartMode: RestartMode = "safe", confirmationTicket?: string) {
+  activate(themeId: string, restartMode: ThemeRestartMode = "safe", confirmationTicket?: string) {
     if (slug(themeId) === null) return Promise.reject(new Error("Invalid theme identifier"));
     return mutation(
       invoke("activate_theme", {

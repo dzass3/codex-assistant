@@ -1,186 +1,43 @@
-name: Release
+name: Windows release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, e.g. 0.1.0 (no v prefix). Creates the tag and a published GitHub release from the matching CHANGELOG section. No desktop artifacts are built — use a v* tag push for a full multi-platform build."
+        description: "Version without the v prefix, for example 0.11.9"
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
-  guard:
-    name: Refuse duplicate published release
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    permissions:
-      contents: read
-    steps:
-      - name: Check that no published release already exists for this tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          # If a release exists for this tag and is NOT a draft, abort. A
-          # draft release with the same name is fine — tauri-action will
-          # update it. A published release with the same tag means a prior
-          # successful run already shipped this version; re-running would
-          # either silently no-op or overwrite the published artifacts.
-          STATE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
-          case "$STATE" in
-            missing)
-              echo "No existing release for $TAG — proceeding."
-              ;;
-            true)
-              echo "Existing draft release for $TAG — tauri-action will update it. Proceeding."
-              ;;
-            false)
-              echo "::error title=Duplicate release::A published release for $TAG already exists. Refusing to re-release the same version."
-              echo "::error::To intentionally re-release, first delete the existing release: gh release delete $TAG --yes --cleanup-tag"
-              exit 1
-              ;;
-            *)
-              echo "::error::Unexpected gh release view output: $STATE"
-              exit 1
-              ;;
-          esac
-
-  notes:
-    name: Extract release notes from CHANGELOG
-    needs: guard
-    if: always() && (needs.guard.result == 'success' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    outputs:
-      body: ${{ steps.extract.outputs.body }}
-      version: ${{ steps.extract.outputs.version }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - id: extract
-        shell: bash
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          echo "Resolving CHANGELOG section for v$VERSION"
-          BODY=$(awk -v ver="$VERSION" '
-            $0 ~ "^## \\[" ver "\\]" { inside=1; print; next }
-            inside && /^## \[/ { exit }
-            inside { print }
-          ' CHANGELOG.md 2>/dev/null || true)
-          if [ -z "$BODY" ]; then
-            echo "::error file=CHANGELOG.md::No CHANGELOG section found for version $VERSION. Add a '## [$VERSION] — YYYY-MM-DD' heading before tagging."
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          {
-            echo 'body<<RELEASE_NOTES_EOF'
-            printf '%s\n' "$BODY"
-            echo RELEASE_NOTES_EOF
-          } >> "$GITHUB_OUTPUT"
-          {
-            echo "## Release notes preview for v$VERSION"
-            echo
-            echo '```markdown'
-            printf '%s\n' "$BODY"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  build-macos:
-    needs: notes
-    if: github.event_name == 'push'
-    runs-on: macos-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          releaseBody: ${{ needs.notes.outputs.body }}
-          releaseDraft: true
-          prerelease: false
-
-  build-linux:
-    needs: notes
-    if: github.event_name == 'push'
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          releaseBody: ${{ needs.notes.outputs.body }}
-          releaseDraft: true
-          prerelease: false
-
-  build-windows:
-    needs: notes
-    if: github.event_name == 'push'
+  validate:
+    name: Validate release source
     runs-on: windows-latest
-    permissions:
-      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Validate version and changelog
+        id: version
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version must use X.Y.Z without a v prefix."
+          }
+          $package = Get-Content -Raw package.json | ConvertFrom-Json
+          $tauri = Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json
+          if ($package.version -ne $env:VERSION -or $tauri.version -ne $env:VERSION) {
+            throw "package.json and tauri.conf.json must both equal $env:VERSION."
+          }
+          if (-not (Select-String -LiteralPath CHANGELOG.md -Pattern "^## $([regex]::Escape($env:VERSION))(?:\s|$)" -Quiet)) {
+            throw "CHANGELOG.md does not contain a ## $env:VERSION section."
+          }
+          "version=$env:VERSION" >> $env:GITHUB_OUTPUT
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -190,6 +47,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -199,66 +58,127 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run complete source gate
+        run: npm run check
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: validate
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            target: x86_64-pc-windows-msvc
+          - arch: arm64
+            target: aarch64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          releaseBody: ${{ needs.notes.outputs.body }}
-          releaseDraft: true
-          prerelease: false
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build NSIS and MSI
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles nsis,msi
+
+      - name: Normalize release filenames and checksums
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          $out = New-Item -ItemType Directory -Force -Path release-artifacts
+          $bundle = Join-Path "src-tauri/target" "$env:TARGET/release/bundle"
+          $exe = @(Get-ChildItem -LiteralPath (Join-Path $bundle "nsis") -Filter *.exe -File -ErrorAction Stop)
+          $msi = @(Get-ChildItem -LiteralPath (Join-Path $bundle "msi") -Filter *.msi -File -ErrorAction Stop)
+          if ($exe.Count -ne 1 -or $msi.Count -ne 1) {
+            throw "Expected exactly one NSIS EXE and one MSI for $env:ARCH."
+          }
+          Copy-Item -LiteralPath $exe[0].FullName -Destination (Join-Path $out "Codex Assistant_$($env:VERSION)_$($env:ARCH)-setup.exe")
+          Copy-Item -LiteralPath $msi[0].FullName -Destination (Join-Path $out "Codex Assistant_$($env:VERSION)_$($env:ARCH)_en-US.msi")
+          Get-ChildItem -LiteralPath $out -File | ForEach-Object {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash
+            "$hash  $($_.Name)" | Add-Content -LiteralPath (Join-Path $out "SHA256SUMS-$env:ARCH.txt")
+          }
+
+      - name: Upload release candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-assistant-${{ needs.validate.outputs.version }}-${{ matrix.arch }}
+          path: release-artifacts/*
+          if-no-files-found: error
 
   publish:
-    name: Publish release (flip draft → public)
-    needs: [build-macos, build-linux, build-windows]
-    if: github.event_name == 'push'
+    name: Publish GitHub release
+    needs: [validate, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: codex-assistant-${{ needs.validate.outputs.version }}-*
+          merge-multiple: true
+          path: release-artifacts
+
+      - name: Create combined checksum file
+        run: cat release-artifacts/SHA256SUMS-*.txt | sort -k2 > release-artifacts/SHA256SUMS.txt
+
+      - name: Extract bilingual changelog section
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          awk -v ver="$VERSION" '
+            $0 ~ "^## " ver "([[:space:]]|$)" { inside=1; print; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          test -s "$RUNNER_TEMP/notes.md"
+          printf '\n> Unsigned build: Windows may show SmartScreen or “Unknown publisher.” Verify SHA-256 before installing.\n' >> "$RUNNER_TEMP/notes.md"
+
+      - name: Refuse duplicate release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION already exists."
+            exit 1
+          fi
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          gh release edit "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --draft=false \
-            --latest
-
-  manual-release:
-    name: Create release without artifacts (manual)
-    needs: notes
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Create published release (tag + notes, no build artifacts)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.notes.outputs.version }}
-          BODY: ${{ needs.notes.outputs.body }}
-        run: |
-          set -euo pipefail
-          TAG="v$VERSION"
-          # Refuse to clobber an existing release/tag — the manual path is for
-          # bootstrapping a version that hasn't shipped yet. To re-release,
-          # delete the existing one first: gh release delete $TAG --yes --cleanup-tag
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error title=Duplicate release::A release for $TAG already exists. Refusing to overwrite."
-            exit 1
-          fi
-          printf '%s\n' "$BODY" > "$RUNNER_TEMP/notes.md"
-          # Creates the tag at this commit (the dispatched ref) and a published,
-          # latest release with the CHANGELOG section as the body. No artifacts.
-          gh release create "$TAG" \
+          gh release create "v$VERSION" \
+            release-artifacts/*.exe \
+            release-artifacts/*.msi \
+            release-artifacts/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "$TAG" \
+            --title "Codex Assistant $VERSION" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             --latest
-          echo "Created release $TAG at $GITHUB_SHA with no build artifacts."

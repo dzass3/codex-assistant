@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "oasis-prince",
+  "name": "绿洲暮光",
+  "description": "绿洲水岸与暮光金辉构成的蓝金主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 18_24_59.png",
+    "mime_type": "image/png",
+    "sha256": "3ea46a0779d363b17c514a30925e66ed76bc4b8c94d6996ad947b0e3631284a5",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2703927
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/oasis-prince.webp",
+    "max_width": 1672,
+    "max_height": 941,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/oasis-prince.webp",
+    "max_width": 720,
+    "max_height": 405,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/oasis-prince.webp",
+    "overlay": "#17484a",
+    "focal_x": 66,
+    "focal_y": 54,
+    "palette": {
+      "surface": "#dfeceb",
+      "surface_strong": "#f5fbfa",
+      "text": "#203738",
+      "accent": "#2f8b88",
+      "border": "#65aaa5"
+    },
+    "effects": {
+      "surface_opacity": 80,
+      "blur_px": 22,
+      "contrast_percent": 100,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 18_24_59.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

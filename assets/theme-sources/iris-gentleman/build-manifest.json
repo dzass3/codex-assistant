@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "iris-gentleman",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 11_20_32 (9).png",
+    "mime_type": "image/png",
+    "sha256": "4f2de73103178832e4f17ca69a6145acc747b336f520d07de5358440551d9087",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2295883
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/iris-gentleman.webp",
+    "mime_type": "image/webp",
+    "sha256": "411886546ecd2ac3b7cd9b52e7a2bd18c1ddb67b678f5c5e6304eebcccc180e0",
+    "width": 1672,
+    "height": 941,
+    "bytes": 223046,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/iris-gentleman.webp",
+    "mime_type": "image/webp",
+    "sha256": "1a40dcbab704c9bb2eeee8dcbbdf27d8f53338213a7cbaa7bb041ea0552e1687",
+    "width": 720,
+    "height": 405,
+    "bytes": 33250,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (9).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

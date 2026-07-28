@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "oasis-prince",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 18_24_59.png",
+    "mime_type": "image/png",
+    "sha256": "3ea46a0779d363b17c514a30925e66ed76bc4b8c94d6996ad947b0e3631284a5",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2703927
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/oasis-prince.webp",
+    "mime_type": "image/webp",
+    "sha256": "a882dab5e07fca4da80c45d31d7cd3363b857ce64a0be2daa7833dd6c84221bc",
+    "width": 1672,
+    "height": 941,
+    "bytes": 385730,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/oasis-prince.webp",
+    "mime_type": "image/webp",
+    "sha256": "5eadea370e86954d6591a86c27bc565bade30df06aef2411d9c7084f190a0722",
+    "width": 720,
+    "height": 405,
+    "bytes": 60246,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 18_24_59.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

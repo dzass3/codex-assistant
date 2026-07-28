@@ -1,200 +1,124 @@
-# Codex Assistant — Domain Context
+# Codex Assistant domain context
 
-## Glossary
+## Product boundary
 
-### Root thread
+Codex Assistant is a Windows read-only native-agent observer and safe theme manager for the official Microsoft Store Codex desktop app. It has exactly two user-facing pages: `实时代理` and `一键换肤`. Model routing, preflight orchestration and injected task controls are retired product concepts.
 
-A user-visible Codex task that owns zero or more descendant agent threads.
+The observer exposes only bounded local metadata: opaque task identity, parent/child relationships, status, project/role labels, requested and authoritative effective model, reasoning effort, freshness and source health. It never exposes prompts, responses, reasoning, tool input/output or full private paths.
 
-### Agent thread
+## Terms
 
-A Codex execution thread with its own identity, model settings, lifecycle events, and optional parent thread.
+### Read-only observer
 
-### Subagent
+A user-visible projection of Codex's existing local state database and rollout metadata. It starts in active-only mode, preserves required ancestors, can reveal idle/interrupted rows on request, and never creates, routes, interrupts or follows up an agent.
 
-An agent thread created by another agent thread. A subagent remains the same agent even when it moves between running and idle turns.
+### Effective model provenance
 
-### Native subagent
+The authoritative model observed from turn context or state metadata, shown separately from a requested model. Requested-only intent is labelled `尚未确认` and is never promoted into an effective model value.
 
-A subagent created through Codex's built-in agent mechanism and represented in Codex's native agent tree. A routed native subagent must satisfy this definition; an external process or detached conversation never does.
+### Observer health
 
-### Delegation mode
+A bounded healthy/degraded/error status for the state database and rollout source. Raw backend errors and full paths are replaced with fixed user-facing copy. Degraded or tracking-error health makes restart safety uncertain.
 
-A user-enabled policy attached to the currently selected root thread. While enabled, later native subagent work in that conversation may be routed repeatedly to an eligible model according to task complexity. Disabling it restores ordinary execution for later turns in that root thread without interrupting work already running or changing another root thread. Enabling delegation mode does not itself start a run and must not launch a detached Codex process or a second conversation window.
+### Current Codex process session
 
-### Routing configuration restore
+The lifetime of the currently verified official Codex process tree. Only activity supported by evidence in this lifetime may be presented as currently running.
 
-A global rollback of the Codex Assistant-managed routing configuration. It is distinct from disabling delegation mode for one root thread and may affect the routing capability of every root thread after Codex reloads the restored configuration.
+### Observed activity time
 
-### Model router
+The most recent whitelisted state or rollout evidence associated with an agent in the current Codex process session. It is distinct from task creation time and is the source of the user-facing relative time.
 
-The quality-first policy used by the current Codex conversation to classify each proposed subtask and select an eligible native custom-agent profile for GPT-5.3 Codex Spark, GPT-5.6 Luna, Terra, or Sol. It optimizes quota usage and elapsed time only after the required quality, capability, tool, and risk constraints are satisfied.
+### Historical unclosed state
 
-### Model route
+An older start record that has no matching terminal record and no activity evidence in the current Codex process session. It remains available as history but is never presented as live work.
 
-The selected execution model plus the recorded reasons for choosing it, including task complexity, risk, required capabilities, estimated cost, and any quality evidence.
+### Theme catalog
 
-### Native capability preflight
+The union of bundled themes that passed the redistribution rights gate and local themes imported by the current Windows user. Catalog presence does not prove a theme is currently visible.
 
-A one-time, non-destructive verification performed after custom-agent installation and Codex restart. It confirms which configured model profiles the current Codex host can actually spawn as native children and observe in the native subagent panel.
+### Bundled theme
 
-### Eligible model
+A declarative pack shipped with the installer. Its visual asset, palette, effects, attribution and rights metadata are listed in the shared catalog and bundled rights manifest.
 
-A configured model profile that passed native capability preflight for the current Codex version, profile version, requested model, and route depth. Presence in the root model picker alone is not proof that a model is eligible for native subagent routing.
+### Local theme
 
-### Routed native subagent
-
-A model-selected child created through Codex's built-in subagent mechanism. A conversation may create multiple routed native subagents over time; each must appear in the current conversation's native subagent panel with its effective model.
-
-### Quality escalation
-
-Re-routing or retrying a subtask on a more capable model when its initial route lacks confidence, fails validation, exceeds its repair budget, or encounters work outside its approved complexity and risk boundary.
-
-### Routing tier
-
-One of four default quality bands: Spark for fully specified mechanical work, Luna for clear low-risk bounded work, Terra for cross-file or judgment-heavy work, and Sol for ambiguous, architectural, high-risk, or final whole-task review work. Luna and Spark tiers exist only when their profiles are eligible models.
-
-### Quality gate
-
-The evidence required before routed work can be accepted: implementer self-verification followed by an independent native review for specification compliance and code quality. A failed gate triggers repair and re-review or quality escalation; it never becomes an accepted result merely because it was cheaper or faster.
-
-### Task envelope
-
-The minimum information supplied by the parent conversation to one routed native subagent: task instructions, relevant project context, constraints, sandbox policy, and output contract. It is not part of an observation.
-
-### Delegation activity
-
-The user-visible state of delegation for a root thread, including whether delegation mode is enabled and whether a routed native subagent is queued, running, completed, failed, or cancelled.
-
-### Opportunistic delegation
-
-The rule that delegation mode permits but does not force native subagent creation. The parent handles trivial work directly and delegates only when the expected benefit of specialization, parallelism, or a lower-cost eligible model exceeds the coordination overhead while preserving the quality requirement.
-
-### Counterfactual savings estimate
-
-An explicitly labelled estimate of the time and quota that the same work might have consumed without delegation mode. It is not a measured saving unless both strategies were actually run under comparable conditions.
-
-### Routing baseline
-
-The quality-matched historical distribution of models, elapsed time, and available usage signals observed while delegation mode was disabled. It is used to estimate the counterfactual cost of comparable work and carries a sample count and confidence level.
-
-### Theme pack
-
-A selectable Codex appearance bundle containing visual assets, style parameters, attribution, compatibility metadata, and a rights manifest. A packaged theme is distributable product content; a user-imported local theme is not.
-
-### Rights manifest
-
-The auditable record attached to every bundled theme asset, including source, author or rights holder, license or written authorization, commercial redistribution scope, required attribution, and review status.
-
-### Theme rights gate
-
-The release rule that permits bundled distribution only when every asset in a theme pack has verifiable commercial redistribution rights. Unverified celebrity likenesses, protected characters, third-party artwork, and repository preview screenshots fail this gate and may only be supplied locally by the user.
-
-### Theme engine
-
-The audited local runtime that applies themes to the official Codex UI through Chromium DevTools Protocol without modifying the official package, `app.asar`, WindowsApps files, or code signature.
-
-### Themed session
-
-A Codex desktop session launched once with a random loopback-only CDP endpoint and verified official process identity. Theme changes may be applied live inside that existing window until the user restores the official appearance or the session ends.
+A user-owned PNG, JPEG or WebP image imported on one device after signature, MIME, dimensions, byte budget and SHA-256 validation. It is never published or redistributed by Codex Assistant.
 
 ### Theme preference
 
-The theme pack a user has selected for future verified themed sessions. A saved preference is not proof that the theme is currently visible.
+The theme selected for a future or current verified session. A saved preference can be paused and is not evidence that Codex is themed.
+
+### Verified theme session
+
+A Codex process launched with a random loopback-only CDP endpoint after official Store package, executable, process owner and listener identity have been verified. The session record contains only bounded identity metadata and expires when identity changes.
 
 ### Applied theme
 
-A theme preference whose styles have been injected into every Codex main task window in the current verified themed session and independently verified as visible. Only this state may be presented as successful application; an incompatible utility or shortcut window may retain the official appearance without invalidating it.
+A preference whose owned style has been injected into every compatible main Codex task page and independently verified. Only this state may be presented as success.
 
 ### Paused theme
 
-A saved theme preference that is not currently applied because no verified themed session is available. Resuming it requires an explicit user action when doing so would restart Codex.
+A saved preference with no currently verified theme session. Resuming may require the user to start a theme session and explicitly approve a Codex restart.
 
-### Conversation control layer
+### Theme environment report
 
-The Codex Assistant control surface injected into the active Codex composer through the verified theme engine. It binds routing state to the visible root thread, displays delegation activity, and contributes only a compact routing control marker to each submitted user turn while enabled; it does not read or retain the user's prompt body.
+A local, user-visible readiness classification derived from platform support, the exact Store package, verified Codex window count, reachable theme session and saved preference. It reports one bounded next action instead of a generic apply failure.
 
-### Routing control surface
+### Supported theme host
 
-The paired Smart Routing controls shown for a root thread in both the task tree and its active Codex composer. Both controls expose one shared root-thread delegation policy; subagent observations inherit or report routing activity and never own an independent routing toggle.
+A Windows 10 22H2 or Windows 11 x64/ARM64 environment with the official Microsoft Store ChatGPT/Codex application and a release-validated compatibility adapter. Web, PWA, portable and third-party packages are outside this boundary.
 
-### Verified routing activation
+### Theme compatibility adapter
 
-The state in which delegation mode, native model eligibility, the selected root thread, and its active composer control have all been verified as one binding. A saved preference or illuminated control without this proof is pending or failed, never enabled.
+A version-tolerant set of structural and semantic evidence used to classify an official page and locate presentation-only surfaces. An adapter fails closed when the evidence is incomplete or unknown.
 
-### Pending routing activation
+### Primary task page
 
-A root-thread preference to enable delegation mode that cannot yet be verified because the corresponding Codex task is not open in a main task window. Opening that task may complete activation automatically; pending activation never opens or switches a Codex window on the user's behalf.
+The visible, interactive official home, project or task page selected from a verified single-window session. Its successful semantic and interaction verification determines whether a theme operation may commit.
 
-### Compatibility fallback
+### Theme welcome surface
 
-The safe degraded mode used when Codex custom-agent preflight or CDP UI compatibility fails. Native routing is limited to eligible profiles, theme injection is disabled when unsafe, and the user receives a clear status instead of a simulated capability or modification of official application files.
+A presentation-owned empty-state layer shown only on a compatible primary task page that has a native composer and no visible conversation. It contains four bounded shortcuts that either invoke an already visible matching official action or prefill the native composer; it never sends a message, replaces a native control or remains visible after conversation evidence appears.
 
-### Requested model
+### Theme reading surface
 
-The model explicitly supplied when the parent asks Codex to create a subagent. It records intent and can be absent when inheritance is requested.
+A bounded translucent material applied only to one official message, tool result, file result, code block or important status unit. It improves contrast without becoming a page-wide wash, changing semantic media, or capturing interaction outside the official unit.
 
-### Effective model
+### Manual reapply boundary
 
-The model recorded in the subagent's latest `turn_context`. This is the authoritative answer to “which model is this subagent actually using?” and can differ from the requested model.
+The selected preference persists, while applied CSS belongs to the current verified session and is re-created only by a later explicit apply. A normal full reopen through the official entry does not automatically apply a theme.
 
-### Reasoning effort
+### Official appearance
 
-The effective reasoning-strength setting recorded for the subagent's latest turn.
+Codex without Codex Assistant-owned style and script nodes. Restore removes only owned nodes and clears the saved preference; it never edits official application files.
 
-### Observation
+### Theme transaction
 
-A metadata-only view of one agent thread at a point in time. It contains identity, lineage, model, reasoning effort, lifecycle state, timestamps, and provenance, but no conversation or tool content.
+The prepare, inject, verify and commit sequence used for apply and switch operations. A failure before commit leaves or restores a consistent prior/official state. Partial success is never reported as applied.
 
-### Observation freshness
+### Restart guard
 
-The age of the newest trusted metadata event used to construct an observation.
+The active-work and confidence projection derived from the same snapshot shown by the observer. A safe restart is blocked for known active work or uncertain monitor health. A force restart requires a 60-second, single-use ticket bound to the exact process identity, active count and confidence, a cancellable grace period and leaf-first revalidation.
 
-### Lifecycle state
+### Theme-state migration
 
-One of `starting`, `running`, `idle`, `interrupted`, or `tracking-error`. `Idle` means the most recent turn completed and the agent may still receive a follow-up; it does not mean the agent was destroyed.
-
-### Model drift
-
-A condition where the requested model and effective model are both known and differ.
-
-### Metadata-only boundary
-
-The observer rule that conversation bodies, reasoning text, tool arguments, tool outputs, full filesystem paths, authentication material, and secrets are never retained, logged, sent to the observer frontend, or displayed. Delegation mode changes the parent conversation's native routing policy but does not create a second content-processing path inside Codex Assistant.
+A bounded migration that moves only known theme preference, control-session and local-theme entries between Codex Assistant-owned state directories. It does not inspect or mutate `.codex`, global Skills, official application data or unrelated legacy files.
 
 ## Invariants
 
-- Effective model wins over requested model whenever both exist.
-- A requested model without an effective model is displayed as pending confirmation, not as actual usage.
-- Lifecycle state is derived from task and activity events; the persisted spawn-edge `open` value is not treated as proof that an agent is running.
-- All Codex data sources are opened read-only.
-- Project identity is shown as a directory basename unless the user explicitly reveals the full path.
-- Monitoring failure must never alter Codex state.
-- Delegation mode is opt-in for a selected root thread and must remain visibly active until disabled or the thread ends.
-- Delegation mode is reported as enabled only after verified routing activation; a currently running turn is unchanged and the new policy begins with the next submitted turn.
-- Delegation mode uses opportunistic delegation; it must not create a subagent for every user message or every trivial operation.
-- Before routing, the parent considers delegation overhead and keeps work local when a child is unlikely to produce a net time or quota benefit.
-- Delegation mode must not implement model execution through a detached process, hidden conversation, injected imitation card, or second execution window.
-- Every routed execution must be a real native subagent associated with the current root thread.
-- Installing or changing native custom-agent profiles may require one Codex restart; after preflight, normal delegation-mode activation must not open or restart another window.
-- The model router may select only eligible models confirmed by native capability preflight.
-- An unsupported configured model must be shown as unavailable and must never be silently substituted or visually imitated.
-- Required quality is a hard routing constraint; quota and elapsed time are secondary optimization objectives.
-- GPT-5.3 Codex Spark and GPT-5.6 Luna may handle only work inside their declared capability and risk boundaries.
-- Every routed native subagent records its model route and exposes the routing reason to the user.
-- The default routing tiers are Spark for fully specified mechanical work, Luna for clear low-risk bounded work, Terra for cross-file or judgment-heavy work, and Sol for architecture, high-risk work, and final whole-task review.
-- Routed implementation requires self-verification plus an independent specification-and-quality review before acceptance.
-- A failed quality gate must be repaired and re-reviewed or escalated to a more capable eligible model.
-- Savings shown without a controlled comparison run must be labelled as estimates, with their basis and confidence visible.
-- Savings estimates compare against a quality-matched routing baseline and include all failed attempts, repair turns, review runs, and escalation costs.
-- When the baseline sample is insufficient, the product shows that evidence is insufficient instead of presenting a precise saving.
-- The product must not duplicate a real task solely to manufacture an enabled-versus-disabled comparison.
-- Every bundled theme pack must pass the theme rights gate and ship with its rights manifest and required attribution.
-- User-imported local theme assets are not uploaded, published, or redistributed by Codex Assistant.
-- Enabling the theme engine may restart Codex once; subsequent theme switches operate in the existing Codex window and must not open a second Codex window.
-- Safe restart never terminates active native agents. A user-confirmed force restart is a destructive exception: it uses a 60-second single-use ticket bound to the exact verified root process identity and current impact, offers a five-second cancellable grace period, terminates only the revalidated descendant tree leaf-first, and never retries after an irreversible partial failure.
-- The theme engine uses a random loopback-only CDP port and verifies official Codex process identity. Restoring the official appearance removes only theme-owned scripts and saved theme state; it never changes root-thread delegation policy or interrupts routed work, and the shared verified control session may remain available for Smart Routing.
-- Codex updates trigger a compatibility check; an incompatible or failed theme must fall back to the official appearance without modifying official application files.
-- The selected architecture is a native-agent configurator plus a conversation control layer; detached execution and official application patching are excluded.
-- The conversation control layer binds delegation mode to the visible root thread and must not enable routing for another task in the same workspace.
-- Compatibility fallback preserves official appearance and exposes unsupported models or controls explicitly rather than simulating them.
+- The desktop UI exposes exactly `实时代理` and `一键换肤`; the observer side is read-only and the theme side mutates only Codex Assistant-owned theme state and verified live presentation.
+- No shipped entrypoint accepts a routing sidecar command and no routing runtime asset is bundled.
+- Observer payloads and UI never contain conversation/tool content or full private paths.
+- Official Codex package files are never modified.
+- CDP is loopback-only and bound to one verified current-user official Codex process tree.
+- The generated theme never changes conversation content foreground, primary-action fill or semantic SVG fill. It may set inherited foreground color only inside verified navigation, header, output-panel and composer chrome so dark glass remains readable.
+- Theme backgrounds and decorative layers never capture pointer events or sit above Codex content.
+- Main content and sidebar must have visible bounds; an existing composer must remain visible and hit-testable.
+- A theme switch is committed only after every compatible main page verifies; utility pages may remain official.
+- Failed or incompatible injection falls back to official appearance without claiming success.
+- Bundled assets must pass the rights gate; local imports stay device-only.
+- Safe restart never stops known or uncertain native work, waits for the complete original verified process tree to exit, and refuses to activate a replacement while any owned Store runtime remains. Force restart is explicit, short-lived, identity-and-impact-bound and non-retrying after irreversible partial failure.
+- Codex starts only through the official entry or a current explicit Codex Assistant action; a normal full reopen never triggers automatic theme application. Codex Assistant is not a supervisor, tray keeper or auto-relauncher.
+- Startup and status polling are read-only outside Codex Assistant's own state directory: they never apply a saved theme, rewrite `.codex/config.toml`, or delete agent, MCP or Skill files.
+- Store activation uses the exact official AppUserModelID and a bounded argument string; the protected WindowsApps executable is never launched directly. A replacement is not accepted until one exact, direct official `codex.exe` app-server remains stable across the readiness window.
+- Restoring official appearance deletes only Codex Assistant-owned live nodes and theme preference state.

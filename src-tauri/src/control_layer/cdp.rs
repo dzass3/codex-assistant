@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::{self, File},
     io::Write,
     net::Ipv4Addr,
@@ -89,72 +89,6 @@ impl BrowserEndpoint {
 impl VerifiedTarget {
     pub fn websocket_url(&self) -> &str {
         &self.websocket_url
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TargetChanges {
-    pub attach: Vec<VerifiedTarget>,
-    pub detach: Vec<String>,
-}
-
-pub struct TargetRegistry {
-    anchor: BrowserAnchor,
-    target_url_hashes: HashMap<String, String>,
-}
-
-impl TargetRegistry {
-    pub fn new(endpoint: &BrowserEndpoint) -> Self {
-        Self {
-            anchor: BrowserAnchor::new(endpoint),
-            target_url_hashes: HashMap::new(),
-        }
-    }
-
-    pub fn reconcile(
-        &mut self,
-        endpoint: &BrowserEndpoint,
-        descriptors: Vec<TargetDescriptor>,
-    ) -> Result<TargetChanges, CdpSecurityError> {
-        self.anchor.verify(endpoint)?;
-        let mut next = HashMap::new();
-        for descriptor in descriptors {
-            let target = endpoint.verify_target(descriptor)?;
-            let url_hash = hash_browser_id(target.websocket_url());
-            if next
-                .insert(target.target_id.clone(), (url_hash, target))
-                .is_some()
-            {
-                return Err(CdpSecurityError::DuplicateTargetIdentity);
-            }
-        }
-        for (target_id, (url_hash, _)) in &next {
-            if self
-                .target_url_hashes
-                .get(target_id)
-                .is_some_and(|existing| existing != url_hash)
-            {
-                return Err(CdpSecurityError::TargetIdentity);
-            }
-        }
-        let mut attach = next
-            .iter()
-            .filter(|(target_id, _)| !self.target_url_hashes.contains_key(*target_id))
-            .map(|(_, (_, target))| target.clone())
-            .collect::<Vec<_>>();
-        attach.sort_by(|left, right| left.target_id.cmp(&right.target_id));
-        let mut detach = self
-            .target_url_hashes
-            .keys()
-            .filter(|target_id| !next.contains_key(*target_id))
-            .cloned()
-            .collect::<Vec<_>>();
-        detach.sort();
-        self.target_url_hashes = next
-            .into_iter()
-            .map(|(target_id, (url_hash, _))| (target_id, url_hash))
-            .collect();
-        Ok(TargetChanges { attach, detach })
     }
 }
 
@@ -478,7 +412,7 @@ impl OwnedSessionStore {
             return Err(SessionStoreError::Unavailable);
         }
         fs::create_dir_all(directory).map_err(|_| SessionStoreError::Unavailable)?;
-        crate::routing::state::protect_owned_path(directory)
+        crate::private_state::protect_owned_path(directory)
             .map_err(|_| SessionStoreError::Unavailable)?;
         let session_file = directory.join("control-session.json");
         if session_file.exists()
@@ -514,7 +448,7 @@ impl OwnedSessionStore {
             .join(format!(".control-session-{}.tmp", Uuid::new_v4()));
         let write_result = (|| {
             let mut file = File::create(&temporary).map_err(|_| SessionStoreError::Unavailable)?;
-            crate::routing::state::protect_owned_path(&temporary)
+            crate::private_state::protect_owned_path(&temporary)
                 .map_err(|_| SessionStoreError::Unavailable)?;
             file.write_all(&bytes)
                 .map_err(|_| SessionStoreError::Unavailable)?;
@@ -524,7 +458,7 @@ impl OwnedSessionStore {
             let _ = fs::remove_file(&temporary);
             return Err(error);
         }
-        if crate::routing::state::replace_existing(&temporary, &self.session_file).is_err() {
+        if crate::private_state::replace_existing(&temporary, &self.session_file).is_err() {
             let _ = fs::remove_file(&temporary);
             return Err(SessionStoreError::Unavailable);
         }
@@ -574,7 +508,6 @@ pub enum IncomingMessage {
     Response { id: u64 },
     BooleanResponse { id: u64, value: bool },
     StringResponse { id: u64, value: String },
-    BindingCalled { payload: String },
     Event { method: String },
 }
 
@@ -766,29 +699,6 @@ impl CdpProtocol {
         if !allowed_event(method) {
             return Err(CdpProtocolError::EventNotAllowed);
         }
-        if method == "Runtime.bindingCalled" {
-            let params = object
-                .get("params")
-                .and_then(Value::as_object)
-                .ok_or(CdpProtocolError::MalformedEnvelope)?;
-            if !keys_are(params, &["name", "payload", "executionContextId"])
-                || params.get("name").and_then(Value::as_str) != Some("codexAssistant")
-                || params
-                    .get("executionContextId")
-                    .and_then(Value::as_u64)
-                    .is_none_or(|id| id == 0)
-            {
-                return Err(CdpProtocolError::MalformedEnvelope);
-            }
-            let payload = params
-                .get("payload")
-                .and_then(Value::as_str)
-                .filter(|payload| safe_binding_payload(payload))
-                .ok_or(CdpProtocolError::MalformedEnvelope)?;
-            return Ok(IncomingMessage::BindingCalled {
-                payload: payload.to_owned(),
-            });
-        }
         Ok(IncomingMessage::Event {
             method: method.to_owned(),
         })
@@ -798,15 +708,10 @@ impl CdpProtocol {
 fn allowed_method(method: &str) -> bool {
     matches!(
         method,
-        "Runtime.enable"
-            | "Page.enable"
-            | "Runtime.addBinding"
+        "Page.enable"
             | "Page.addScriptToEvaluateOnNewDocument"
             | "Page.removeScriptToEvaluateOnNewDocument"
             | "Runtime.evaluate"
-            | "Target.setDiscoverTargets"
-            | "Target.attachToTarget"
-            | "Target.detachFromTarget"
     )
 }
 
@@ -821,133 +726,16 @@ fn safe_script_identifier(value: &str) -> bool {
 fn allowed_event(method: &str) -> bool {
     matches!(
         method,
-        "Target.targetCreated"
-            | "Target.targetDestroyed"
-            | "Target.attachedToTarget"
-            | "Target.detachedFromTarget"
-            | "Runtime.bindingCalled"
+        "Runtime.executionContextCreated"
+            | "Runtime.executionContextsCleared"
             | "Page.frameNavigated"
+            | "Page.domContentEventFired"
+            | "Page.loadEventFired"
     )
 }
 
 fn keys_are(object: &Map<String, Value>, expected: &[&str]) -> bool {
     object.len() == expected.len() && expected.iter().all(|key| object.contains_key(*key))
-}
-
-fn safe_binding_payload(payload: &str) -> bool {
-    if payload.is_empty() || payload.len() > 4_096 || !payload.is_ascii() {
-        return false;
-    }
-    let Ok(Value::Object(object)) = serde_json::from_str::<Value>(payload) else {
-        return false;
-    };
-    let base_valid = object.get("v").and_then(Value::as_u64) == Some(1)
-        && object
-            .get("sessionId")
-            .and_then(Value::as_str)
-            .is_some_and(safe_metadata_id)
-        && object
-            .get("targetId")
-            .and_then(Value::as_str)
-            .is_some_and(safe_metadata_id)
-        && object
-            .get("routeId")
-            .and_then(Value::as_str)
-            .and_then(|value| Uuid::parse_str(value).ok())
-            .is_some_and(|value| !value.is_nil());
-    if !base_valid {
-        return false;
-    }
-    match object.get("type").and_then(Value::as_str) {
-        Some("toggle") => {
-            keys_are(
-                &object,
-                &["v", "sessionId", "targetId", "type", "routeId", "enabled"],
-            ) && object.get("enabled").and_then(Value::as_bool).is_some()
-        }
-        Some("compatibility") => {
-            keys_are(
-                &object,
-                &[
-                    "v",
-                    "sessionId",
-                    "targetId",
-                    "type",
-                    "routeId",
-                    "compatible",
-                    "reason",
-                ],
-            ) && object.get("compatible").and_then(Value::as_bool).is_some()
-                && object
-                    .get("reason")
-                    .and_then(Value::as_str)
-                    .is_some_and(|reason| {
-                        matches!(
-                            reason,
-                            "ready"
-                                | "unsupported-route"
-                                | "malformed-route"
-                                | "incompatible-shell"
-                                | "ambiguous-composer"
-                                | "unobserved-root"
-                                | "child-route"
-                                | "route-mismatch"
-                        )
-                    })
-        }
-        Some("submit_intent") => safe_submission_payload(&object, false),
-        Some("insertion_result") => {
-            safe_submission_payload(&object, true)
-                && object
-                    .get("result")
-                    .and_then(Value::as_str)
-                    .is_some_and(|result| matches!(result, "inserted" | "failed"))
-        }
-        _ => false,
-    }
-}
-
-fn safe_submission_payload(object: &Map<String, Value>, with_result: bool) -> bool {
-    let expected = if with_result {
-        &[
-            "v",
-            "sessionId",
-            "targetId",
-            "type",
-            "routeId",
-            "routeKey",
-            "submissionId",
-            "result",
-        ][..]
-    } else {
-        &[
-            "v",
-            "sessionId",
-            "targetId",
-            "type",
-            "routeId",
-            "routeKey",
-            "submissionId",
-        ][..]
-    };
-    keys_are(object, expected)
-        && object
-            .get("routeKey")
-            .and_then(Value::as_str)
-            .and_then(|value| Uuid::parse_str(value).ok())
-            .is_some_and(|value| !value.is_nil())
-        && object
-            .get("submissionId")
-            .and_then(Value::as_str)
-            .is_some_and(safe_metadata_id)
-}
-
-fn safe_metadata_id(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 128
-        && value.chars().all(|character| {
-            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | ':' | '-')
-        })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1018,6 +806,16 @@ impl CdpClient {
         })
     }
 
+    fn accept_text(&mut self, text: &str) -> Result<Option<IncomingMessage>, CdpClientError> {
+        if text.starts_with(r#"{"method":"Runtime.consoleAPICalled","params":"#) {
+            return Ok(None);
+        }
+        self.protocol
+            .accept(text)
+            .map(Some)
+            .map_err(map_protocol_error)
+    }
+
     pub async fn call(&mut self, method: &str, params: Value) -> Result<(), CdpClientError> {
         let outbound = self
             .protocol
@@ -1040,22 +838,22 @@ impl CdpClient {
                 return Err(CdpClientError::FrameTooLarge);
             }
             match incoming {
-                Message::Text(text) => match self
-                    .protocol
-                    .accept(text.as_str())
-                    .map_err(map_protocol_error)?
-                {
-                    IncomingMessage::Response { id } if id == outbound.id => return Ok(()),
-                    IncomingMessage::Response { .. } => {
-                        return Err(CdpClientError::ProtocolViolation)
+                Message::Text(text) => {
+                    let Some(message) = self.accept_text(text.as_str())? else {
+                        continue;
+                    };
+                    match message {
+                        IncomingMessage::Response { id } if id == outbound.id => return Ok(()),
+                        IncomingMessage::Response { .. } => {
+                            return Err(CdpClientError::ProtocolViolation)
+                        }
+                        IncomingMessage::BooleanResponse { .. }
+                        | IncomingMessage::StringResponse { .. } => {
+                            return Err(CdpClientError::ProtocolViolation)
+                        }
+                        IncomingMessage::Event { .. } => {}
                     }
-                    IncomingMessage::BooleanResponse { .. }
-                    | IncomingMessage::StringResponse { .. } => {
-                        return Err(CdpClientError::ProtocolViolation)
-                    }
-                    IncomingMessage::BindingCalled { .. } => {}
-                    IncomingMessage::Event { .. } => {}
-                },
+                }
                 Message::Ping(payload) => {
                     timeout(self.timeout, self.socket.send(Message::Pong(payload)))
                         .await
@@ -1093,21 +891,22 @@ impl CdpClient {
                 return Err(CdpClientError::FrameTooLarge);
             }
             match incoming {
-                Message::Text(text) => match self
-                    .protocol
-                    .accept(text.as_str())
-                    .map_err(map_protocol_error)?
-                {
-                    IncomingMessage::StringResponse { id, value } if id == outbound.id => {
-                        return Ok(value)
+                Message::Text(text) => {
+                    let Some(message) = self.accept_text(text.as_str())? else {
+                        continue;
+                    };
+                    match message {
+                        IncomingMessage::StringResponse { id, value } if id == outbound.id => {
+                            return Ok(value)
+                        }
+                        IncomingMessage::Response { .. }
+                        | IncomingMessage::BooleanResponse { .. }
+                        | IncomingMessage::StringResponse { .. } => {
+                            return Err(CdpClientError::ProtocolViolation)
+                        }
+                        IncomingMessage::Event { .. } => {}
                     }
-                    IncomingMessage::Response { .. }
-                    | IncomingMessage::BooleanResponse { .. }
-                    | IncomingMessage::StringResponse { .. } => {
-                        return Err(CdpClientError::ProtocolViolation)
-                    }
-                    IncomingMessage::BindingCalled { .. } | IncomingMessage::Event { .. } => {}
-                },
+                }
                 Message::Ping(payload) => {
                     timeout(self.timeout, self.socket.send(Message::Pong(payload)))
                         .await
@@ -1148,61 +947,22 @@ impl CdpClient {
                 return Err(CdpClientError::FrameTooLarge);
             }
             match incoming {
-                Message::Text(text) => match self
-                    .protocol
-                    .accept(text.as_str())
-                    .map_err(map_protocol_error)?
-                {
-                    IncomingMessage::BooleanResponse { id, value } if id == outbound.id => {
-                        return Ok(value)
+                Message::Text(text) => {
+                    let Some(message) = self.accept_text(text.as_str())? else {
+                        continue;
+                    };
+                    match message {
+                        IncomingMessage::BooleanResponse { id, value } if id == outbound.id => {
+                            return Ok(value)
+                        }
+                        IncomingMessage::Response { .. }
+                        | IncomingMessage::BooleanResponse { .. }
+                        | IncomingMessage::StringResponse { .. } => {
+                            return Err(CdpClientError::ProtocolViolation)
+                        }
+                        IncomingMessage::Event { .. } => {}
                     }
-                    IncomingMessage::Response { .. }
-                    | IncomingMessage::BooleanResponse { .. }
-                    | IncomingMessage::StringResponse { .. } => {
-                        return Err(CdpClientError::ProtocolViolation)
-                    }
-                    IncomingMessage::BindingCalled { .. } => {}
-                    IncomingMessage::Event { .. } => {}
-                },
-                Message::Ping(payload) => {
-                    timeout(self.timeout, self.socket.send(Message::Pong(payload)))
-                        .await
-                        .map_err(|_| CdpClientError::TimedOut)?
-                        .map_err(|_| CdpClientError::WriteFailed)?;
                 }
-                Message::Pong(_) => {}
-                Message::Close(_) => return Err(CdpClientError::ConnectionClosed),
-                Message::Binary(_) | Message::Frame(_) => {
-                    return Err(CdpClientError::ProtocolViolation)
-                }
-            }
-        }
-    }
-
-    pub async fn next_binding_payload(&mut self) -> Result<String, CdpClientError> {
-        loop {
-            let incoming = timeout(self.timeout, self.socket.next())
-                .await
-                .map_err(|_| CdpClientError::TimedOut)?
-                .ok_or(CdpClientError::ConnectionClosed)?
-                .map_err(|_| CdpClientError::ReadFailed)?;
-            if incoming.len() > MAX_CDP_FRAME_BYTES {
-                return Err(CdpClientError::FrameTooLarge);
-            }
-            match incoming {
-                Message::Text(text) => match self
-                    .protocol
-                    .accept(text.as_str())
-                    .map_err(map_protocol_error)?
-                {
-                    IncomingMessage::BindingCalled { payload } => return Ok(payload),
-                    IncomingMessage::Event { .. } => {}
-                    IncomingMessage::Response { .. }
-                    | IncomingMessage::BooleanResponse { .. }
-                    | IncomingMessage::StringResponse { .. } => {
-                        return Err(CdpClientError::ProtocolViolation)
-                    }
-                },
                 Message::Ping(payload) => {
                     timeout(self.timeout, self.socket.send(Message::Pong(payload)))
                         .await

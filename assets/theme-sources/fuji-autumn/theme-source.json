@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "fuji-autumn",
+  "name": "富士秋光",
+  "description": "富士远景、秋叶与金色落日构成的温暖主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月26日 13_38_21.png",
+    "mime_type": "image/png",
+    "sha256": "9d2152a558b476dcc0805b3173ce20fcfcdf46574e5396fac38880f4d50e2c30",
+    "width": 1024,
+    "height": 1536,
+    "bytes": 2555247
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/fuji-autumn.webp",
+    "max_width": 1024,
+    "max_height": 1536,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/fuji-autumn.webp",
+    "max_width": 405,
+    "max_height": 720,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/fuji-autumn.webp",
+    "overlay": "#57351f",
+    "focal_x": 50,
+    "focal_y": 62,
+    "palette": {
+      "surface": "#eee4d8",
+      "surface_strong": "#fff9f2",
+      "text": "#3b3028",
+      "accent": "#c4773f",
+      "border": "#d0a17d"
+    },
+    "effects": {
+      "surface_opacity": 80,
+      "blur_px": 22,
+      "contrast_percent": 100,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月26日 13_38_21.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

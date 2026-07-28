@@ -9,6 +9,7 @@ use serde::Deserialize;
 pub const CODEX_PACKAGE_NAME: &str = "OpenAI.Codex";
 pub const CODEX_PACKAGE_FAMILY: &str = "OpenAI.Codex_2p2nqsd0c76g0";
 pub const CODEX_EXECUTABLE_NAME: &str = "ChatGPT.exe";
+pub const CODEX_APP_USER_MODEL_ID: &str = "OpenAI.Codex_2p2nqsd0c76g0!App";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureStatus {
@@ -109,6 +110,7 @@ pub enum IdentityError {
     CloseFailed,
     ExitTimeout,
     LaunchFailed,
+    ActivationFailed,
     PortUnavailable,
     InvalidPort,
     ProcessQuery,
@@ -119,12 +121,21 @@ pub enum IdentityError {
     TerminationFailed,
     TreeStillRunning,
     OperationCancelled,
+    AppServerUnavailable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProcessTreeEntry {
     pub pid: u32,
     pub parent_pid: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeProcessProbe {
+    pub pid: u32,
+    pub parent_pid: u32,
+    pub owner_sid: String,
+    pub canonical_image_path: PathBuf,
 }
 
 pub fn plan_leaf_first_termination(
@@ -156,6 +167,73 @@ pub fn plan_leaf_first_termination(
         right_depth.cmp(left_depth).then(left_pid.cmp(right_pid))
     });
     Ok(plan.into_iter().map(|(pid, _)| pid).collect())
+}
+
+pub fn validate_tree_drain(
+    original_processes: &[u32],
+    live_processes: &[u32],
+) -> Result<(), IdentityError> {
+    let live = live_processes
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    if original_processes.iter().any(|pid| live.contains(pid)) {
+        Err(IdentityError::TreeStillRunning)
+    } else {
+        Ok(())
+    }
+}
+
+pub fn validate_no_owned_runtime_processes(
+    processes: &[RuntimeProcessProbe],
+) -> Result<(), IdentityError> {
+    if processes.is_empty() {
+        Ok(())
+    } else {
+        Err(IdentityError::TreeStillRunning)
+    }
+}
+
+pub fn validate_app_server_set(
+    package: &VerifiedPackage,
+    root: &VerifiedProcess,
+    processes: &[RuntimeProcessProbe],
+) -> Result<u32, IdentityError> {
+    if root.package_version != package.version
+        || !same_windows_path(&root.image_path, &package.executable)
+    {
+        return Err(IdentityError::ReplacementIdentity);
+    }
+    let expected = package.root.join("app").join("resources").join("codex.exe");
+    let candidates = processes
+        .iter()
+        .filter(|process| {
+            process.pid != 0
+                && process.parent_pid == root.pid
+                && process.owner_sid == root.owner_sid
+                && same_windows_path(&process.canonical_image_path, &expected)
+        })
+        .collect::<Vec<_>>();
+    match candidates.as_slice() {
+        [process] => Ok(process.pid),
+        _ => Err(IdentityError::AppServerUnavailable),
+    }
+}
+
+pub fn validate_stable_pid_samples(
+    samples: &[u32],
+    required_samples: usize,
+) -> Result<u32, IdentityError> {
+    if required_samples == 0 || samples.len() < required_samples {
+        return Err(IdentityError::AppServerUnavailable);
+    }
+    let window = &samples[samples.len() - required_samples..];
+    let expected = window[0];
+    if expected != 0 && window.iter().all(|pid| *pid == expected) {
+        Ok(expected)
+    } else {
+        Err(IdentityError::AppServerUnavailable)
+    }
 }
 
 #[cfg(windows)]
@@ -332,6 +410,125 @@ fn terminate_verified_process(fingerprint: &TerminationFingerprint) -> Result<()
         return Err(IdentityError::TerminationFailed);
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn wait_for_original_tree_exit(
+    original_processes: &[u32],
+    fingerprints: &[TerminationFingerprint],
+    timeout_ms: u32,
+) -> Result<(), IdentityError> {
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_millis(u64::from(timeout_ms));
+    loop {
+        let mut live = Vec::new();
+        for fingerprint in fingerprints {
+            if !process_has_exited(fingerprint)? {
+                live.push(fingerprint.pid);
+            }
+        }
+        if validate_tree_drain(original_processes, &live).is_ok() {
+            return Ok(());
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(IdentityError::TreeStillRunning);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[cfg(windows)]
+fn runtime_image_matches(package: &VerifiedPackage, image_path: &std::path::Path) -> bool {
+    let resources = package.root.join("app").join("resources");
+    same_windows_path(image_path, &package.executable)
+        || same_windows_path(image_path, &resources.join("codex.exe"))
+        || same_windows_path(image_path, &resources.join("codex-code-mode-host.exe"))
+}
+
+#[cfg(windows)]
+fn discover_owned_runtime_processes(
+    package: &VerifiedPackage,
+    current_user_sid: &str,
+) -> Result<Vec<RuntimeProcessProbe>, IdentityError> {
+    discover_runtime_processes(package, current_user_sid, None)
+}
+
+#[cfg(windows)]
+fn discover_direct_runtime_processes(
+    package: &VerifiedPackage,
+    current_user_sid: &str,
+    parent_pid: u32,
+) -> Result<Vec<RuntimeProcessProbe>, IdentityError> {
+    discover_runtime_processes(package, current_user_sid, Some(parent_pid))
+}
+
+#[cfg(windows)]
+fn discover_runtime_processes(
+    package: &VerifiedPackage,
+    current_user_sid: &str,
+    direct_parent: Option<u32>,
+) -> Result<Vec<RuntimeProcessProbe>, IdentityError> {
+    let entries = snapshot_process_tree()?;
+    let mut processes = Vec::new();
+    for entry in entries {
+        if direct_parent.is_some_and(|parent_pid| entry.parent_pid != parent_pid) {
+            continue;
+        }
+        let identity = match query_process_identity(entry.pid) {
+            Ok(identity) => identity,
+            Err(IdentityError::ProcessQuery) | Err(IdentityError::ProcessId) => continue,
+            Err(error) => return Err(error),
+        };
+        if identity.owner_sid == current_user_sid
+            && runtime_image_matches(package, &identity.canonical_image_path)
+        {
+            processes.push(RuntimeProcessProbe {
+                pid: identity.pid,
+                parent_pid: entry.parent_pid,
+                owner_sid: identity.owner_sid,
+                canonical_image_path: identity.canonical_image_path,
+            });
+        }
+    }
+    Ok(processes)
+}
+
+#[cfg(windows)]
+fn wait_for_app_server_ready(
+    package: &VerifiedPackage,
+    root: &VerifiedProcess,
+    timeout_ms: u32,
+) -> Result<(), IdentityError> {
+    const REQUIRED_STABLE_SAMPLES: usize = 8;
+    const SAMPLE_INTERVAL_MS: u64 = 250;
+
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_millis(u64::from(timeout_ms));
+    let mut samples = Vec::with_capacity(REQUIRED_STABLE_SAMPLES);
+    loop {
+        let current = verified_process_from_pid(package, root.pid, &root.owner_sid)?;
+        if current != *root {
+            return Err(IdentityError::ReplacementIdentity);
+        }
+        let processes = discover_direct_runtime_processes(package, &root.owner_sid, root.pid)?;
+        match validate_app_server_set(package, root, &processes) {
+            Ok(pid) => {
+                if samples.last().is_some_and(|previous| *previous != pid) {
+                    samples.clear();
+                }
+                samples.push(pid);
+                if validate_stable_pid_samples(&samples, REQUIRED_STABLE_SAMPLES).is_ok() {
+                    return Ok(());
+                }
+            }
+            Err(IdentityError::AppServerUnavailable) => samples.clear(),
+            Err(error) => return Err(error),
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(IdentityError::AppServerUnavailable);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(SAMPLE_INTERVAL_MS));
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -546,10 +743,56 @@ pub fn cdp_launch_arguments(port: u16) -> Result<[String; 2], IdentityError> {
     ])
 }
 
+pub fn store_activation_arguments(port: u16) -> Result<String, IdentityError> {
+    Ok(cdp_launch_arguments(port)?.join(" "))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RestartedSession {
     pub process: VerifiedProcess,
     pub port: u16,
+}
+
+#[cfg(windows)]
+pub fn launch_verified_codex(
+    package: &VerifiedPackage,
+    current_user_sid: &str,
+    reservation: PortReservation,
+    timeout_ms: u32,
+) -> Result<RestartedSession, IdentityError> {
+    if !(1_000..=30_000).contains(&timeout_ms) {
+        return Err(IdentityError::ExitTimeout);
+    }
+    let fresh_package = discover_store_package()?;
+    if fresh_package.version != package.version
+        || !same_windows_path(&fresh_package.root, &package.root)
+        || !same_windows_path(&fresh_package.executable, &package.executable)
+    {
+        return Err(IdentityError::PackageVersion);
+    }
+    if !discover_verified_ui_processes(package, current_user_sid)?.is_empty() {
+        return Err(IdentityError::AmbiguousUiProcess);
+    }
+    validate_no_owned_runtime_processes(&discover_owned_runtime_processes(
+        package,
+        current_user_sid,
+    )?)?;
+    let port = reservation.release();
+    let launched_pid = activate_store_codex(port)?;
+    let process =
+        wait_for_first_verified_process(package, launched_pid, current_user_sid, timeout_ms)?;
+    wait_for_app_server_ready(package, &process, timeout_ms)?;
+    Ok(RestartedSession { process, port })
+}
+
+#[cfg(not(windows))]
+pub fn launch_verified_codex(
+    _package: &VerifiedPackage,
+    _current_user_sid: &str,
+    _reservation: PortReservation,
+    _timeout_ms: u32,
+) -> Result<RestartedSession, IdentityError> {
+    Err(IdentityError::LaunchFailed)
 }
 
 #[cfg(windows)]
@@ -571,9 +814,20 @@ pub fn restart_verified_codex(
     {
         return Err(IdentityError::PackageVersion);
     }
+    let initial_entries = snapshot_process_tree()?;
+    let initial_plan = plan_leaf_first_termination(current_process.pid, &initial_entries)?;
+    let fingerprints = initial_plan
+        .iter()
+        .map(|pid| termination_fingerprint(*pid, &current_process.owner_sid))
+        .collect::<Result<Vec<_>, _>>()?;
     close_verified_ui_process(package, current_process, timeout_ms)?;
+    wait_for_original_tree_exit(&initial_plan, &fingerprints, timeout_ms)?;
+    validate_no_owned_runtime_processes(&discover_owned_runtime_processes(
+        package,
+        &current_process.owner_sid,
+    )?)?;
     let port = reservation.release();
-    let launched_pid = launch_cdp_replacement(package, port)?;
+    let launched_pid = activate_store_codex(port)?;
     let process = wait_for_exact_replacement(
         package,
         current_process.pid,
@@ -581,6 +835,7 @@ pub fn restart_verified_codex(
         &current_process.owner_sid,
         timeout_ms,
     )?;
+    wait_for_app_server_ready(package, &process, timeout_ms)?;
     Ok(RestartedSession { process, port })
 }
 
@@ -665,9 +920,13 @@ pub fn restart_verified_codex_force(
     {
         return Err(IdentityError::TreeStillRunning);
     }
+    validate_no_owned_runtime_processes(&discover_owned_runtime_processes(
+        package,
+        &current_process.owner_sid,
+    )?)?;
 
     let port = reservation.release();
-    let launched_pid = launch_cdp_replacement(package, port)?;
+    let launched_pid = activate_store_codex(port)?;
     let process = wait_for_exact_replacement(
         package,
         current_process.pid,
@@ -675,6 +934,7 @@ pub fn restart_verified_codex_force(
         &current_process.owner_sid,
         timeout_ms,
     )?;
+    wait_for_app_server_ready(package, &process, timeout_ms)?;
     Ok(RestartedSession { process, port })
 }
 
@@ -703,20 +963,117 @@ pub fn restart_verified_codex_force(
 }
 
 #[cfg(windows)]
-fn launch_cdp_replacement(package: &VerifiedPackage, port: u16) -> Result<u32, IdentityError> {
-    use std::process::Command;
+pub fn activate_store_codex(port: u16) -> Result<u32, IdentityError> {
+    let arguments = store_activation_arguments(port)?;
+    std::thread::spawn(move || activate_store_codex_inner(&arguments))
+        .join()
+        .map_err(|_| IdentityError::ActivationFailed)?
+}
 
-    let arguments = cdp_launch_arguments(port)?;
-    let child = Command::new(&package.executable)
-        .args(arguments)
-        .spawn()
-        .map_err(|_| IdentityError::LaunchFailed)?;
-    let pid = child.id();
-    if pid == 0 {
-        return Err(IdentityError::LaunchFailed);
+#[cfg(not(windows))]
+pub fn activate_store_codex(_port: u16) -> Result<u32, IdentityError> {
+    Err(IdentityError::ActivationFailed)
+}
+
+#[cfg(windows)]
+fn activate_store_codex_inner(arguments: &str) -> Result<u32, IdentityError> {
+    use std::ffi::c_void;
+
+    use windows_sys::{
+        core::GUID,
+        Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
+            COINIT_APARTMENTTHREADED,
+        },
+    };
+
+    #[repr(C)]
+    struct ApplicationActivationManager {
+        vtable: *const ApplicationActivationManagerVtable,
     }
-    drop(child);
-    Ok(pid)
+
+    #[repr(C)]
+    struct ApplicationActivationManagerVtable {
+        query_interface: unsafe extern "system" fn(
+            *mut ApplicationActivationManager,
+            *const GUID,
+            *mut *mut c_void,
+        ) -> i32,
+        add_ref: unsafe extern "system" fn(*mut ApplicationActivationManager) -> u32,
+        release: unsafe extern "system" fn(*mut ApplicationActivationManager) -> u32,
+        activate_application: unsafe extern "system" fn(
+            *mut ApplicationActivationManager,
+            *const u16,
+            *const u16,
+            u32,
+            *mut u32,
+        ) -> i32,
+        activate_for_file: usize,
+        activate_for_protocol: usize,
+    }
+
+    const CLSID_APPLICATION_ACTIVATION_MANAGER: GUID = GUID {
+        data1: 0x45ba127d,
+        data2: 0x10a8,
+        data3: 0x46ea,
+        data4: [0x8a, 0xb7, 0x56, 0xea, 0x90, 0x78, 0x94, 0x3c],
+    };
+    const IID_APPLICATION_ACTIVATION_MANAGER: GUID = GUID {
+        data1: 0x2e941141,
+        data2: 0x7f97,
+        data3: 0x4756,
+        data4: [0xba, 0x1d, 0x9d, 0xec, 0xde, 0x89, 0x4a, 0x3d],
+    };
+
+    let initialized = unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) };
+    if initialized < 0 {
+        return Err(IdentityError::ActivationFailed);
+    }
+
+    let result = (|| {
+        let mut manager = std::ptr::null_mut::<ApplicationActivationManager>();
+        let created = unsafe {
+            CoCreateInstance(
+                &CLSID_APPLICATION_ACTIVATION_MANAGER,
+                std::ptr::null_mut(),
+                CLSCTX_INPROC_SERVER,
+                &IID_APPLICATION_ACTIVATION_MANAGER,
+                &mut manager as *mut *mut ApplicationActivationManager as *mut *mut c_void,
+            )
+        };
+        if created < 0 || manager.is_null() {
+            return Err(IdentityError::ActivationFailed);
+        }
+
+        let app_id = wide(CODEX_APP_USER_MODEL_ID);
+        let arguments = wide(arguments);
+        let mut pid = 0_u32;
+        let activated = unsafe {
+            ((*(*manager).vtable).activate_application)(
+                manager,
+                app_id.as_ptr(),
+                arguments.as_ptr(),
+                0,
+                &mut pid,
+            )
+        };
+        unsafe {
+            ((*(*manager).vtable).release)(manager);
+        }
+        if activated < 0 || pid == 0 {
+            Err(IdentityError::ActivationFailed)
+        } else {
+            Ok(pid)
+        }
+    })();
+
+    unsafe { CoUninitialize() };
+    result
+}
+
+#[cfg(windows)]
+fn wide(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 #[cfg(windows)]
@@ -885,6 +1242,30 @@ fn wait_for_exact_replacement(
             Ok(process) => return Ok(process),
             Err(IdentityError::AmbiguousUiProcess) if verified.is_empty() => {}
             Err(error) => return Err(error),
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(IdentityError::ExitTimeout);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[cfg(windows)]
+fn wait_for_first_verified_process(
+    package: &VerifiedPackage,
+    launched_pid: u32,
+    current_user_sid: &str,
+    timeout_ms: u32,
+) -> Result<VerifiedProcess, IdentityError> {
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_millis(u64::from(timeout_ms));
+    loop {
+        let verified = discover_verified_ui_processes(package, current_user_sid)?;
+        match verified.as_slice() {
+            [process] if process.pid == launched_pid => return Ok(process.clone()),
+            [] => {}
+            [_] => return Err(IdentityError::ReplacementIdentity),
+            _ => return Err(IdentityError::AmbiguousUiProcess),
         }
         if std::time::Instant::now() >= deadline {
             return Err(IdentityError::ExitTimeout);

@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "wisteria-bride",
+  "name": "紫藤花嫁",
+  "description": "紫藤花境与柔和玻璃材质构成的明亮人物主题。",
+  "category": "original-character",
+  "preview_path": "/themes/wisteria-bride.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "wisteria-bride",
+    "overlay": "#4b315d",
+    "focal_x": 73,
+    "focal_y": 50
+  },
+  "palette": {
+    "surface": "#f4eaf6",
+    "surface_strong": "#fff8ff",
+    "text": "#38243f",
+    "accent": "#a966c2",
+    "border": "#d8a9e3"
+  },
+  "effects": {
+    "surface_opacity": 76,
+    "blur_px": 24,
+    "contrast_percent": 96,
+    "motion": false
+  },
+  "assets": [
+    {
+      "id": "wisteria-bride",
+      "mime_type": "image/webp",
+      "sha256": "414d4a1c23e5b4f1017ccdc0ac5c20ae81f7c39da55f23e2c00d7d83edc1f341"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (3).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

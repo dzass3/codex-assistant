@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "seaside-blue",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 20_02_56.png",
+    "mime_type": "image/png",
+    "sha256": "884d1da4a3c3bc6f63481a52d8c4e39fa11556236d9c9e6976a05032238e45bc",
+    "width": 941,
+    "height": 1672,
+    "bytes": 2460129
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/seaside-blue.webp",
+    "mime_type": "image/webp",
+    "sha256": "232109f8ef11eadb02c3a9406eee5be581212717a645c24fe8d5268899f6c8d0",
+    "width": 941,
+    "height": 1672,
+    "bytes": 313436,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/seaside-blue.webp",
+    "mime_type": "image/webp",
+    "sha256": "293e1292390df8df9994e33171124e3f1c1abe28127e1de42a89986b407f0de7",
+    "width": 405,
+    "height": 720,
+    "bytes": 52916,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

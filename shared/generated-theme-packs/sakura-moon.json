@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "sakura-moon",
+  "name": "樱月夜宴",
+  "description": "樱花、满月与紫粉夜色构成的梦幻主题。",
+  "category": "original-character",
+  "preview_path": "/themes/sakura-moon.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "sakura-moon",
+    "overlay": "#3f2458",
+    "focal_x": 72,
+    "focal_y": 53
+  },
+  "palette": {
+    "surface": "#eadff0",
+    "surface_strong": "#fbf5ff",
+    "text": "#352640",
+    "accent": "#b468ba",
+    "border": "#ce91d2"
+  },
+  "effects": {
+    "surface_opacity": 78,
+    "blur_px": 24,
+    "contrast_percent": 99,
+    "motion": false
+  },
+  "assets": [
+    {
+      "id": "sakura-moon",
+      "mime_type": "image/webp",
+      "sha256": "75c4cb3e64d837b8a7308926256745b86e3a18138e24503093e2210b1736bece"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 18_33_41.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

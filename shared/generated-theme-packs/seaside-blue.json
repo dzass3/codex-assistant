@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "seaside-blue",
+  "name": "海风晴夏",
+  "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
+  "category": "original-character",
+  "preview_path": "/themes/seaside-blue.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "seaside-blue",
+    "overlay": "#246a9b",
+    "focal_x": 50,
+    "focal_y": 48
+  },
+  "palette": {
+    "surface": "#e2f1fa",
+    "surface_strong": "#f5fbff",
+    "text": "#20394b",
+    "accent": "#3f9bd3",
+    "border": "#83bfdf"
+  },
+  "effects": {
+    "surface_opacity": 78,
+    "blur_px": 22,
+    "contrast_percent": 96,
+    "motion": false
+  },
+  "assets": [
+    {
+      "id": "seaside-blue",
+      "mime_type": "image/webp",
+      "sha256": "232109f8ef11eadb02c3a9406eee5be581212717a645c24fe8d5268899f6c8d0"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

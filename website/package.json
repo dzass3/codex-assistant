@@ -1,6 +1,6 @@
 {
   "name": "codex-assistant-site",
-  "version": "0.7.3",
+  "version": "0.11.8",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -10,6 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "release:verify": "node scripts/verify-release-manifest.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

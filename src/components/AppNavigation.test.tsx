@@ -3,14 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { AppNavigation } from "./AppNavigation";
 
 describe("AppNavigation", () => {
-  it("switches between Live Agents, Smart Routing, and Themes", () => {
+  it("exposes exactly the two approved product pages", () => {
     const onChange = vi.fn();
-    render(<AppNavigation active="live" onChange={onChange} />);
+    render(<AppNavigation active="monitor" onChange={onChange} />);
 
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
     expect(screen.getByRole("tab", { name: "实时代理" })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(screen.getByRole("tab", { name: "Smart Routing" }));
-    expect(onChange).toHaveBeenCalledWith("routing");
-    fireEvent.click(screen.getByRole("tab", { name: "主题管理" }));
+    expect(screen.getByRole("tab", { name: "一键换肤" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.queryByText(/Smart Routing/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "一键换肤" }));
     expect(onChange).toHaveBeenCalledWith("themes");
   });
 });

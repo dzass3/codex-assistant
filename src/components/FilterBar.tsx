@@ -1,9 +1,4 @@
-export interface MonitorFilters {
-  query: string;
-  model: string;
-  project: string;
-  activeOnly: boolean;
-}
+import type { MonitorFilters } from "./AgentTree";
 
 interface FilterBarProps {
   filters: MonitorFilters;
@@ -51,12 +46,14 @@ export function FilterBar({ filters, models, projects, onChange }: FilterBarProp
       </label>
       <div className="segmented" aria-label="代理范围">
         <button
+          type="button"
           className={filters.activeOnly ? "is-active" : ""}
           onClick={() => update("activeOnly", true)}
         >
           活跃
         </button>
         <button
+          type="button"
           className={!filters.activeOnly ? "is-active" : ""}
           onClick={() => update("activeOnly", false)}
         >

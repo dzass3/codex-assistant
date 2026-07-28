@@ -1,236 +1,120 @@
-//! Regression guard for the Tauri ACL.
-//!
-//! Every IPC command registered in `tauri::generate_handler![ ... ]` must also be
-//! granted by the `[default]` permission set in `permissions/default.toml`, and
-//! the capability in `capabilities/default.json` must reference that set.
-//! Otherwise the desktop build rejects the call at runtime with
-//! `Command <name> not allowed by ACL` — the failure mode that hit claude-code-trace
-//! when a feature added the handler but forgot the matching `commands.allow`
-//! entry. The check runs in both directions so a stale ACL grant is caught too.
-
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 const LIB_RS: &str = include_str!("../src/lib.rs");
-const DEFAULT_TOML: &str = include_str!("../permissions/default.toml");
-const CAPABILITY_JSON: &str = include_str!("../capabilities/default.json");
-const ROUTING_API: &str = include_str!("../../src/lib/routingApi.ts");
+const MAIN_RS: &str = include_str!("../src/main.rs");
+const PERMISSIONS: &str = include_str!("../permissions/default.toml");
+const TAURI_CONFIG: &str = include_str!("../tauri.conf.json");
 const THEME_API: &str = include_str!("../../src/lib/themeApi.ts");
+const MONITOR_API: &str = include_str!("../../src/lib/monitorApi.ts");
+const APP: &str = include_str!("../../src/App.tsx");
 
-/// Contents of every double-quoted string in `s`.
-fn quoted_strings(s: &str) -> BTreeSet<String> {
-    s.split('"')
-        .enumerate()
-        .filter(|(i, _)| i % 2 == 1)
-        .map(|(_, part)| part.to_string())
+fn granted_commands() -> BTreeSet<String> {
+    let document: toml::Value = toml::from_str(PERMISSIONS).expect("permissions TOML");
+    document
+        .get("permission")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .flat_map(|entry| {
+            entry
+                .get("commands")
+                .and_then(|commands| commands.get("allow"))
+                .and_then(toml::Value::as_array)
+                .into_iter()
+                .flatten()
+        })
+        .filter_map(toml::Value::as_str)
+        .map(str::to_owned)
         .collect()
 }
 
-/// Command names registered in `tauri::generate_handler![ ... ]` (last path segment).
 fn handler_commands() -> BTreeSet<String> {
-    let start = LIB_RS
-        .find("generate_handler![")
-        .expect("generate_handler! macro present in lib.rs");
-    let rest = &LIB_RS[start..];
-    let open = rest.find('[').expect("opening [ for generate_handler!");
-    let close = rest.find(']').expect("closing ] for generate_handler!");
-    rest[open + 1..close]
-        .split(',')
+    let body = LIB_RS
+        .split_once("tauri::generate_handler![")
+        .and_then(|(_, tail)| tail.split_once("])"))
+        .map(|(body, _)| body)
+        .expect("Tauri handler list");
+    body.split(',')
         .map(str::trim)
-        .filter(|t| !t.is_empty())
-        .map(|t| t.rsplit("::").next().unwrap().trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
         .collect()
 }
 
-/// Identifiers referenced by the `[default]` permission set.
-fn default_permission_set() -> BTreeSet<String> {
-    let key = "permissions = [";
-    let start = DEFAULT_TOML
-        .find(key)
-        .expect("[default] permissions array present");
-    let after = &DEFAULT_TOML[start + key.len()..];
-    let end = after.find(']').expect("closing ] for default permissions");
-    quoted_strings(&after[..end])
-}
-
-/// Map of each `[[permission]]` identifier to the commands it allows.
-fn permission_blocks() -> BTreeMap<String, BTreeSet<String>> {
-    let mut map = BTreeMap::new();
-    for chunk in DEFAULT_TOML.split("[[permission]]").skip(1) {
-        let Some(id_line) = chunk
-            .lines()
-            .find(|l| l.trim_start().starts_with("identifier"))
-        else {
-            continue;
-        };
-        let Some(id) = quoted_strings(id_line).into_iter().next() else {
-            continue;
-        };
-        let key = "commands.allow = [";
-        let cmds = match chunk.find(key) {
-            Some(s) => {
-                let after = &chunk[s + key.len()..];
-                let end = after.find(']').unwrap_or(after.len());
-                quoted_strings(&after[..end])
-            }
-            None => BTreeSet::new(),
-        };
-        map.insert(id, cmds);
+#[test]
+fn desktop_exposes_only_read_only_observer_and_theme_commands() {
+    let expected = BTreeSet::from([
+        "activate_theme".to_owned(),
+        "cancel_force_restart".to_owned(),
+        "get_monitor_settings".to_owned(),
+        "get_monitor_snapshot".to_owned(),
+        "get_theme_preview_data_url".to_owned(),
+        "get_theme_environment".to_owned(),
+        "get_theme_snapshot".to_owned(),
+        "import_local_theme".to_owned(),
+        "prepare_force_restart".to_owned(),
+        "refresh_monitor".to_owned(),
+        "restore_theme".to_owned(),
+        "set_codex_home".to_owned(),
+        "start_theme_session".to_owned(),
+    ]);
+    assert_eq!(granted_commands(), expected);
+    assert_eq!(handler_commands(), expected);
+    for command in [
+        "activate_theme",
+        "cancel_force_restart",
+        "get_theme_preview_data_url",
+        "get_theme_environment",
+        "get_theme_snapshot",
+        "import_local_theme",
+        "prepare_force_restart",
+        "restore_theme",
+        "start_theme_session",
+    ] {
+        assert!(THEME_API.contains(&format!("invoke(\"{command}\"")));
     }
-    map
-}
-
-/// Commands granted by the `[default]` permission set.
-fn acl_granted_commands() -> BTreeSet<String> {
-    let referenced = default_permission_set();
-    let blocks = permission_blocks();
-    referenced
-        .iter()
-        .filter_map(|id| blocks.get(id))
-        .flat_map(|cmds| cmds.iter().cloned())
-        .collect()
-}
-
-#[test]
-fn handler_and_acl_grant_the_same_commands() {
-    let handler = handler_commands();
-    let granted = acl_granted_commands();
-
-    let missing_from_acl: Vec<_> = handler.difference(&granted).collect();
-    assert!(
-        missing_from_acl.is_empty(),
-        "commands registered in generate_handler! but missing an ACL `commands.allow` entry \
-         (these fail at runtime with `Command <name> not allowed by ACL`): {missing_from_acl:?}"
-    );
-
-    let extra_in_acl: Vec<_> = granted.difference(&handler).collect();
-    assert!(
-        extra_in_acl.is_empty(),
-        "ACL grants commands that are not registered in generate_handler!: {extra_in_acl:?}"
-    );
-}
-
-#[test]
-fn capability_references_the_default_permission_set() {
-    // The granular commands.allow entries only take effect if the capability
-    // actually pulls in the local `default` permission set.
-    assert!(
-        quoted_strings(CAPABILITY_JSON).contains("default"),
-        "capabilities/default.json must reference the \"default\" permission set so the \
-         app command grants in permissions/default.toml are applied"
-    );
-}
-
-#[test]
-fn monitor_commands_are_acl_granted() {
-    let granted = acl_granted_commands();
-    for cmd in [
+    for command in [
+        "get_monitor_settings",
         "get_monitor_snapshot",
         "refresh_monitor",
-        "get_monitor_settings",
         "set_codex_home",
     ] {
-        assert!(granted.contains(cmd), "{cmd} must be ACL-granted");
+        assert!(MONITOR_API.contains(&format!("invoke(\"{command}\"")));
     }
 }
 
 #[test]
-fn smart_routing_exposes_only_the_narrow_commands_end_to_end() {
-    let expected = BTreeSet::from([
-        "get_routing_snapshot".to_owned(),
-        "install_routing".to_owned(),
-        "restore_routing".to_owned(),
-        "prepare_force_restart".to_owned(),
-        "cancel_force_restart".to_owned(),
-        "request_codex_restart".to_owned(),
-        "begin_routing_preflight".to_owned(),
-        "set_root_routing_enabled".to_owned(),
-    ]);
-    let granted = acl_granted_commands();
-    let handler = handler_commands();
-    let frontend = [
-        "get_routing_snapshot",
-        "install_routing",
-        "restore_routing",
-        "prepare_force_restart",
-        "cancel_force_restart",
-        "request_codex_restart",
-        "begin_routing_preflight",
-        "set_root_routing_enabled",
-    ]
-    .into_iter()
-    .filter(|command| ROUTING_API.contains(&format!("invoke(\"{command}\"")))
-    .map(str::to_owned)
-    .collect::<BTreeSet<_>>();
-
-    assert!(
-        expected.is_subset(&granted),
-        "routing ACL mismatch: {granted:?}"
-    );
-    assert!(
-        expected.is_subset(&handler),
-        "routing handler mismatch: {handler:?}"
-    );
-    assert_eq!(
-        frontend, expected,
-        "frontend routing command surface changed"
-    );
-    for forbidden in [
-        "run_command",
-        "execute_process",
-        "read_file",
-        "write_file",
-        "evaluate_script",
-        "send_cdp",
-    ] {
-        assert!(!granted.contains(forbidden));
-        assert!(!handler.contains(forbidden));
-        assert!(!ROUTING_API.contains(&format!("invoke(\"{forbidden}\"")));
-    }
+fn observer_event_contract_is_namespaced_and_emits_only_changed_snapshots() {
+    let event_declaration = "const MONITOR_EVENT: &str = \"monitor://snapshot\"";
+    assert!(LIB_RS.contains(event_declaration));
+    assert!(MONITOR_API.contains("const MONITOR_EVENT = \"monitor://snapshot\""));
+    assert!(LIB_RS.contains("if changed"));
+    assert!(LIB_RS.contains("handle.emit(MONITOR_EVENT, snapshot)"));
 }
 
 #[test]
-fn themes_expose_only_narrow_commands_end_to_end() {
-    let expected = BTreeSet::from([
-        "get_theme_snapshot".to_owned(),
-        "start_theme_session".to_owned(),
-        "prepare_force_restart".to_owned(),
-        "cancel_force_restart".to_owned(),
-        "activate_theme".to_owned(),
-        "restore_theme".to_owned(),
-    ]);
-    let granted = acl_granted_commands();
-    let handler = handler_commands();
-    let frontend = [
-        "get_theme_snapshot",
-        "start_theme_session",
-        "prepare_force_restart",
-        "cancel_force_restart",
-        "activate_theme",
-        "restore_theme",
-    ]
-    .into_iter()
-    .filter(|command| THEME_API.contains(&format!("invoke(\"{command}\"")))
-    .map(str::to_owned)
-    .collect::<BTreeSet<_>>();
-
-    assert_eq!(frontend, expected, "frontend theme command surface changed");
-    assert!(
-        expected.is_subset(&granted),
-        "theme ACL mismatch: {granted:?}"
-    );
-    assert!(
-        expected.is_subset(&handler),
-        "theme handler mismatch: {handler:?}"
-    );
-    for forbidden in [
-        "open_file",
-        "import_remote_theme",
-        "evaluate_script",
-        "send_cdp",
-        "install_extension",
+fn shipped_entrypoints_and_resources_contain_no_smart_routing_surface() {
+    for (name, source) in [
+        ("lib.rs", LIB_RS),
+        ("main.rs", MAIN_RS),
+        ("permissions", PERMISSIONS),
+        ("tauri config", TAURI_CONFIG),
+        ("App", APP),
     ] {
-        assert!(!granted.contains(forbidden));
-        assert!(!handler.contains(forbidden));
-        assert!(!THEME_API.contains(&format!("invoke(\"{forbidden}\"")));
+        let lower = source.to_ascii_lowercase();
+        for forbidden in [
+            "smart routing",
+            "routing-mcp",
+            "get_routing_snapshot",
+            "begin_routing_preflight",
+            "set_root_routing_enabled",
+            "resources/routing",
+            "routing-control",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "{name} still contains {forbidden}"
+            );
+        }
     }
 }

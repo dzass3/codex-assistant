@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "autumn-wuxia",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月25日 00_06_10.png",
+    "mime_type": "image/png",
+    "sha256": "d8407bd29d4244e1f2ed597cf63a099e0046653f11dc2c299afaa16927c89074",
+    "width": 1086,
+    "height": 1448,
+    "bytes": 2617764
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/autumn-wuxia.webp",
+    "mime_type": "image/webp",
+    "sha256": "fef7a907dbcdea953fd3cbe337b017abedbe2acf0a3667fc47a20ecbdde3c681",
+    "width": 1086,
+    "height": 1448,
+    "bytes": 331348,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/autumn-wuxia.webp",
+    "mime_type": "image/webp",
+    "sha256": "3847f69a9dfa4e3d51cd4a7300ea939049ee530f28a5120e8a87cff41fed34b3",
+    "width": 405,
+    "height": 540,
+    "bytes": 38352,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_10.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "codex-assistant"
-version = "0.7.0"
+version = "0.11.8"
 edition = "2021"
 rust-version = "1.82"
 
@@ -46,10 +46,10 @@ futures-util = "0.3"
 dirs = "6"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tauri-plugin-single-instance = "2"
-toml_edit = "=0.22.27"
 sha2 = "=0.10.9"
 base64 = "=0.22.1"
 fs2 = "=0.4.3"
+notify = "=8.2.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.59.0", features = [
@@ -62,6 +62,7 @@ windows-sys = { version = "=0.59.0", features = [
   "Win32_Networking_WinSock",
   "Win32_System_Threading",
   "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Com",
   "Win32_UI_WindowsAndMessaging",
 ] }
 

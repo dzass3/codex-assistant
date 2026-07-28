@@ -29,7 +29,7 @@ export function SettingsDialog({ open, settings, onClose, onSave }: SettingsDial
       await onSave(path.trim());
       onClose();
     } catch {
-      setError("该目录不是有效的 Codex Home，请检查其中是否包含 state_5.sqlite 或 sessions。");
+      setError("该目录不是有效的 Codex Home，请检查目录后重试。");
     } finally {
       setSaving(false);
     }
@@ -44,14 +44,14 @@ export function SettingsDialog({ open, settings, onClose, onSave }: SettingsDial
         aria-labelledby="settings-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button className="dialog-close" aria-label="关闭" onClick={onClose}>
+        <button type="button" className="dialog-close" aria-label="关闭" onClick={onClose}>
           ×
         </button>
-        <span className="eyebrow">PRIVACY & SOURCE</span>
+        <span className="eyebrow">PRIVACY &amp; SOURCE</span>
         <h2 id="settings-title">监控数据目录</h2>
         <p className="dialog-copy">
-          默认自动读取当前 Windows 用户的 Codex
-          Home。设置自定义目录时，只保存目录位置，不会修改其中任何文件。
+          默认只读当前 Windows 用户的 Codex Home。自定义位置只属于 Codex Assistant
+          设置，不会修改目录内容。
         </p>
         <div className="current-location">
           <span>当前来源</span>
@@ -67,12 +67,17 @@ export function SettingsDialog({ open, settings, onClose, onSave }: SettingsDial
           />
         </label>
         <p className="field-help">留空保存可恢复默认自动检测。</p>
-        {error && <p className="dialog-error">{error}</p>}
+        {error ? <p className="dialog-error">{error}</p> : null}
         <div className="dialog-actions">
-          <button className="button-secondary" onClick={onClose}>
+          <button type="button" className="button-secondary" onClick={onClose}>
             取消
           </button>
-          <button className="button-primary" onClick={save} disabled={saving}>
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => void save()}
+            disabled={saving}
+          >
             {saving ? "验证中…" : "验证并保存"}
           </button>
         </div>

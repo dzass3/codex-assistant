@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "wisteria-bride",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 11_20_32 (3).png",
+    "mime_type": "image/png",
+    "sha256": "33a66e9b2024de2cee165c7fb822fcf3bf54cde0f599629634f28dc4c1645cb9",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2019217
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/wisteria-bride.webp",
+    "mime_type": "image/webp",
+    "sha256": "414d4a1c23e5b4f1017ccdc0ac5c20ae81f7c39da55f23e2c00d7d83edc1f341",
+    "width": 1672,
+    "height": 941,
+    "bytes": 168410,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/wisteria-bride.webp",
+    "mime_type": "image/webp",
+    "sha256": "50becb0285d48f5b093f4c2d233a41a065f70fb44f0f6e0d09e60d3cc4e2c6bb",
+    "width": 720,
+    "height": 405,
+    "bytes": 24702,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (3).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

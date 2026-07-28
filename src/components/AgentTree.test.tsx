@@ -1,16 +1,15 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import type { AgentObservation } from "../../shared/monitor-types";
 import { AgentTree } from "./AgentTree";
 
 const root: AgentObservation = {
   thread_id: "root",
   parent_thread_id: null,
-  agent_path: null,
   display_name: "主任务",
   role: null,
   project: "monitor",
-  originator: null,
+  originator: "Codex Desktop",
   requested_model: "gpt-5.6-sol",
   effective_model: "gpt-5.6-sol",
   model_source: "turn-context",
@@ -29,8 +28,10 @@ const child: AgentObservation = {
   thread_id: "child",
   parent_thread_id: "root",
   display_name: "后端实现",
+  role: "worker",
   requested_model: "gpt-5.6-sol",
   effective_model: "gpt-5.6-terra",
+  reasoning_effort: "xhigh",
   status: "running",
   model_drift: true,
   is_subagent: true,
@@ -38,75 +39,100 @@ const child: AgentObservation = {
 };
 
 describe("AgentTree", () => {
-  it("keeps the parent visible when an active child matches", () => {
+  it("keeps an idle parent visible when an active child matches", () => {
     render(
       <AgentTree
         agents={[root, child]}
         filters={{ query: "后端", model: "all", project: "all", activeOnly: true }}
       />,
     );
+
     expect(screen.getByText("主任务")).toBeInTheDocument();
     expect(screen.getByText("后端实现")).toBeInTheDocument();
+    expect(screen.getByText("gpt-5.6-terra")).toBeInTheDocument();
+    expect(screen.getByText("xhigh")).toBeInTheDocument();
     expect(screen.getByText("模型漂移")).toBeInTheDocument();
+    expect(screen.queryByText(/Smart Routing/i)).not.toBeInTheDocument();
   });
 
-  it("does not render idle-only matches in active mode", () => {
+  it("labels requested-only model intent without presenting it as effective", () => {
     render(
       <AgentTree
-        agents={[root]}
+        agents={[
+          {
+            ...child,
+            thread_id: "pending",
+            display_name: "待启动审查",
+            requested_model: "gpt-5.6-terra",
+            effective_model: null,
+            model_source: "requested-only",
+            status: "starting",
+            model_drift: false,
+          },
+        ]}
         filters={{ query: "", model: "all", project: "all", activeOnly: true }}
       />,
     );
-    expect(screen.getByText("没有匹配的代理")).toBeInTheDocument();
+
+    expect(screen.getByText("尚未确认")).toBeInTheDocument();
+    expect(screen.getByText("仅请求值")).toBeInTheDocument();
+    expect(screen.getByText("请求 gpt-5.6-terra")).toBeInTheDocument();
   });
 
-  it("places a verified Smart Routing control only on each root row", () => {
-    const setRootEnabled = vi.fn();
-    render(
+  it("reveals idle and interrupted agents only in all mode", () => {
+    const ended = {
+      ...child,
+      thread_id: "ended",
+      parent_thread_id: null,
+      display_name: "已中断审查",
+      status: "interrupted" as const,
+    };
+    const { rerender } = render(
       <AgentTree
-        agents={[root, child]}
-        filters={{ query: "", model: "all", project: "all", activeOnly: false }}
-        routing={{
-          available: true,
-          operationActive: false,
-          routes: [{ conversation_id: "root", enabled: true }],
-          controls: [{ conversation_id: "root", status: "pending-open" }],
-          onSetRootEnabled: setRootEnabled,
-        }}
+        agents={[root, ended]}
+        filters={{ query: "", model: "all", project: "all", activeOnly: true }}
       />,
     );
 
-    expect(screen.getByText("等待打开")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "关闭 主任务 Smart Routing" })).toBeEnabled();
-    expect(
-      screen.queryByRole("button", { name: /后端实现 Smart Routing/ }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText(/数据不足/)).toBeInTheDocument();
+    expect(screen.queryByText("已中断审查")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "关闭 主任务 Smart Routing" }));
-    expect(setRootEnabled).toHaveBeenCalledWith("root", false);
-  });
-
-  it("explains quality-first routing when a root enables it for the first time", () => {
-    const setRootEnabled = vi.fn();
-    render(
+    rerender(
       <AgentTree
-        agents={[root]}
+        agents={[root, ended]}
         filters={{ query: "", model: "all", project: "all", activeOnly: false }}
-        routing={{
-          available: true,
-          operationActive: false,
-          routes: [{ conversation_id: "root", enabled: false }],
-          controls: [{ conversation_id: "root", status: "off" }],
-          onSetRootEnabled: setRootEnabled,
-        }}
       />,
     );
+    expect(screen.getByText("主任务")).toBeInTheDocument();
+    expect(screen.getByText("已中断审查")).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "启用 主任务 Smart Routing" }));
+  it("labels stale unclosed work as history and formats ages over one day", () => {
+    render(
+      <AgentTree
+        agents={[
+          {
+            ...child,
+            status: "historical-unclosed",
+            freshness_ms: 211 * 60 * 60 * 1_000,
+            updated_at_ms: Date.UTC(2026, 6, 18, 8, 0, 0),
+          },
+        ]}
+        filters={{ query: "", model: "all", project: "all", activeOnly: false }}
+      />,
+    );
+    expect(screen.getByText("历史状态未闭合")).toBeInTheDocument();
+    expect(screen.getByText(/8 天前/)).toBeInTheDocument();
+    expect(screen.getByTestId("agent-child")).toHaveAttribute("title");
+  });
 
-    expect(setRootEnabled).toHaveBeenCalledWith("root", true);
-    expect(screen.getByRole("status")).toHaveTextContent("质量优先");
-    expect(screen.getByRole("status")).toHaveTextContent("下一条消息");
+  it("does not infer activity when the official app is stopped", () => {
+    render(
+      <AgentTree
+        agents={[]}
+        codexRunning={false}
+        filters={{ query: "", model: "all", project: "all", activeOnly: true }}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Codex 未运行" })).toBeInTheDocument();
   });
 });

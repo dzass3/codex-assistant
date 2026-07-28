@@ -1,6 +1,14 @@
-export type AgentStatus = "starting" | "running" | "idle" | "interrupted" | "tracking-error";
+export type AgentStatus =
+  | "starting"
+  | "running"
+  | "uncertain"
+  | "historical-unclosed"
+  | "idle"
+  | "interrupted"
+  | "tracking-error";
 export type ModelSource = "turn-context" | "state-database" | "requested-only" | "unknown";
 export type HealthLevel = "healthy" | "degraded" | "error";
+export type ObserverStatus = "live" | "delayed" | "uncertain" | "error";
 
 export interface HealthEntry {
   level: HealthLevel;
@@ -12,7 +20,6 @@ export interface HealthEntry {
 export interface AgentObservation {
   thread_id: string;
   parent_thread_id: string | null;
-  agent_path: string | null;
   display_name: string;
   role: string | null;
   project: string | null;
@@ -35,6 +42,8 @@ export interface SummaryCounts {
   subagents: number;
   starting: number;
   running: number;
+  uncertain: number;
+  historical_unclosed: number;
   idle: number;
   interrupted: number;
   tracking_errors: number;
@@ -43,6 +52,9 @@ export interface SummaryCounts {
 
 export interface MonitorSnapshot {
   generated_at_ms: number;
+  codex_running: boolean;
+  session_started_at_ms: number | null;
+  observer_status: ObserverStatus;
   agents: AgentObservation[];
   counts: SummaryCounts;
   health: {

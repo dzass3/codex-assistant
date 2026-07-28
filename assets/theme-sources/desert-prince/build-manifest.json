@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "desert-prince",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 17_57_31 (9).png",
+    "mime_type": "image/png",
+    "sha256": "951e3a5ca2b5e4f573710acbbdc94fae4d53c60fd1d33917efcd7f043ed1ad20",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2353372
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/desert-prince.webp",
+    "mime_type": "image/webp",
+    "sha256": "d55bdf33d53cf95afbee1d75a40e9c667e341a33f73f3cecbdba82b34fb7236f",
+    "width": 1672,
+    "height": 941,
+    "bytes": 264560,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/desert-prince.webp",
+    "mime_type": "image/webp",
+    "sha256": "43ea1c9bcfa752dd774107bcd2b89df084cf3527ad0009b57f52968709c690c3",
+    "width": 720,
+    "height": 405,
+    "bytes": 45320,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_31 (9).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

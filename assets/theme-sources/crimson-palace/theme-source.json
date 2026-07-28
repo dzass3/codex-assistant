@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "crimson-palace",
+  "name": "赤月华庭",
+  "description": "赤月、灯火与华庭夜色交织的深红主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 17_57_29 (2).png",
+    "mime_type": "image/png",
+    "sha256": "d85226ef5a90465050ed9b1b0aee2ecdb98578904eda6dbd6294c78a969e72f1",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2567723
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/crimson-palace.webp",
+    "max_width": 1672,
+    "max_height": 941,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/crimson-palace.webp",
+    "max_width": 720,
+    "max_height": 405,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/crimson-palace.webp",
+    "overlay": "#3b0d16",
+    "focal_x": 72,
+    "focal_y": 52,
+    "palette": {
+      "surface": "#2b1218",
+      "surface_strong": "#3b171f",
+      "text": "#fff5f3",
+      "accent": "#d45d67",
+      "border": "#9f4550"
+    },
+    "effects": {
+      "surface_opacity": 82,
+      "blur_px": 20,
+      "contrast_percent": 108,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_29 (2).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

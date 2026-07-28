@@ -3,6 +3,8 @@ use serde_json::Value as JsonValue;
 const TAURI_CONF: &str = include_str!("../tauri.conf.json");
 const CARGO_TOML: &str = include_str!("../Cargo.toml");
 const MAIN_RS: &str = include_str!("../src/main.rs");
+const LIB_RS: &str = include_str!("../src/lib.rs");
+const THEME_APP_RS: &str = include_str!("../src/theme_app.rs");
 const RUNTIME_RS: &str = include_str!("../src/monitor/runtime.rs");
 const PACKAGE_JSON: &str = include_str!("../../package.json");
 const PACKAGE_LOCK_JSON: &str = include_str!("../../package-lock.json");
@@ -11,6 +13,7 @@ const THIRD_PARTY_NOTICES: &str = include_str!("../../THIRD_PARTY_NOTICES.md");
 const DEFAULT_CAPABILITY: &str = include_str!("../capabilities/default.json");
 const DEFAULT_PERMISSION: &str = include_str!("../permissions/default.toml");
 const NSIS_HOOK: &str = include_str!("../windows/installer-hooks.nsh");
+const APP_NAVIGATION: &str = include_str!("../../src/components/AppNavigation.tsx");
 
 fn json(document: &str, label: &str) -> JsonValue {
     serde_json::from_str(document).unwrap_or_else(|error| panic!("invalid {label}: {error}"))
@@ -50,7 +53,7 @@ fn locks_the_codex_assistant_product_identity() {
     let capability = json(DEFAULT_CAPABILITY, "capabilities/default.json");
 
     assert_eq!(tauri["productName"].as_str(), Some("Codex Assistant"));
-    assert_eq!(tauri["version"].as_str(), Some("0.7.0"));
+    assert_eq!(tauri["version"].as_str(), Some("0.11.8"));
     assert_eq!(
         tauri["identifier"].as_str(),
         Some("com.codexagentmonitor.desktop")
@@ -72,17 +75,17 @@ fn locks_the_codex_assistant_product_identity() {
     );
 
     assert_eq!(package["name"].as_str(), Some("codex-assistant"));
-    assert_eq!(package["version"].as_str(), Some("0.7.0"));
+    assert_eq!(package["version"].as_str(), Some("0.11.8"));
     assert_eq!(lockfile["name"].as_str(), Some("codex-assistant"));
-    assert_eq!(lockfile["version"].as_str(), Some("0.7.0"));
+    assert_eq!(lockfile["version"].as_str(), Some("0.11.8"));
     assert_eq!(
         lockfile["packages"][""]["name"].as_str(),
         Some("codex-assistant")
     );
-    assert_eq!(lockfile["packages"][""]["version"].as_str(), Some("0.7.0"));
+    assert_eq!(lockfile["packages"][""]["version"].as_str(), Some("0.11.8"));
 
     assert_eq!(cargo["package"]["name"].as_str(), Some("codex-assistant"));
-    assert_eq!(cargo["package"]["version"].as_str(), Some("0.7.0"));
+    assert_eq!(cargo["package"]["version"].as_str(), Some("0.11.8"));
     assert_eq!(
         cargo["bin"]
             .as_array()
@@ -102,7 +105,7 @@ fn locks_the_codex_assistant_product_identity() {
     );
     assert_eq!(
         permissions["default"]["description"].as_str(),
-        Some("Allow the sanitized Codex Assistant command surface")
+        Some("Allow the local read-only observer and theme command surface")
     );
 
     assert!(nsis_instruction("!macro NSIS_HOOK_PREINSTALL"));
@@ -157,4 +160,36 @@ fn locks_the_codex_assistant_product_identity() {
     assert!(current_version_guard < legacy_delete);
     assert!(preinstall.contains(&"StrCpy $INSTDIR \"$R4\""));
     assert!(preinstall.contains(&"SetOutPath \"$INSTDIR\""));
+}
+
+#[test]
+fn desktop_exposes_exactly_observer_and_theme_surfaces_without_routing() {
+    assert!(APP_NAVIGATION.contains("实时代理"));
+    assert!(APP_NAVIGATION.contains("一键换肤"));
+    assert_eq!(APP_NAVIGATION.matches("role=\"tab\"").count(), 2);
+    assert!(!APP_NAVIGATION.contains("Smart Routing"));
+    assert!(LIB_RS.contains("get_monitor_snapshot"));
+    assert!(LIB_RS.contains("refresh_monitor"));
+    assert!(!LIB_RS.contains("routing_app"));
+}
+
+#[test]
+fn installer_exposes_no_alternate_codex_entry_or_background_start_path() {
+    assert!(!MAIN_RS.contains("--launch-themed-codex"));
+    assert!(!LIB_RS.contains("theme_launcher"));
+    assert!(!NSIS_HOOK.contains("CreateShortCut \"$SMPROGRAMS\\${RETIRED_THEMED_CODEX_SHORTCUT}\""));
+    assert!(NSIS_HOOK.contains(
+        "!insertmacro IsShortcutTarget \"$SMPROGRAMS\\${RETIRED_THEMED_CODEX_SHORTCUT}\" \"$INSTDIR\\${MAINBINARYNAME}.exe\""
+    ));
+    assert!(!NSIS_HOOK.contains("$SMSTARTUP"));
+    assert!(!NSIS_HOOK.contains("CurrentVersion\\Run"));
+    assert!(!NSIS_HOOK.to_ascii_lowercase().contains("schtasks"));
+}
+
+#[test]
+fn startup_and_background_polling_never_apply_or_reapply_a_theme() {
+    assert!(!LIB_RS.contains("reconcile_active_theme"));
+    assert!(!THEME_APP_RS.contains("reconcile_active_theme"));
+    assert!(!THEME_APP_RS.contains("reconcile_selected_theme_with"));
+    assert!(!THEME_APP_RS.contains("reconcile_at_ms"));
 }

@@ -1,5 +1,0 @@
-name = "codex_assistant_terra"
-description = "Cross-layer native implementation and independent review"
-model = "gpt-5.6-terra"
-model_reasoning_effort = "high"
-developer_instructions = "Use for cross-layer implementation and quality review after native eligibility has been verified. Work as a visible native child and self-verify. Only Terra may spawn one lower-tier native child when explicit parent instructions use fork_turns=\"none\" or a bounded recent-history fork and the routing budget permits it. Never use detached executors or transmit task content to routing metadata tools."

@@ -55,6 +55,9 @@ impl MonitorRuntime {
         let now_ms = now_ms();
         let snapshot = MonitorSnapshot {
             generated_at_ms: now_ms,
+            codex_running: false,
+            session_started_at_ms: None,
+            observer_status: super::model::ObserverStatus::Delayed,
             agents: Vec::new(),
             counts: Default::default(),
             health: SourceHealth {
@@ -102,6 +105,14 @@ impl MonitorRuntime {
             },
             is_default: state.codex_home == state.default_home,
         }
+    }
+
+    pub fn watch_root(&self) -> PathBuf {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .codex_home
+            .clone()
     }
 
     pub fn set_codex_home(&self, raw_path: &str) -> Result<MonitorSettings, String> {
@@ -195,6 +206,7 @@ impl MonitorRuntime {
             )
         };
 
+        let (codex_running, session_started_at_ms) = current_codex_session();
         let input = merge_sources(
             state_facts.as_ref(),
             &rollout_facts,
@@ -202,6 +214,8 @@ impl MonitorRuntime {
                 state_database: state_health,
                 rollout_observer: rollout_health,
             },
+            codex_running,
+            session_started_at_ms,
         );
         let snapshot = reconcile(input, now);
         let signature = stable_signature(&snapshot);
@@ -216,6 +230,8 @@ fn merge_sources(
     state: Option<&StateFacts>,
     rollouts: &RolloutFacts,
     health: SourceHealth,
+    codex_running: bool,
+    session_started_at_ms: Option<i64>,
 ) -> ReconcileInput {
     let mut threads: Vec<ThreadFact> = state
         .map(|facts| {
@@ -257,7 +273,47 @@ fn merge_sources(
         threads,
         spawns: deduplicate_spawns(&rollouts.spawns),
         health,
+        codex_running,
+        session_started_at_ms,
     }
+}
+
+#[cfg(windows)]
+fn current_codex_session() -> (bool, Option<i64>) {
+    use crate::control_layer::windows_package::{
+        discover_store_package, discover_verified_ui_processes, query_process_creation_time,
+        query_process_identity,
+    };
+    let Ok(package) = discover_store_package() else {
+        return (false, None);
+    };
+    let Ok(current_user) = query_process_identity(std::process::id()) else {
+        return (false, None);
+    };
+    let Ok(processes) = discover_verified_ui_processes(&package, &current_user.owner_sid) else {
+        return (false, None);
+    };
+    if processes.is_empty() {
+        return (false, None);
+    }
+    let session_started = (processes.len() == 1)
+        .then(|| query_process_creation_time(processes[0].pid).ok())
+        .flatten()
+        .and_then(filetime_to_unix_ms);
+    (true, session_started)
+}
+
+#[cfg(not(windows))]
+fn current_codex_session() -> (bool, Option<i64>) {
+    (false, None)
+}
+
+#[cfg(windows)]
+fn filetime_to_unix_ms(ticks: u64) -> Option<i64> {
+    const WINDOWS_TO_UNIX_EPOCH_MS: u64 = 11_644_473_600_000;
+    let milliseconds = ticks / 10_000;
+    let unix = milliseconds.checked_sub(WINDOWS_TO_UNIX_EPOCH_MS)?;
+    i64::try_from(unix).ok()
 }
 
 fn deduplicate_spawns(spawns: &[SpawnFact]) -> Vec<SpawnFact> {
@@ -388,6 +444,8 @@ mod tests {
                 state_database: HealthEntry::healthy("ok", 1),
                 rollout_observer: HealthEntry::healthy("ok", 1),
             },
+            true,
+            Some(0),
         );
         assert_eq!(
             input.threads[0].rollout_model.as_deref(),

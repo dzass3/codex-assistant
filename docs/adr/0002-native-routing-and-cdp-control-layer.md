@@ -1,6 +1,6 @@
 # ADR 0002: Native routing and CDP control layer
 
-- Status: Accepted in principle; pending written-spec review
+- Status: Superseded by ADR 0004 for the current product
 - Date: 2026-07-18
 
 ## Context

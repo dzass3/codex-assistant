@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "meteor-evening",
+  "name": "流星晚霞",
+  "description": "流星划过橙蓝晚霞与湿润街巷的暮色主题。",
+  "category": "original-character",
+  "preview_path": "/themes/meteor-evening.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "meteor-evening",
+    "overlay": "#262d50",
+    "focal_x": 50,
+    "focal_y": 58
+  },
+  "palette": {
+    "surface": "#e8e0dc",
+    "surface_strong": "#faf5f1",
+    "text": "#302d37",
+    "accent": "#d5764f",
+    "border": "#bd8a7b"
+  },
+  "effects": {
+    "surface_opacity": 82,
+    "blur_px": 22,
+    "contrast_percent": 104,
+    "motion": false
+  },
+  "assets": [
+    {
+      "id": "meteor-evening",
+      "mime_type": "image/webp",
+      "sha256": "d5c8ca4e5c1c6b176ee7a6ec75ac19b9686a73bb9e7849c1d6a1eb150c4e0630"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_19.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

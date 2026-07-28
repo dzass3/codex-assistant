@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "verdant-fairy",
+  "name": "森灵花语",
+  "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
+  "category": "original-character",
+  "preview_path": "/themes/verdant-fairy.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "verdant-fairy",
+    "overlay": "#244d32",
+    "focal_x": 72,
+    "focal_y": 53
+  },
+  "palette": {
+    "surface": "#e8f1e8",
+    "surface_strong": "#f7fcf7",
+    "text": "#23382a",
+    "accent": "#669d64",
+    "border": "#9bc49b"
+  },
+  "effects": {
+    "surface_opacity": 78,
+    "blur_px": 22,
+    "contrast_percent": 98,
+    "motion": false
+  },
+  "assets": [
+    {
+      "id": "verdant-fairy",
+      "mime_type": "image/webp",
+      "sha256": "705a52123dbc5b54f7b1d5fe82958bbedb8f6d26fda09c6cc16fc9bfad8782e5"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_31 (7).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

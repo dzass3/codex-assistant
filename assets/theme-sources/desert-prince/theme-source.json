@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "desert-prince",
+  "name": "金沙王庭",
+  "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 17_57_31 (9).png",
+    "mime_type": "image/png",
+    "sha256": "951e3a5ca2b5e4f573710acbbdc94fae4d53c60fd1d33917efcd7f043ed1ad20",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2353372
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/desert-prince.webp",
+    "max_width": 1672,
+    "max_height": 941,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/desert-prince.webp",
+    "max_width": 720,
+    "max_height": 405,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/desert-prince.webp",
+    "overlay": "#5b371c",
+    "focal_x": 77,
+    "focal_y": 51,
+    "palette": {
+      "surface": "#f2e7d5",
+      "surface_strong": "#fff9ee",
+      "text": "#3f2e20",
+      "accent": "#b57a39",
+      "border": "#d3a66b"
+    },
+    "effects": {
+      "surface_opacity": 80,
+      "blur_px": 20,
+      "contrast_percent": 98,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_31 (9).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

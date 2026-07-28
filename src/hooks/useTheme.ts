@@ -1,20 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ThemeOperationReceipt, ThemeUiSnapshot } from "../../shared/theme-types";
-import type { ForceRestartImpact, RestartIntent } from "../../shared/routing-types";
+import type {
+  ForceRestartImpact,
+  ThemeEnvironmentReport,
+  ThemeOperationReceipt,
+  ThemeRestartIntent,
+  ThemeUiSnapshot,
+} from "../../shared/theme-types";
 import { themeApi } from "../lib/themeApi";
 
-type ThemeOperation = "start-session" | "activate" | "restore";
+type ThemeOperation = "start-session" | "activate" | "import" | "restore";
 const REFRESH_MS = 5_000;
 const FAILURE_MESSAGES: Record<string, string> = {
+  "monitor-uncertain": "代理监控数据不完整；为避免打断任务，普通重启已阻止。",
   "confirmation-expired": "确认票据已过期，请重新检查影响并再次确认。",
-  "impact-changed": "运行中的子代理或进程树已经变化，必须重新确认。",
+  "impact-changed": "运行中的任务或进程树已经变化，必须重新确认。",
   "operation-conflict": "另一个生命周期操作正在进行，请等待其完成。",
   "identity-changed": "Codex 进程身份或创建时间已变化，操作已关闭失败。",
   "termination-failed": "部分进程无法终止；不会启动替代窗口或自动重试。",
   "old-tree-still-running": "旧 Codex 进程树仍未完全退出，因此没有启动新实例。",
   "terminal-partial-failure": "终止已开始但新会话未验证成功；不会自动循环重试。",
   "cdp-verification-failed": "新 Codex 的回环端口或浏览器身份验证失败。",
+  "cdp-unavailable": "当前 Codex 控制会话不可用；请恢复主题会话后重试。",
   "dom-incompatible": "当前 Codex 页面结构与该主题不兼容，已保留原外观。",
+  "multiple-windows": "检测到多个可见的 Codex 主页面，请只保留一个窗口后重试。",
   "partial-apply-failed": "并非所有 Codex 页面都兼容，主题未标记为已应用。",
 };
 
@@ -27,6 +35,7 @@ function failureMessage(receipt: ThemeOperationReceipt): string {
 
 export function useTheme() {
   const [snapshot, setSnapshot] = useState<ThemeUiSnapshot | null>(null);
+  const [environment, setEnvironment] = useState<ThemeEnvironmentReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [degraded, setDegraded] = useState(false);
@@ -46,47 +55,73 @@ export function useTheme() {
     }
     setSnapshot(next);
     setDegraded(false);
-    setError(null);
+    return true;
+  }, []);
+
+  const acceptEnvironment = useCallback((next: ThemeEnvironmentReport | null) => {
+    if (next === null) {
+      setDegraded(true);
+      setError("本机环境检测返回了无效结果，请重新安装最新版 Codex Assistant。");
+      return false;
+    }
+    setEnvironment(next);
     return true;
   }, []);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      accept(await themeApi.getSnapshot());
+      const [nextSnapshot, nextEnvironment] = await Promise.all([
+        themeApi.getSnapshot(),
+        themeApi.getEnvironment(),
+      ]);
+      if (accept(nextSnapshot) && acceptEnvironment(nextEnvironment)) setError(null);
     } catch {
       setDegraded(true);
       setError("主题状态刷新失败，已保留上一次可用快照。");
     } finally {
       setRefreshing(false);
     }
-  }, [accept]);
+  }, [accept, acceptEnvironment]);
 
   const mutate = useCallback(
     async (
       kind: ThemeOperation,
       action: () => Promise<ThemeOperationReceipt>,
-      forceIntent?: RestartIntent,
+      forceIntent?: ThemeRestartIntent,
       themeId?: string,
     ) => {
       if (operationActive.current) return null;
       operationActive.current = true;
       setOperation(kind);
+      setError(null);
       try {
         const nextReceipt = await action();
         setReceipt(nextReceipt);
         if (
           nextReceipt.status === "blocked" &&
-          nextReceipt.reason_codes.includes("active-child") &&
+          (nextReceipt.reason_codes.includes("active-work") ||
+            nextReceipt.reason_codes.includes("monitor-uncertain")) &&
           forceIntent
         ) {
           const impact = await themeApi.prepareForceRestart(forceIntent, themeId);
           setPendingForce(impact);
           setPendingThemeId(themeId ?? null);
-        } else if (nextReceipt.status === "failed") {
+        }
+        const [nextSnapshot, nextEnvironment] = await Promise.all([
+          themeApi.getSnapshot(),
+          themeApi.getEnvironment(),
+        ]);
+        accept(nextSnapshot);
+        acceptEnvironment(nextEnvironment);
+        if (
+          nextReceipt.status === "failed" ||
+          (nextReceipt.status === "blocked" &&
+            !nextReceipt.reason_codes.includes("active-work") &&
+            !nextReceipt.reason_codes.includes("monitor-uncertain"))
+        ) {
           setError(failureMessage(nextReceipt));
         }
-        accept(await themeApi.getSnapshot());
         return nextReceipt;
       } catch {
         setDegraded(true);
@@ -101,7 +136,7 @@ export function useTheme() {
         setOperation(null);
       }
     },
-    [accept],
+    [accept, acceptEnvironment],
   );
 
   const startSession = useCallback(
@@ -112,6 +147,38 @@ export function useTheme() {
     (themeId: string) =>
       mutate("activate", () => themeApi.activate(themeId), "activate-theme", themeId),
     [mutate],
+  );
+  const importLocalImage = useCallback(
+    async (name: string, imageDataUrl: string) => {
+      if (operationActive.current) return null;
+      operationActive.current = true;
+      setOperation("import");
+      setError(null);
+      try {
+        const imported = await themeApi.importLocalImage(name, imageDataUrl);
+        accept(await themeApi.getSnapshot());
+        acceptEnvironment(await themeApi.getEnvironment());
+        const nextReceipt = await themeApi.activate(imported.theme_id);
+        setReceipt(nextReceipt);
+        const [nextSnapshot, nextEnvironment] = await Promise.all([
+          themeApi.getSnapshot(),
+          themeApi.getEnvironment(),
+        ]);
+        accept(nextSnapshot);
+        acceptEnvironment(nextEnvironment);
+        if (nextReceipt.status !== "applied" && nextReceipt.status !== "noop") {
+          setError(failureMessage(nextReceipt));
+        }
+        return nextReceipt;
+      } catch {
+        setError("本机图片导入失败；仅支持不超过 1.45 MB 的 JPEG、PNG 或 WebP 文件。");
+        return null;
+      } finally {
+        operationActive.current = false;
+        setOperation(null);
+      }
+    },
+    [accept, acceptEnvironment],
   );
   const restore = useCallback(() => mutate("restore", () => themeApi.restore()), [mutate]);
 
@@ -128,6 +195,7 @@ export function useTheme() {
     operationActive.current = true;
     const kind = pendingForce.intent === "theme-session" ? "start-session" : "activate";
     setOperation(kind);
+    setError(null);
     try {
       const nextReceipt =
         pendingForce.intent === "activate-theme" && pendingThemeId
@@ -140,7 +208,12 @@ export function useTheme() {
       setReceipt(nextReceipt);
       setPendingForce(null);
       setPendingThemeId(null);
-      accept(await themeApi.getSnapshot());
+      const [nextSnapshot, nextEnvironment] = await Promise.all([
+        themeApi.getSnapshot(),
+        themeApi.getEnvironment(),
+      ]);
+      accept(nextSnapshot);
+      acceptEnvironment(nextEnvironment);
       if (nextReceipt.status !== "applied" && nextReceipt.status !== "noop") {
         setError(failureMessage(nextReceipt));
       }
@@ -152,13 +225,15 @@ export function useTheme() {
       operationActive.current = false;
       setOperation(null);
     }
-  }, [accept, pendingForce, pendingThemeId]);
+  }, [accept, acceptEnvironment, pendingForce, pendingThemeId]);
 
   useEffect(() => {
     let mounted = true;
-    themeApi
-      .getSnapshot()
-      .then((next) => mounted && accept(next))
+    Promise.all([themeApi.getSnapshot(), themeApi.getEnvironment()])
+      .then(
+        ([nextSnapshot, nextEnvironment]) =>
+          mounted && accept(nextSnapshot) && acceptEnvironment(nextEnvironment),
+      )
       .catch(() => {
         if (mounted) {
           setDegraded(true);
@@ -170,9 +245,13 @@ export function useTheme() {
     const interval = window.setInterval(() => {
       if (!mounted || polling.current || operationActive.current) return;
       polling.current = true;
-      themeApi
-        .getSnapshot()
-        .then((next) => mounted && accept(next))
+      Promise.all([themeApi.getSnapshot(), themeApi.getEnvironment()])
+        .then(([nextSnapshot, nextEnvironment]) => {
+          if (mounted) {
+            accept(nextSnapshot);
+            acceptEnvironment(nextEnvironment);
+          }
+        })
         .catch(() => {
           if (mounted) {
             setDegraded(true);
@@ -188,10 +267,11 @@ export function useTheme() {
       mounted = false;
       window.clearInterval(interval);
     };
-  }, [accept]);
+  }, [accept, acceptEnvironment]);
 
   return {
     snapshot,
+    environment,
     loading,
     refreshing,
     degraded,
@@ -201,8 +281,10 @@ export function useTheme() {
     receipt,
     pendingForce,
     refresh,
+    refreshEnvironment: refresh,
     startSession,
     activate,
+    importLocalImage,
     restore,
     confirmForceRestart,
     cancelForceRestart,

@@ -1,10 +1,17 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use codex_assistant_lib::{
     control_layer::cdp::OwnedSessionRecord,
-    routing_app::{
-        OperationStatus, RoutingApplication, RoutingSetupReasonCode, ThemeSessionStatus,
+    theme_app::{
+        decide_session_action, OperationStatus, ThemeApplication, ThemeReasonCode,
+        ThemeSessionAction, ThemeSessionStatus,
     },
 };
+use sha2::{Digest, Sha256};
 use tempfile::tempdir;
+
+fn app_at(path: &std::path::Path) -> ThemeApplication {
+    ThemeApplication::for_state_directory(path.to_path_buf()).expect("theme application")
+}
 
 fn session() -> OwnedSessionRecord {
     OwnedSessionRecord {
@@ -18,224 +25,139 @@ fn session() -> OwnedSessionRecord {
     }
 }
 
-#[test]
-fn theme_session_apply_and_restore_are_independent_from_routing_installation() {
-    let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
-    )
-    .unwrap();
-    let initial = app.theme_snapshot();
-    assert_eq!(initial.session_status, ThemeSessionStatus::Inactive);
-    assert_eq!(initial.packs.len(), 12);
-    assert!(initial.selected_theme_id.is_none());
-    assert!(initial.applied_theme_id.is_none());
-
-    let started = app.start_theme_session_with(0, || Ok(session()));
-
-    assert_eq!(started.status, OperationStatus::Applied);
-    assert_eq!(
-        app.theme_snapshot().session_status,
-        ThemeSessionStatus::Ready
-    );
-    let applied = app.apply_theme_with("aurora-grid", |pack| {
-        assert_eq!(pack.id, "aurora-grid");
-        Ok(1)
+fn write_local_theme(state: &std::path::Path) {
+    let directory = state.join("local-themes").join("arina-pink");
+    std::fs::create_dir_all(&directory).expect("local theme directory");
+    let bytes = b"local-image";
+    std::fs::write(directory.join("arina-pink.jpg"), bytes).expect("local asset");
+    let manifest = serde_json::json!({
+        "schema_version": 1,
+        "minimum_engine_version": 1,
+        "id": "arina-pink",
+        "name": "Arina Pink",
+        "description": "User-owned local theme",
+        "category": "local-import",
+        "preview_path": "local-theme:arina-pink",
+        "backdrop": {"kind": "image", "asset_id": "arina-pink", "overlay": "#fff5f6", "focal_x": 72, "focal_y": 45},
+        "palette": {"surface": "#fff8f8", "surface_strong": "#fffdfd", "text": "#3b292d", "accent": "#d9637e", "border": "#e7aeba"},
+        "effects": {"surface_opacity": 78, "blur_px": 10, "contrast_percent": 96, "motion": false},
+        "assets": [{"id": "arina-pink", "mime_type": "image/jpeg", "sha256": format!("{:x}", Sha256::digest(bytes))}],
+        "rights": {"source": "User-owned local import", "rightsholder": "User-provided asset", "license": "Local use only", "commercial_redistribution": false, "attribution": "Stored locally by user request", "reviewed_at": "2026-07-19", "manual_signoff": true, "status": "local-only"}
     });
-    assert_eq!(applied.status, OperationStatus::Applied);
-    assert_eq!(
-        app.theme_snapshot().applied_theme_id.as_deref(),
-        Some("aurora-grid")
-    );
-    let restored = app.restore_theme_with(|| Ok(1));
-    assert_eq!(restored.status, OperationStatus::Applied);
-    assert!(app.theme_snapshot().applied_theme_id.is_none());
+    std::fs::write(
+        directory.join("theme.json"),
+        serde_json::to_vec_pretty(&manifest).expect("manifest"),
+    )
+    .expect("local manifest");
 }
 
 #[test]
-fn inactive_theme_activation_restarts_once_and_applies_the_selected_theme() {
+fn theme_session_apply_and_restore_use_only_theme_state() {
     let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
-    )
-    .unwrap();
-    let mut restarted = false;
+    let app = app_at(root.path());
+    let initial = app.snapshot();
+    assert_eq!(initial.session_status, ThemeSessionStatus::Inactive);
+    assert_eq!(initial.packs.len(), 14);
 
-    let receipt = app.activate_theme_with(
-        "gothic-horizon",
-        0,
-        || {
-            restarted = true;
-            Ok(session())
-        },
-        |pack| {
-            assert_eq!(pack.id, "gothic-horizon");
-            Ok(1)
-        },
-    );
-
-    assert!(restarted);
-    assert_eq!(receipt.status, OperationStatus::Applied);
     assert_eq!(
-        app.theme_snapshot().applied_theme_id.as_deref(),
-        Some("gothic-horizon")
-    );
-}
-
-#[test]
-fn one_click_theme_activation_retries_until_the_main_task_dom_is_ready() {
-    let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
-    )
-    .unwrap();
-    app.start_theme_session_with(0, || Ok(session()));
-    let mut attempts = 0;
-    let mut waits = 0;
-
-    let receipt = app.retry_theme_application_with(
-        3,
-        || {
-            attempts += 1;
-            app.apply_theme_with("crystal-daylight", |_| {
-                if attempts == 1 {
-                    Err(RoutingSetupReasonCode::DomIncompatible)
-                } else {
-                    Ok(1)
-                }
-            })
-        },
-        || waits += 1,
-    );
-
-    assert_eq!(receipt.status, OperationStatus::Applied);
-    assert_eq!(attempts, 2);
-    assert_eq!(waits, 1);
-    assert_eq!(
-        app.theme_snapshot().applied_theme_id.as_deref(),
-        Some("crystal-daylight")
-    );
-}
-
-#[test]
-fn failed_theme_switch_keeps_selected_and_applied_state_distinct() {
-    let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
-    )
-    .unwrap();
-    app.start_theme_session_with(0, || Ok(session()));
-    assert_eq!(
-        app.apply_theme_with("aurora-grid", |_| Ok(1)).status,
+        app.start_session_with(0, || Ok(session())).status,
         OperationStatus::Applied
     );
-
-    let failed = app.apply_theme_with("gothic-horizon", |_| {
-        Err(RoutingSetupReasonCode::DomIncompatible)
-    });
-
-    assert_eq!(failed.status, OperationStatus::Failed);
-    let snapshot = app.theme_snapshot();
+    assert_eq!(app.snapshot().session_status, ThemeSessionStatus::Ready);
     assert_eq!(
-        snapshot.selected_theme_id.as_deref(),
-        Some("gothic-horizon")
+        app.apply_theme_with("wisteria-bride", |pack| {
+            assert_eq!(pack.id, "wisteria-bride");
+            Ok(1)
+        })
+        .status,
+        OperationStatus::Applied
     );
-    assert_eq!(snapshot.applied_theme_id.as_deref(), Some("aurora-grid"));
+    assert_eq!(
+        app.snapshot().applied_theme_id.as_deref(),
+        Some("wisteria-bride")
+    );
+    assert_eq!(app.restore_with(|| Ok(1)).status, OperationStatus::Applied);
+    assert!(app.snapshot().applied_theme_id.is_none());
 }
 
 #[test]
-fn theme_session_restart_is_blocked_while_a_native_child_is_active() {
+fn local_pack_and_import_are_available_without_a_routing_manifest() {
     let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
+    write_local_theme(root.path());
+    let app = app_at(root.path());
+    assert!(app
+        .snapshot()
+        .packs
+        .iter()
+        .any(|pack| pack.id == "arina-pink"));
+
+    let bytes = include_bytes!("../../public/themes/wisteria-bride.webp");
+    let data_url = format!("data:image/webp;base64,{}", STANDARD.encode(bytes));
+    let imported = app
+        .import_local_theme("My Aurora", &data_url)
+        .expect("theme import");
+    assert!(imported.theme_id.starts_with("local-"));
+    assert!(app
+        .import_local_theme("Remote", "https://example.com/a.webp")
+        .is_err());
+}
+
+#[test]
+fn retired_bundled_preference_is_cleared_once_without_touching_local_themes() {
+    let root = tempdir().unwrap();
+    write_local_theme(root.path());
+    std::fs::write(
+        root.path().join("theme-state.json"),
+        br#"{"schema_version":1,"selected_theme_id":"aurora-grid"}"#,
     )
     .unwrap();
 
-    let blocked = app.start_theme_session_with(1, || Ok(session()));
+    let migrated = app_at(root.path());
+    let snapshot = migrated.snapshot();
+    assert!(snapshot.selected_theme_id.is_none());
+    assert_eq!(
+        snapshot.catalog_notice.as_deref(),
+        Some("原主题已下架，请从 14 个新主题中重新选择")
+    );
+    assert!(snapshot.packs.iter().any(|pack| pack.id == "arina-pink"));
+    drop(migrated);
 
-    assert_eq!(blocked.status, OperationStatus::Blocked);
-    assert_eq!(
-        blocked.reason_codes,
-        vec![RoutingSetupReasonCode::ActiveChild]
-    );
-    assert_eq!(
-        app.theme_snapshot().session_status,
-        ThemeSessionStatus::Inactive
-    );
+    let repeated = app_at(root.path());
+    assert!(repeated.snapshot().selected_theme_id.is_none());
+    assert!(repeated.snapshot().catalog_notice.is_none());
+    assert!(repeated
+        .snapshot()
+        .packs
+        .iter()
+        .any(|pack| pack.id == "arina-pink"));
 }
 
 #[test]
-fn selected_theme_survives_application_restart_as_paused_not_applied() {
+fn valid_local_preference_survives_bundled_catalog_replacement() {
     let root = tempdir().unwrap();
-    let codex = root.path().join("codex");
-    let skills = root.path().join("skills");
-    let state = root.path().join("state");
-    {
-        let app = RoutingApplication::for_paths(
-            codex.clone(),
-            skills.clone(),
-            std::env::current_exe().unwrap(),
-            state.clone(),
-        )
-        .unwrap();
-        app.start_theme_session_with(0, || Ok(session()));
-        assert_eq!(
-            app.apply_theme_with("violet-afterdark", |_| Ok(1)).status,
-            OperationStatus::Applied
-        );
-    }
-
-    let restarted =
-        RoutingApplication::for_paths(codex, skills, std::env::current_exe().unwrap(), state)
-            .unwrap();
-    let snapshot = restarted.theme_snapshot();
-
-    assert_eq!(snapshot.session_status, ThemeSessionStatus::Paused);
-    assert_eq!(
-        snapshot.selected_theme_id.as_deref(),
-        Some("violet-afterdark")
-    );
-    assert!(snapshot.applied_theme_id.is_none());
-}
-
-#[test]
-fn stale_control_session_pauses_theme_and_can_be_reestablished() {
-    let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
+    write_local_theme(root.path());
+    std::fs::write(
+        root.path().join("theme-state.json"),
+        br#"{"schema_version":1,"selected_theme_id":"arina-pink"}"#,
     )
     .unwrap();
-    app.start_theme_session_with(0, || Ok(session()));
-    app.apply_theme_with("cyan-chorus", |_| Ok(1));
 
-    app.reconcile_theme_session_with(|_| false);
+    let app = app_at(root.path());
 
-    let paused = app.theme_snapshot();
-    assert_eq!(paused.session_status, ThemeSessionStatus::Paused);
-    assert_eq!(paused.selected_theme_id.as_deref(), Some("cyan-chorus"));
-    assert!(paused.applied_theme_id.is_none());
+    assert_eq!(
+        app.snapshot().selected_theme_id.as_deref(),
+        Some("arina-pink")
+    );
+    assert!(app.snapshot().catalog_notice.is_none());
+}
 
+#[test]
+fn inactive_activation_starts_once_and_applies() {
+    let root = tempdir().unwrap();
+    let app = app_at(root.path());
     let mut restarted = false;
-    let resumed = app.activate_theme_with(
-        "cyan-chorus",
+    let result = app.activate_with(
+        "crimson-palace",
         0,
         || {
             restarted = true;
@@ -244,64 +166,153 @@ fn stale_control_session_pauses_theme_and_can_be_reestablished() {
         |_| Ok(1),
     );
     assert!(restarted);
-    assert_eq!(resumed.status, OperationStatus::Applied);
-}
-
-#[test]
-fn recovered_session_reapplies_saved_theme_without_a_second_user_click() {
-    let root = tempdir().unwrap();
-    let app = RoutingApplication::for_paths(
-        root.path().join("codex"),
-        root.path().join("skills"),
-        std::env::current_exe().unwrap(),
-        root.path().join("state"),
-    )
-    .unwrap();
-    app.start_theme_session_with(0, || Ok(session()));
-    app.apply_theme_with("roseglass-atelier", |_| Ok(1));
-    app.reconcile_theme_session_with(|_| false);
-    app.start_theme_session_with(0, || Ok(session()));
-
-    let reapplied = app.reconcile_selected_theme_with(|pack| {
-        assert_eq!(pack.id, "roseglass-atelier");
-        Ok(1)
-    });
-
-    assert_eq!(reapplied.status, OperationStatus::Applied);
+    assert_eq!(result.status, OperationStatus::Applied);
     assert_eq!(
-        app.theme_snapshot().applied_theme_id.as_deref(),
-        Some("roseglass-atelier")
+        app.snapshot().applied_theme_id.as_deref(),
+        Some("crimson-palace")
     );
 }
 
 #[test]
-fn restoring_a_paused_theme_clears_the_saved_preference() {
+fn activation_retries_while_the_main_dom_is_not_ready() {
     let root = tempdir().unwrap();
-    let codex = root.path().join("codex");
-    let skills = root.path().join("skills");
-    let state = root.path().join("state");
-    let app = RoutingApplication::for_paths(
-        codex.clone(),
-        skills.clone(),
-        std::env::current_exe().unwrap(),
-        state.clone(),
-    )
-    .unwrap();
-    app.start_theme_session_with(0, || Ok(session()));
-    app.apply_theme_with("noir-stage", |_| Ok(1));
-    app.reconcile_theme_session_with(|_| false);
+    let app = app_at(root.path());
+    app.start_session_with(0, || Ok(session()));
+    let mut attempts = 0;
+    let mut waits = 0;
+    let result = app.retry_theme_application_with(
+        3,
+        || {
+            attempts += 1;
+            app.apply_theme_with("mint-gentleman", |_| {
+                if attempts == 1 {
+                    Err(ThemeReasonCode::DomIncompatible)
+                } else {
+                    Ok(1)
+                }
+            })
+        },
+        || waits += 1,
+    );
+    assert_eq!(result.status, OperationStatus::Applied);
+    assert_eq!((attempts, waits), (2, 1));
+}
 
-    let restored = app.restore_theme_with(|| panic!("paused theme has no live styles to remove"));
+#[test]
+fn activation_retries_after_a_rolled_back_partial_application() {
+    let root = tempdir().unwrap();
+    let app = app_at(root.path());
+    app.start_session_with(0, || Ok(session()));
+    let mut attempts = 0;
+    let mut waits = 0;
+    let result = app.retry_theme_application_with(
+        3,
+        || {
+            attempts += 1;
+            app.apply_theme_with("mint-gentleman", |_| {
+                if attempts == 1 {
+                    Err(ThemeReasonCode::PartialApplyFailed)
+                } else {
+                    Ok(1)
+                }
+            })
+        },
+        || waits += 1,
+    );
+    assert_eq!(result.status, OperationStatus::Applied);
+    assert_eq!((attempts, waits), (2, 1));
+}
 
-    assert_eq!(restored.status, OperationStatus::Applied);
-    let snapshot = app.theme_snapshot();
-    assert_eq!(snapshot.session_status, ThemeSessionStatus::Inactive);
-    assert!(snapshot.selected_theme_id.is_none());
+#[test]
+fn activation_does_not_retry_a_terminal_failure() {
+    let root = tempdir().unwrap();
+    let app = app_at(root.path());
+    app.start_session_with(0, || Ok(session()));
+    let mut attempts = 0;
+    let mut waits = 0;
+    let result = app.retry_theme_application_with(
+        3,
+        || {
+            attempts += 1;
+            app.apply_theme_with("mint-gentleman", |_| {
+                Err(ThemeReasonCode::CdpVerificationFailed)
+            })
+        },
+        || waits += 1,
+    );
+    assert_eq!(result.status, OperationStatus::Failed);
+    assert_eq!((attempts, waits), (1, 0));
+}
+
+#[test]
+fn failed_switch_never_misreports_the_new_theme_as_applied() {
+    let root = tempdir().unwrap();
+    let app = app_at(root.path());
+    app.start_session_with(0, || Ok(session()));
+    app.apply_theme_with("wisteria-bride", |_| Ok(1));
+    let failed = app.apply_theme_with("crimson-palace", |_| Err(ThemeReasonCode::DomIncompatible));
+    assert_eq!(failed.status, OperationStatus::Failed);
+    let snapshot = app.snapshot();
+    assert_eq!(
+        snapshot.selected_theme_id.as_deref(),
+        Some("crimson-palace")
+    );
+    assert_eq!(snapshot.applied_theme_id.as_deref(), Some("wisteria-bride"));
+}
+
+#[test]
+fn session_restart_is_blocked_while_native_work_is_active() {
+    let root = tempdir().unwrap();
+    let app = app_at(root.path());
+    let blocked = app.start_session_with(1, || Ok(session()));
+    assert_eq!(blocked.status, OperationStatus::Blocked);
+    assert_eq!(blocked.reason_codes, vec![ThemeReasonCode::ActiveWork]);
+}
+
+#[test]
+fn selected_theme_survives_application_restart_as_paused() {
+    let root = tempdir().unwrap();
+    {
+        let app = app_at(root.path());
+        app.start_session_with(0, || Ok(session()));
+        app.apply_theme_with("sakura-moon", |_| Ok(1));
+    }
+    let restarted = app_at(root.path());
+    let snapshot = restarted.snapshot();
+    assert_eq!(snapshot.session_status, ThemeSessionStatus::Paused);
+    assert_eq!(snapshot.selected_theme_id.as_deref(), Some("sakura-moon"));
     assert!(snapshot.applied_theme_id.is_none());
-    drop(app);
+}
 
-    let restarted =
-        RoutingApplication::for_paths(codex, skills, std::env::current_exe().unwrap(), state)
-            .unwrap();
-    assert!(restarted.theme_snapshot().selected_theme_id.is_none());
+#[test]
+fn stale_session_pauses_and_restore_clears_the_saved_preference() {
+    let root = tempdir().unwrap();
+    let app = app_at(root.path());
+    app.start_session_with(0, || Ok(session()));
+    app.apply_theme_with("violet-blade", |_| Ok(1));
+    app.reconcile_session_with(|_| false);
+    assert_eq!(app.snapshot().session_status, ThemeSessionStatus::Paused);
+    let restored = app.restore_with(|| panic!("paused theme has no live style"));
+    assert_eq!(restored.status, OperationStatus::Applied);
+    assert!(app.snapshot().selected_theme_id.is_none());
+}
+
+#[test]
+fn session_action_launches_cold_codex_restarts_unmanaged_and_fails_closed_on_ambiguity() {
+    assert_eq!(
+        decide_session_action(0, false),
+        Ok(ThemeSessionAction::Launch)
+    );
+    assert_eq!(
+        decide_session_action(1, false),
+        Ok(ThemeSessionAction::Restart)
+    );
+    assert_eq!(
+        decide_session_action(1, true),
+        Ok(ThemeSessionAction::Reuse)
+    );
+    assert_eq!(
+        decide_session_action(2, false),
+        Err(ThemeReasonCode::UnsupportedHost)
+    );
 }

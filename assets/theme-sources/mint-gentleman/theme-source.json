@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "mint-gentleman",
+  "name": "薄荷礼服",
+  "description": "薄荷绿礼服与晨光花廊组成的清透主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 11_20_32 (4).png",
+    "mime_type": "image/png",
+    "sha256": "4972d800de70c896aa454ebce08772228917f7ebe7765a96bf76ee5ee004b7b6",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2278026
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/mint-gentleman.webp",
+    "max_width": 1672,
+    "max_height": 941,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/mint-gentleman.webp",
+    "max_width": 720,
+    "max_height": 405,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/mint-gentleman.webp",
+    "overlay": "#31584f",
+    "focal_x": 78,
+    "focal_y": 48,
+    "palette": {
+      "surface": "#eaf3ee",
+      "surface_strong": "#f8fcfa",
+      "text": "#243b35",
+      "accent": "#5e9d88",
+      "border": "#9fc8b9"
+    },
+    "effects": {
+      "surface_opacity": 78,
+      "blur_px": 22,
+      "contrast_percent": 95,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (4).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

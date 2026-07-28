@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "seaside-blue",
+  "name": "海风晴夏",
+  "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 20_02_56.png",
+    "mime_type": "image/png",
+    "sha256": "884d1da4a3c3bc6f63481a52d8c4e39fa11556236d9c9e6976a05032238e45bc",
+    "width": 941,
+    "height": 1672,
+    "bytes": 2460129
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/seaside-blue.webp",
+    "max_width": 941,
+    "max_height": 1672,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/seaside-blue.webp",
+    "max_width": 405,
+    "max_height": 720,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/seaside-blue.webp",
+    "overlay": "#246a9b",
+    "focal_x": 50,
+    "focal_y": 48,
+    "palette": {
+      "surface": "#e2f1fa",
+      "surface_strong": "#f5fbff",
+      "text": "#20394b",
+      "accent": "#3f9bd3",
+      "border": "#83bfdf"
+    },
+    "effects": {
+      "surface_opacity": 78,
+      "blur_px": 22,
+      "contrast_percent": 96,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

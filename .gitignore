@@ -5,6 +5,14 @@ site/
 .superpowers/
 .env
 .env.*
+.scratch/
+outputs/
+website/.openai/
+website/.wrangler/
+website/public/downloads/
+*.log
+*.tmp
+*.bak
 
 # Rust
 src-tauri/target/

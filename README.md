@@ -1,48 +1,157 @@
 # Codex Assistant
 
-一个 Windows 独立窗口工具，用于实时查看 Codex 根任务与原生子代理实际使用的模型、推理强度、运行状态和模型漂移。
+> Windows 官方 ChatGPT/Codex 的只读子代理观察器与安全一键换肤工具。<br>
+> A read-only subagent observer and safe one-click theme companion for the official Windows ChatGPT/Codex app.
 
-当前版本包括三项完整能力：
+![Codex Assistant social preview](website/public/og.png)
 
-- Live Agents：只读观察根任务与原生子代理的请求模型、有效模型、层级和生命周期。
-- Smart Routing：经过可见预检后，按质量底线持续将复杂任务分配给 Sol/Terra，将边界清晰任务分配给 Luna/Spark；支持 Terra → Luna/Spark 两层原生委派。
-- 主题管理：在经过验证的本机 Codex 会话中一键应用 12 个版权已核验的声明式主题，并可恢复官方外观。
+[官网](https://codex-assistant-windows.dzass2.chatgpt.site) ·
+[下载 v0.11.8](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8) ·
+[问题反馈](https://github.com/dzass3/codex-assistant/issues)
 
-## 隐私边界
+## 中文
 
-- 只读打开 `~/.codex/state_5.sqlite` 和数据库引用的 rollout 文件。
-- 只解析代理关系、有效模型、推理强度和生命周期等白名单元数据。
-- 不保留、不发送、不展示提示词、回复、推理内容、工具参数或工具输出。
-- 不修改 Codex 状态库或 rollout 文件；集成测试会在读取前后校验文件指纹。
-- 默认完全本地运行，无遥测、无账号、无网络服务。
-- CDP 控制仅允许回环地址、同一 Windows 用户和官方 Microsoft Store Codex 进程；前端只开放列入 ACL 的窄 IPC 命令，不提供通用文件、任意 PID 终止或任意脚本接口。
-- 安全重启不会终止活动子代理；用户明确确认的强制模式使用 60 秒单次票据、五秒宽限期和叶节点优先的身份复核终止流程。
+### 功能
 
-## 模型判定
+- 只读显示根任务和子代理的层级、运行状态、实际模型、推理强度与模型漂移。
+- 一键应用 14 套随安装包分发、已经完成人工权利核验的主题。
+- 导入你有权使用的 PNG、JPEG 或 WebP 图片；素材只保存在当前设备。
+- 应用前检测 Windows、处理器架构、Microsoft Store 官方 Codex、窗口数量、版本适配器与主题控制会话。
+- 主题只装饰经过验证的视觉层，不修改 Microsoft Store 包、`app.asar`、WindowsApps 文件、官方数据库或代码签名。
+- 失败时关闭失败并恢复一致的官方外观；不会把部分应用误报为成功。
 
-有效模型按以下优先级显示：
+Smart Routing 不属于当前产品。Codex Assistant 不创建、控制、改派或自动重启子代理；实时代理页只读取本机已有的安全元数据。
 
-1. rollout 中最新的 `turn_context.model`（运行时确认）；
-2. `state_5.sqlite` 中的线程模型；
-3. 若只有创建子代理时的请求值，则明确标为“仅请求值”，不会伪装成实际模型。
+### 支持环境
 
-当请求模型与运行确认模型不同时，界面会显示模型漂移。
+- Windows 10/11
+- x64 或 ARM64
+- Microsoft Store 安装的官方 ChatGPT/Codex 桌面应用
 
-## 开发与验证
+其他打包方式、多个同时运行的官方窗口或未知版本会被预检拒绝，并显示可执行的处理建议。
 
-需要 Node.js、Rust 和 Windows C++ 构建工具。
+### 安装
+
+在 [v0.11.8 Release](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8) 中按设备选择：
+
+| 架构  | 推荐安装包                               | MSI                                      |
+| ----- | ---------------------------------------- | ---------------------------------------- |
+| x64   | `Codex Assistant_0.11.8_x64-setup.exe`   | `Codex Assistant_0.11.8_x64_en-US.msi`   |
+| ARM64 | `Codex Assistant_0.11.8_arm64-setup.exe` | `Codex Assistant_0.11.8_arm64_en-US.msi` |
+
+> **未签名提示：** 0.11.8 安装包尚未购买代码签名证书，Windows 可能显示 SmartScreen 或“未知发布者”提示。请只从本仓库 Release 或官网进入下载，并使用 Release 中的 `SHA256SUMS.txt` 校验文件。
+
+PowerShell 校验示例：
 
 ```powershell
-npm install
-npm run tauri dev
-npm run check
-npm run tauri build -- --bundles nsis
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\Codex Assistant_0.11.8_x64-setup.exe'
 ```
 
-核心实现位于 `src-tauri/src/monitor/`，前端只接收经过显式字段映射的脱敏快照。
+### 应用与恢复主题
 
-公开展示站位于 `website/`。它包含交互式脱敏演示和 Windows 安装包下载；真实的本机观察、路由与换肤能力只在桌面版中运行。
+1. 从官方入口打开 ChatGPT/Codex，并确保只运行一个官方窗口。
+2. 打开 Codex Assistant，在“一键换肤”页通过本机环境检测。
+3. 选择主题并点击“应用主题”；需要重启官方应用时，Codex Assistant 会先说明影响并等待确认。
+4. 点击“恢复官方外观”可撤销当前会话中的主题。
 
-## 来源与许可
+主题选择会保留，但主题应用绑定当前经过验证的官方会话。完全关闭并从官方入口重新打开 ChatGPT/Codex 后，需要回到 Codex Assistant 再点击一次“应用主题”。应用不会创建替代入口、启动项、计划任务、系统托盘常驻或自动重启官方应用。
 
-本项目基于 [PixelPaw-Labs/codex-trace](https://github.com/PixelPaw-Labs/codex-trace) 的 Tauri 桌面基础开发。详情见 `THIRD_PARTY_NOTICES.md`，许可见 `LICENSE`。
+### 本机图片导入
+
+导入器会检查真实文件签名、MIME、像素尺寸、编码大小、SHA-256 和目录边界。相同图片重复导入是幂等的。本机素材只写入 Codex Assistant 自有状态目录，不会上传、进入源码、网站或公开安装包。
+
+### 隐私与安全边界
+
+- 监控只读取本机状态数据库和 rollout 的白名单元数据。
+- 不读取或展示提示词、回复、推理、工具参数/输出、Cookie、令牌或完整私人路径。
+- CDP 只允许随机回环端口、当前 Windows 用户和经过校验的官方进程。
+- 背景层不接收鼠标事件；主题应用后会验证主内容、侧栏和输入区仍然可见、可点击。
+- 登录、账户、支付、授权、权限、恢复与未知页面保持官方外观。
+- 启动迁移只处理 Codex Assistant 自有状态，不读取、改写或清理用户的 `.codex` 配置、代理、MCP 或全局 Skills。
+
+更多设计与来源边界见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### 故障排查
+
+- **应用后没有皮肤：** 保持一个官方窗口，点击“刷新状态”，按预检提示建立主题控制会话后再次应用。
+- **重开后主题消失：** 这是当前安全模型的预期行为；选择已保存，请手动再次点击“应用主题”。
+- **页面显示不兼容：** 先恢复官方外观并在 Issues 提交官方 Codex 版本、Codex Assistant 版本和脱敏错误码。
+- **安装警告：** 对照 Release 的 SHA-256；不要从第三方网盘或重新打包站点安装。
+
+### 源码构建
+
+需要 Node.js 22+、Rust stable、WebView2 和带 Windows C++ 工具链的 Visual Studio Build Tools。
+
+```powershell
+npm ci
+npm run check
+npm run tauri build -- --bundles nsis,msi
+```
+
+网站位于 `website/`：
+
+```powershell
+cd website
+npm ci
+npm test
+```
+
+## English
+
+### What it does
+
+- Observes root tasks and native subagents using read-only, allow-listed local metadata.
+- Ships 14 rights-reviewed themes and supports local PNG, JPEG, and WebP imports.
+- Checks Windows, CPU architecture, the official Microsoft Store Codex package, window count, version adapter, and the local theme-control session before applying a theme.
+- Decorates verified visual surfaces without patching the Store package, `app.asar`, WindowsApps files, official databases, or code signatures.
+- Fails closed and restores a consistent official appearance when compatibility checks do not pass.
+
+Smart Routing is not part of this product. The observer does not create, control, reroute, or restart subagents.
+
+### Requirements
+
+- Windows 10 or Windows 11
+- x64 or ARM64
+- The official Microsoft Store ChatGPT/Codex desktop app
+
+### Install and verify
+
+Download the matching EXE or MSI from the [v0.11.8 release](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8).
+
+> **Unsigned build:** version 0.11.8 is not code-signed. Windows may show SmartScreen or “Unknown publisher.” Download only through this repository or the official project website, then compare the SHA-256 value with `SHA256SUMS.txt`.
+
+### Apply or restore a theme
+
+1. Start ChatGPT/Codex from its official entry and keep exactly one official window open.
+2. Open Codex Assistant and pass the local preflight checks.
+3. Pick a theme and click **Apply theme**. If a restart is needed, the app explains the impact and waits for explicit confirmation.
+4. Use **Restore official appearance** to remove the current session theme.
+
+The selection persists, but application is bound to the currently verified official session. After fully closing and reopening ChatGPT/Codex, click **Apply theme** again. Codex Assistant does not install an alternate launcher, startup task, scheduled task, tray resident, or automatic restart service.
+
+### Privacy and safety
+
+- No prompts, responses, chain-of-thought, tool payloads, cookies, tokens, or full private paths are collected.
+- Local image imports stay on the device.
+- Theme backgrounds never receive pointer events, and post-apply checks protect navigation, content, icons, controls, and the composer.
+- Login, account, billing, authorization, permission, recovery, and unknown pages retain the official appearance.
+
+### Development
+
+```powershell
+npm ci
+npm run check
+npm run tauri build -- --bundles nsis,msi
+```
+
+The public website is in `website/` and can be verified with `npm test`.
+
+## Attribution and license
+
+Codex Assistant retains the history and MIT attribution of
+[PixelPaw-Labs/codex-trace](https://github.com/PixelPaw-Labs/codex-trace).
+The theme workflow was reviewed against
+[Fei-Away/Codex-Dream-Skin](https://github.com/Fei-Away/Codex-Dream-Skin)
+as a design reference; its excluded media is not redistributed here.
+
+See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and the rights metadata in `shared/theme-catalog.json`.

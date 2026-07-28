@@ -31,6 +31,8 @@ impl SourceError {
 pub enum AgentStatus {
     Starting,
     Running,
+    Uncertain,
+    HistoricalUnclosed,
     Idle,
     Interrupted,
     TrackingError,
@@ -50,6 +52,15 @@ pub enum ModelSource {
 pub enum HealthLevel {
     Healthy,
     Degraded,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ObserverStatus {
+    Live,
+    Delayed,
+    Uncertain,
     Error,
 }
 
@@ -102,6 +113,8 @@ pub struct SummaryCounts {
     pub subagents: usize,
     pub starting: usize,
     pub running: usize,
+    pub uncertain: usize,
+    pub historical_unclosed: usize,
     pub idle: usize,
     pub interrupted: usize,
     pub tracking_errors: usize,
@@ -112,7 +125,6 @@ pub struct SummaryCounts {
 pub struct AgentObservation {
     pub thread_id: String,
     pub parent_thread_id: Option<String>,
-    pub agent_path: Option<String>,
     pub display_name: String,
     pub role: Option<String>,
     pub project: Option<String>,
@@ -133,19 +145,56 @@ pub struct AgentObservation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MonitorSnapshot {
     pub generated_at_ms: i64,
+    pub codex_running: bool,
+    pub session_started_at_ms: Option<i64>,
+    pub observer_status: ObserverStatus,
     pub agents: Vec<AgentObservation>,
     pub counts: SummaryCounts,
     pub health: SourceHealth,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RestartSafetyProjection {
+    pub active_work_count: usize,
+    pub monitor_confident: bool,
+}
+
+impl RestartSafetyProjection {
+    pub fn confirmed(active_work_count: usize) -> Self {
+        Self {
+            active_work_count,
+            monitor_confident: true,
+        }
+    }
+
+    pub fn from_snapshot(snapshot: &MonitorSnapshot) -> Self {
+        let sources_healthy = snapshot.health.state_database.level == HealthLevel::Healthy
+            && snapshot.health.rollout_observer.level == HealthLevel::Healthy;
+        Self {
+            active_work_count: snapshot.counts.starting + snapshot.counts.running,
+            monitor_confident: sources_healthy
+                && snapshot.counts.tracking_errors == 0
+                && snapshot.counts.uncertain == 0,
+        }
+    }
+
+    pub fn blocking_reason(self) -> Option<&'static str> {
+        if self.active_work_count != 0 {
+            Some("active-work")
+        } else if !self.monitor_confident {
+            Some("monitor-uncertain")
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct ThreadFact {
     pub thread_id: String,
     pub parent_thread_id: Option<String>,
-    pub agent_path: Option<String>,
     pub nickname: Option<String>,
     pub role: Option<String>,
-    pub title: Option<String>,
     pub project: Option<String>,
     pub originator: Option<String>,
     pub database_model: Option<String>,
@@ -165,7 +214,6 @@ pub struct SpawnFact {
     pub child_thread_id: String,
     pub requested_model: Option<String>,
     pub requested_effort: Option<String>,
-    pub task_name: Option<String>,
     pub occurred_at_ms: Option<i64>,
 }
 
@@ -174,4 +222,6 @@ pub struct ReconcileInput {
     pub threads: Vec<ThreadFact>,
     pub spawns: Vec<SpawnFact>,
     pub health: SourceHealth,
+    pub codex_running: bool,
+    pub session_started_at_ms: Option<i64>,
 }

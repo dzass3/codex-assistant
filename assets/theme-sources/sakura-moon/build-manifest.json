@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "sakura-moon",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 18_33_41.png",
+    "mime_type": "image/png",
+    "sha256": "f5bee5f1025b83e20b9e4bd2751f3d1bbfb63fd289bed21583db6fc4c37a1d05",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2662134
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/sakura-moon.webp",
+    "mime_type": "image/webp",
+    "sha256": "75c4cb3e64d837b8a7308926256745b86e3a18138e24503093e2210b1736bece",
+    "width": 1672,
+    "height": 941,
+    "bytes": 349654,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/sakura-moon.webp",
+    "mime_type": "image/webp",
+    "sha256": "1e3c668747955ac274849ef86e79643c1c6507671b15380783e4d1ceceb071e6",
+    "width": 720,
+    "height": 405,
+    "bytes": 55132,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 18_33_41.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

@@ -8,6 +8,7 @@
 !define LEGACY_MANU_PRODUCT_KEY "Software\codexagentmonitor\${LEGACY_PRODUCT_NAME}"
 !define LEGACY_MAIN_BINARY "codex-agent-model-monitor.exe"
 !define LEGACY_UNINSTALL_BACKUP "codex-agent-monitor-0.4.0-uninstall.exe"
+!define RETIRED_THEMED_CODEX_SHORTCUT "Codex（主题版）.lnk"
 
 !macro NSIS_HOOK_PREINSTALL
   DetailPrint "Checking for a verified Codex Agent Monitor 0.4.0 installation"
@@ -138,7 +139,7 @@ legacy_pre_done:
     Goto legacy_post_rollback
   ${EndIf}
 
-  DetailPrint "Codex Assistant 0.7.0 verified; removing the legacy identity"
+  DetailPrint "Codex Assistant ${VERSION} verified; removing the legacy identity"
   Delete "$R4\${LEGACY_MAIN_BINARY}"
   ${If} ${FileExists} "$R4\${LEGACY_MAIN_BINARY}"
     Abort "Codex Assistant was installed, but the legacy executable could not be removed. Its recovery identity was retained."
@@ -172,4 +173,21 @@ legacy_post_rollback:
   ; pointed at the exact recovery uninstaller created in PREINSTALL.
   Abort "Codex Assistant installation could not be verified. Codex Agent Monitor recovery was retained."
 legacy_post_done:
+  ; Codex Assistant 0.10.0 no longer owns an alternate Codex entry. Remove only
+  ; the exact retired shortcut when it still targets this installed binary.
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${RETIRED_THEMED_CODEX_SHORTCUT}" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $0
+  ${If} $0 = 1
+    !insertmacro UnpinShortcut "$SMPROGRAMS\${RETIRED_THEMED_CODEX_SHORTCUT}"
+    Delete "$SMPROGRAMS\${RETIRED_THEMED_CODEX_SHORTCUT}"
+  ${EndIf}
+!macroend
+
+!macro NSIS_HOOK_PREUNINSTALL
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${RETIRED_THEMED_CODEX_SHORTCUT}" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $0
+  ${If} $0 = 1
+    !insertmacro UnpinShortcut "$SMPROGRAMS\${RETIRED_THEMED_CODEX_SHORTCUT}"
+    Delete "$SMPROGRAMS\${RETIRED_THEMED_CODEX_SHORTCUT}"
+  ${EndIf}
 !macroend

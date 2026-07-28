@@ -1,31 +1,21 @@
-export type AppPage = "live" | "routing" | "themes";
+export type AppPage = "monitor" | "themes";
 
-export function AppNavigation({
-  active,
-  onChange,
-}: {
+interface AppNavigationProps {
   active: AppPage;
   onChange: (page: AppPage) => void;
-}) {
+}
+
+export function AppNavigation({ active, onChange }: AppNavigationProps) {
   return (
     <nav className="app-navigation" role="tablist" aria-label="Codex Assistant 功能">
       <button
         type="button"
         role="tab"
-        aria-selected={active === "live"}
-        className={active === "live" ? "is-active" : undefined}
-        onClick={() => onChange("live")}
+        aria-selected={active === "monitor"}
+        className={active === "monitor" ? "is-active" : undefined}
+        onClick={() => onChange("monitor")}
       >
         实时代理
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={active === "routing"}
-        className={active === "routing" ? "is-active" : undefined}
-        onClick={() => onChange("routing")}
-      >
-        Smart Routing
       </button>
       <button
         type="button"
@@ -34,7 +24,7 @@ export function AppNavigation({
         className={active === "themes" ? "is-active" : undefined}
         onClick={() => onChange("themes")}
       >
-        主题管理
+        一键换肤
       </button>
     </nav>
   );

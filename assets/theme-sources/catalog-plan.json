@@ -1,0 +1,383 @@
+{
+  "schema_version": 1,
+  "themes": [
+    {
+      "id": "wisteria-bride",
+      "name": "紫藤花嫁",
+      "source_file": "ChatGPT Image 2026年7月24日 11_20_32 (3).png",
+      "sha256": "33a66e9b2024de2cee165c7fb822fcf3bf54cde0f599629634f28dc4c1645cb9",
+      "bytes": 2019217,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "紫藤花境与柔和玻璃材质构成的明亮人物主题。",
+      "focal_x": 73,
+      "focal_y": 50,
+      "overlay": "#4b315d",
+      "palette": {
+        "surface": "#f4eaf6",
+        "surface_strong": "#fff8ff",
+        "text": "#38243f",
+        "accent": "#a966c2",
+        "border": "#d8a9e3"
+      },
+      "effects": {
+        "surface_opacity": 76,
+        "blur_px": 24,
+        "contrast_percent": 96,
+        "motion": false
+      }
+    },
+    {
+      "id": "mint-gentleman",
+      "name": "薄荷礼服",
+      "source_file": "ChatGPT Image 2026年7月24日 11_20_32 (4).png",
+      "sha256": "4972d800de70c896aa454ebce08772228917f7ebe7765a96bf76ee5ee004b7b6",
+      "bytes": 2278026,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "薄荷绿礼服与晨光花廊组成的清透主题。",
+      "focal_x": 78,
+      "focal_y": 48,
+      "overlay": "#31584f",
+      "palette": {
+        "surface": "#eaf3ee",
+        "surface_strong": "#f8fcfa",
+        "text": "#243b35",
+        "accent": "#5e9d88",
+        "border": "#9fc8b9"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 22,
+        "contrast_percent": 95,
+        "motion": false
+      }
+    },
+    {
+      "id": "iris-gentleman",
+      "name": "鸢尾绅士",
+      "source_file": "ChatGPT Image 2026年7月24日 11_20_32 (9).png",
+      "sha256": "4f2de73103178832e4f17ca69a6145acc747b336f520d07de5358440551d9087",
+      "bytes": 2295883,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "冷紫鸢尾与静谧庭院构成的优雅浅色主题。",
+      "focal_x": 73,
+      "focal_y": 49,
+      "overlay": "#3d406c",
+      "palette": {
+        "surface": "#e9eaf6",
+        "surface_strong": "#f8f8ff",
+        "text": "#292b47",
+        "accent": "#7776b8",
+        "border": "#aaa9d8"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 24,
+        "contrast_percent": 97,
+        "motion": false
+      }
+    },
+    {
+      "id": "crimson-palace",
+      "name": "赤月华庭",
+      "source_file": "ChatGPT Image 2026年7月24日 17_57_29 (2).png",
+      "sha256": "d85226ef5a90465050ed9b1b0aee2ecdb98578904eda6dbd6294c78a969e72f1",
+      "bytes": 2567723,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "赤月、灯火与华庭夜色交织的深红主题。",
+      "focal_x": 72,
+      "focal_y": 52,
+      "overlay": "#3b0d16",
+      "palette": {
+        "surface": "#2b1218",
+        "surface_strong": "#3b171f",
+        "text": "#fff5f3",
+        "accent": "#d45d67",
+        "border": "#9f4550"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 20,
+        "contrast_percent": 108,
+        "motion": false
+      }
+    },
+    {
+      "id": "verdant-fairy",
+      "name": "森灵花语",
+      "source_file": "ChatGPT Image 2026年7月24日 17_57_31 (7).png",
+      "sha256": "6d89debe262a0df5c23052f71f9474a39e4c6bd42fe9e29e768f249ef9013089",
+      "bytes": 2665814,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
+      "focal_x": 72,
+      "focal_y": 53,
+      "overlay": "#244d32",
+      "palette": {
+        "surface": "#e8f1e8",
+        "surface_strong": "#f7fcf7",
+        "text": "#23382a",
+        "accent": "#669d64",
+        "border": "#9bc49b"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 22,
+        "contrast_percent": 98,
+        "motion": false
+      }
+    },
+    {
+      "id": "desert-prince",
+      "name": "金沙王庭",
+      "source_file": "ChatGPT Image 2026年7月24日 17_57_31 (9).png",
+      "sha256": "951e3a5ca2b5e4f573710acbbdc94fae4d53c60fd1d33917efcd7f043ed1ad20",
+      "bytes": 2353372,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
+      "focal_x": 77,
+      "focal_y": 51,
+      "overlay": "#5b371c",
+      "palette": {
+        "surface": "#f2e7d5",
+        "surface_strong": "#fff9ee",
+        "text": "#3f2e20",
+        "accent": "#b57a39",
+        "border": "#d3a66b"
+      },
+      "effects": {
+        "surface_opacity": 80,
+        "blur_px": 20,
+        "contrast_percent": 98,
+        "motion": false
+      }
+    },
+    {
+      "id": "oasis-prince",
+      "name": "绿洲暮光",
+      "source_file": "ChatGPT Image 2026年7月24日 18_24_59.png",
+      "sha256": "3ea46a0779d363b17c514a30925e66ed76bc4b8c94d6996ad947b0e3631284a5",
+      "bytes": 2703927,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "绿洲水岸与暮光金辉构成的蓝金主题。",
+      "focal_x": 66,
+      "focal_y": 54,
+      "overlay": "#17484a",
+      "palette": {
+        "surface": "#dfeceb",
+        "surface_strong": "#f5fbfa",
+        "text": "#203738",
+        "accent": "#2f8b88",
+        "border": "#65aaa5"
+      },
+      "effects": {
+        "surface_opacity": 80,
+        "blur_px": 22,
+        "contrast_percent": 100,
+        "motion": false
+      }
+    },
+    {
+      "id": "sakura-moon",
+      "name": "樱月夜宴",
+      "source_file": "ChatGPT Image 2026年7月24日 18_33_41.png",
+      "sha256": "f5bee5f1025b83e20b9e4bd2751f3d1bbfb63fd289bed21583db6fc4c37a1d05",
+      "bytes": 2662134,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "樱花、满月与紫粉夜色构成的梦幻主题。",
+      "focal_x": 72,
+      "focal_y": 53,
+      "overlay": "#3f2458",
+      "palette": {
+        "surface": "#eadff0",
+        "surface_strong": "#fbf5ff",
+        "text": "#352640",
+        "accent": "#b468ba",
+        "border": "#ce91d2"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 24,
+        "contrast_percent": 99,
+        "motion": false
+      }
+    },
+    {
+      "id": "seaside-blue",
+      "name": "海风晴夏",
+      "source_file": "ChatGPT Image 2026年7月24日 20_02_56.png",
+      "sha256": "884d1da4a3c3bc6f63481a52d8c4e39fa11556236d9c9e6976a05032238e45bc",
+      "bytes": 2460129,
+      "width": 941,
+      "height": 1672,
+      "layout": "portrait",
+      "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
+      "focal_x": 50,
+      "focal_y": 48,
+      "overlay": "#246a9b",
+      "palette": {
+        "surface": "#e2f1fa",
+        "surface_strong": "#f5fbff",
+        "text": "#20394b",
+        "accent": "#3f9bd3",
+        "border": "#83bfdf"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 22,
+        "contrast_percent": 96,
+        "motion": false
+      }
+    },
+    {
+      "id": "autumn-wuxia",
+      "name": "云岭秋侠",
+      "source_file": "ChatGPT Image 2026年7月25日 00_06_10.png",
+      "sha256": "d8407bd29d4244e1f2ed597cf63a099e0046653f11dc2c299afaa16927c89074",
+      "bytes": 2617764,
+      "width": 1086,
+      "height": 1448,
+      "layout": "portrait",
+      "description": "云岭、古城与秋叶构成的沉静武侠主题。",
+      "focal_x": 50,
+      "focal_y": 61,
+      "overlay": "#283246",
+      "palette": {
+        "surface": "#e7e4df",
+        "surface_strong": "#f8f6f2",
+        "text": "#2e3038",
+        "accent": "#a45f3d",
+        "border": "#b58a72"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 20,
+        "contrast_percent": 103,
+        "motion": false
+      }
+    },
+    {
+      "id": "meteor-evening",
+      "name": "流星晚霞",
+      "source_file": "ChatGPT Image 2026年7月25日 00_06_19.png",
+      "sha256": "2031cf20d017cb9bb2e53b6953086a5d5074e1916c9c9c3ecf8f8e8cf8620501",
+      "bytes": 2295952,
+      "width": 941,
+      "height": 1672,
+      "layout": "portrait",
+      "description": "流星划过橙蓝晚霞与湿润街巷的暮色主题。",
+      "focal_x": 50,
+      "focal_y": 58,
+      "overlay": "#262d50",
+      "palette": {
+        "surface": "#e8e0dc",
+        "surface_strong": "#faf5f1",
+        "text": "#302d37",
+        "accent": "#d5764f",
+        "border": "#bd8a7b"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 22,
+        "contrast_percent": 104,
+        "motion": false
+      }
+    },
+    {
+      "id": "violet-blade",
+      "name": "紫夜剑影",
+      "source_file": "ChatGPT Image 2026年7月25日 00_06_48.png",
+      "sha256": "3e8e2e1827124dce3cf04b735def72c4c1589c4745ce884f815a81dd474af8e9",
+      "bytes": 2324008,
+      "width": 941,
+      "height": 1672,
+      "layout": "portrait",
+      "description": "紫色刀光、月夜与暗影构成的高对比主题。",
+      "focal_x": 50,
+      "focal_y": 55,
+      "overlay": "#160d35",
+      "palette": {
+        "surface": "#211b36",
+        "surface_strong": "#2c2347",
+        "text": "#f8f3ff",
+        "accent": "#9b6df0",
+        "border": "#7054a8"
+      },
+      "effects": {
+        "surface_opacity": 84,
+        "blur_px": 20,
+        "contrast_percent": 112,
+        "motion": false
+      }
+    },
+    {
+      "id": "fuji-autumn",
+      "name": "富士秋光",
+      "source_file": "ChatGPT Image 2026年7月26日 13_38_21.png",
+      "sha256": "9d2152a558b476dcc0805b3173ce20fcfcdf46574e5396fac38880f4d50e2c30",
+      "bytes": 2555247,
+      "width": 1024,
+      "height": 1536,
+      "layout": "portrait",
+      "description": "富士远景、秋叶与金色落日构成的温暖主题。",
+      "focal_x": 50,
+      "focal_y": 62,
+      "overlay": "#57351f",
+      "palette": {
+        "surface": "#eee4d8",
+        "surface_strong": "#fff9f2",
+        "text": "#3b3028",
+        "accent": "#c4773f",
+        "border": "#d0a17d"
+      },
+      "effects": {
+        "surface_opacity": 80,
+        "blur_px": 22,
+        "contrast_percent": 100,
+        "motion": false
+      }
+    },
+    {
+      "id": "spring-street",
+      "name": "春日花街",
+      "source_file": "ChatGPT Image 2026年7月26日 14_00_18.png",
+      "sha256": "e5d5ccefb1afa123fe5c959f986eab91e7f2f4e579ed097599ba935de9f6ffb8",
+      "bytes": 2298672,
+      "width": 1122,
+      "height": 1402,
+      "layout": "portrait",
+      "description": "春日花街、白裙与柔和日光构成的清新主题。",
+      "focal_x": 58,
+      "focal_y": 55,
+      "overlay": "#755454",
+      "palette": {
+        "surface": "#f3e9e7",
+        "surface_strong": "#fffafa",
+        "text": "#3d2f31",
+        "accent": "#c67f8e",
+        "border": "#ddaab3"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 24,
+        "contrast_percent": 96,
+        "motion": false
+      }
+    }
+  ]
+}

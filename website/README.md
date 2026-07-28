@@ -1,20 +1,15 @@
-# Codex Assistant public site
+# Codex Assistant website
 
-Codex Assistant 的公开产品展示与 Windows 安装包下载站。页面提供脱敏的 Live Agents、Smart Routing 和主题管理交互演示；真实本机控制能力只存在于 Windows 桌面版。
+Codex Assistant 0.11.8 的公开官网源码。站点介绍 14 套一键主题、本机环境检测、只读子代理观察、安全边界和本机图片导入，并为 x64/ARM64 提供 EXE/MSI 四种 GitHub Release 下载入口。
 
-## 本地运行
-
-需要 Node.js `>=22.13.0`。
+二进制安装包不提交到源码树或 Sites 源码仓库。页面中的版本、文件大小、SHA-256 和 GitHub Release 链接统一维护在 `app/release-data.ts`。
 
 ```powershell
-npm install
-npm run dev
-npm run lint
+npm ci
+npm run release:verify
 npm test
 ```
 
-`npm test` 会生成 Cloudflare Worker 兼容的 vinext 构建，并验证 SSR 产品内容、桌面/网页能力边界、安装包和模板清理状态。
+站点使用 Vinext/Sites 构建和发布。`.openai/hosting.json` 是本机 Sites 项目绑定，不进入公开仓库；没有该文件时公开源码仍可完成构建和测试。
 
-## 托管
-
-`.openai/hosting.json` 绑定 OpenAI Sites 项目。站点不使用数据库、对象存储、身份验证或运行时密钥。
+0.11.8 安装包尚未代码签名，官网必须持续显示 SmartScreen/“未知发布者”提示与 SHA-256。

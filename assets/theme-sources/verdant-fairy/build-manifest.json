@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "verdant-fairy",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月24日 17_57_31 (7).png",
+    "mime_type": "image/png",
+    "sha256": "6d89debe262a0df5c23052f71f9474a39e4c6bd42fe9e29e768f249ef9013089",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2665814
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/verdant-fairy.webp",
+    "mime_type": "image/webp",
+    "sha256": "705a52123dbc5b54f7b1d5fe82958bbedb8f6d26fda09c6cc16fc9bfad8782e5",
+    "width": 1672,
+    "height": 941,
+    "bytes": 336844,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/verdant-fairy.webp",
+    "mime_type": "image/webp",
+    "sha256": "f81f66d2254217dc67d6266e11d09ca613e616b9764f12bf904055fadf9862d2",
+    "width": 720,
+    "height": 405,
+    "bytes": 56002,
+    "quality": 78
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_31 (7).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

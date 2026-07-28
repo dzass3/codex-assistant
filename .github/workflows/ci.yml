@@ -7,8 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  check:
-    runs-on: macos-latest
+  windows-app:
+    name: Windows application gate
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -31,23 +32,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: TypeScript type check
-        run: npx tsc --noEmit
+      - name: Run complete source gate
+        run: npm run check
 
-      - name: JS/TS lint
-        run: npx oxlint
+  website:
+    name: Public website gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v5
 
-      - name: JS/TS format check
-        run: npx oxfmt --check
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
 
-      - name: Frontend tests
-        run: npx vitest run
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Rust format check
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: Verify release manifest
+        run: npm run release:verify
 
-      - name: Rust lint
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-
-      - name: Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Test production website build
+        run: npm test

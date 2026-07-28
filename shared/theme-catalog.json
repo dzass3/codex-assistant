@@ -4,40 +4,413 @@
     {
       "schema_version": 1,
       "minimum_engine_version": 1,
-      "id": "aurora-grid",
-      "name": "Aurora Grid",
-      "description": "Project-owned abstract aurora with restrained glass surfaces.",
-      "category": "abstract",
-      "preview_path": "/themes/aurora-grid.webp",
+      "id": "wisteria-bride",
+      "name": "紫藤花嫁",
+      "description": "紫藤花境与柔和玻璃材质构成的明亮人物主题。",
+      "category": "original-character",
+      "preview_path": "/themes/wisteria-bride.webp",
       "backdrop": {
         "kind": "image",
-        "asset_id": "aurora-grid-preview",
-        "overlay": "#07111f",
+        "asset_id": "wisteria-bride",
+        "overlay": "#4b315d",
+        "focal_x": 73,
+        "focal_y": 50
+      },
+      "palette": {
+        "surface": "#f4eaf6",
+        "surface_strong": "#fff8ff",
+        "text": "#38243f",
+        "accent": "#a966c2",
+        "border": "#d8a9e3"
+      },
+      "effects": {
+        "surface_opacity": 76,
+        "blur_px": 24,
+        "contrast_percent": 96,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "wisteria-bride",
+          "mime_type": "image/webp",
+          "sha256": "414d4a1c23e5b4f1017ccdc0ac5c20ae81f7c39da55f23e2c00d7d83edc1f341"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (3).png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "mint-gentleman",
+      "name": "薄荷礼服",
+      "description": "薄荷绿礼服与晨光花廊组成的清透主题。",
+      "category": "original-character",
+      "preview_path": "/themes/mint-gentleman.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "mint-gentleman",
+        "overlay": "#31584f",
+        "focal_x": 78,
+        "focal_y": 48
+      },
+      "palette": {
+        "surface": "#eaf3ee",
+        "surface_strong": "#f8fcfa",
+        "text": "#243b35",
+        "accent": "#5e9d88",
+        "border": "#9fc8b9"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 22,
+        "contrast_percent": 95,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "mint-gentleman",
+          "mime_type": "image/webp",
+          "sha256": "3400a4ac25957aae1bc11958adf25c11501a560eea6d6d053d7b7882d3685d7f"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (4).png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "iris-gentleman",
+      "name": "鸢尾绅士",
+      "description": "冷紫鸢尾与静谧庭院构成的优雅浅色主题。",
+      "category": "original-character",
+      "preview_path": "/themes/iris-gentleman.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "iris-gentleman",
+        "overlay": "#3d406c",
+        "focal_x": 73,
+        "focal_y": 49
+      },
+      "palette": {
+        "surface": "#e9eaf6",
+        "surface_strong": "#f8f8ff",
+        "text": "#292b47",
+        "accent": "#7776b8",
+        "border": "#aaa9d8"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 24,
+        "contrast_percent": 97,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "iris-gentleman",
+          "mime_type": "image/webp",
+          "sha256": "411886546ecd2ac3b7cd9b52e7a2bd18c1ddb67b678f5c5e6304eebcccc180e0"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (9).png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "crimson-palace",
+      "name": "赤月华庭",
+      "description": "赤月、灯火与华庭夜色交织的深红主题。",
+      "category": "original-character",
+      "preview_path": "/themes/crimson-palace.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "crimson-palace",
+        "overlay": "#3b0d16",
+        "focal_x": 72,
+        "focal_y": 52
+      },
+      "palette": {
+        "surface": "#2b1218",
+        "surface_strong": "#3b171f",
+        "text": "#fff5f3",
+        "accent": "#d45d67",
+        "border": "#9f4550"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 20,
+        "contrast_percent": 108,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "crimson-palace",
+          "mime_type": "image/webp",
+          "sha256": "75c364aa2de5fe6528c1052d0665e6438634e15d164e80a404491a139eedd9dd"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_29 (2).png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "verdant-fairy",
+      "name": "森灵花语",
+      "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
+      "category": "original-character",
+      "preview_path": "/themes/verdant-fairy.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "verdant-fairy",
+        "overlay": "#244d32",
+        "focal_x": 72,
+        "focal_y": 53
+      },
+      "palette": {
+        "surface": "#e8f1e8",
+        "surface_strong": "#f7fcf7",
+        "text": "#23382a",
+        "accent": "#669d64",
+        "border": "#9bc49b"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 22,
+        "contrast_percent": 98,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "verdant-fairy",
+          "mime_type": "image/webp",
+          "sha256": "705a52123dbc5b54f7b1d5fe82958bbedb8f6d26fda09c6cc16fc9bfad8782e5"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_31 (7).png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "desert-prince",
+      "name": "金沙王庭",
+      "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
+      "category": "original-character",
+      "preview_path": "/themes/desert-prince.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "desert-prince",
+        "overlay": "#5b371c",
+        "focal_x": 77,
+        "focal_y": 51
+      },
+      "palette": {
+        "surface": "#f2e7d5",
+        "surface_strong": "#fff9ee",
+        "text": "#3f2e20",
+        "accent": "#b57a39",
+        "border": "#d3a66b"
+      },
+      "effects": {
+        "surface_opacity": 80,
+        "blur_px": 20,
+        "contrast_percent": 98,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "desert-prince",
+          "mime_type": "image/webp",
+          "sha256": "d55bdf33d53cf95afbee1d75a40e9c667e341a33f73f3cecbdba82b34fb7236f"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 17_57_31 (9).png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "oasis-prince",
+      "name": "绿洲暮光",
+      "description": "绿洲水岸与暮光金辉构成的蓝金主题。",
+      "category": "original-character",
+      "preview_path": "/themes/oasis-prince.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "oasis-prince",
+        "overlay": "#17484a",
+        "focal_x": 66,
+        "focal_y": 54
+      },
+      "palette": {
+        "surface": "#dfeceb",
+        "surface_strong": "#f5fbfa",
+        "text": "#203738",
+        "accent": "#2f8b88",
+        "border": "#65aaa5"
+      },
+      "effects": {
+        "surface_opacity": 80,
+        "blur_px": 22,
+        "contrast_percent": 100,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "oasis-prince",
+          "mime_type": "image/webp",
+          "sha256": "a882dab5e07fca4da80c45d31d7cd3363b857ce64a0be2daa7833dd6c84221bc"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 18_24_59.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "sakura-moon",
+      "name": "樱月夜宴",
+      "description": "樱花、满月与紫粉夜色构成的梦幻主题。",
+      "category": "original-character",
+      "preview_path": "/themes/sakura-moon.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "sakura-moon",
+        "overlay": "#3f2458",
+        "focal_x": 72,
+        "focal_y": 53
+      },
+      "palette": {
+        "surface": "#eadff0",
+        "surface_strong": "#fbf5ff",
+        "text": "#352640",
+        "accent": "#b468ba",
+        "border": "#ce91d2"
+      },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 24,
+        "contrast_percent": 99,
+        "motion": false
+      },
+      "assets": [
+        {
+          "id": "sakura-moon",
+          "mime_type": "image/webp",
+          "sha256": "75c4cb3e64d837b8a7308926256745b86e3a18138e24503093e2210b1736bece"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 18_33_41.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "seaside-blue",
+      "name": "海风晴夏",
+      "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
+      "category": "original-character",
+      "preview_path": "/themes/seaside-blue.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "seaside-blue",
+        "overlay": "#246a9b",
         "focal_x": 50,
         "focal_y": 48
       },
       "palette": {
-        "surface": "#101827",
-        "surface_strong": "#111b2d",
-        "text": "#eef7ff",
-        "accent": "#64e7ff",
-        "border": "#6fdcf0"
+        "surface": "#e2f1fa",
+        "surface_strong": "#f5fbff",
+        "text": "#20394b",
+        "accent": "#3f9bd3",
+        "border": "#83bfdf"
       },
-      "effects": { "surface_opacity": 78, "blur_px": 22, "contrast_percent": 108, "motion": true },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 22,
+        "contrast_percent": 96,
+        "motion": false
+      },
       "assets": [
         {
-          "id": "aurora-grid-preview",
+          "id": "seaside-blue",
           "mime_type": "image/webp",
-          "sha256": "d3834b3f7b603dc65dc6920d891ef8e323a5c8077ed2eaa71085efeb1680478a"
+          "sha256": "232109f8ef11eadb02c3a9406eee5be581212717a645c24fe8d5268899f6c8d0"
         }
       ],
       "rights": {
-        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
+        "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -45,40 +418,45 @@
     {
       "schema_version": 1,
       "minimum_engine_version": 1,
-      "id": "observatory-muse",
-      "name": "Observatory Muse",
-      "description": "Original fictional technologist in a quiet violet observatory.",
+      "id": "autumn-wuxia",
+      "name": "云岭秋侠",
+      "description": "云岭、古城与秋叶构成的沉静武侠主题。",
       "category": "original-character",
-      "preview_path": "/themes/original-observatory-muse.jpg",
+      "preview_path": "/themes/autumn-wuxia.webp",
       "backdrop": {
         "kind": "image",
-        "asset_id": "original-observatory-muse",
-        "overlay": "#071326",
+        "asset_id": "autumn-wuxia",
+        "overlay": "#283246",
         "focal_x": 50,
-        "focal_y": 50
+        "focal_y": 61
       },
       "palette": {
-        "surface": "#0c1730",
-        "surface_strong": "#101a35",
-        "text": "#f4f2ff",
-        "accent": "#a990ff",
-        "border": "#7f8cff"
+        "surface": "#e7e4df",
+        "surface_strong": "#f8f6f2",
+        "text": "#2e3038",
+        "accent": "#a45f3d",
+        "border": "#b58a72"
       },
-      "effects": { "surface_opacity": 76, "blur_px": 24, "contrast_percent": 105, "motion": false },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 20,
+        "contrast_percent": 103,
+        "motion": false
+      },
       "assets": [
         {
-          "id": "original-observatory-muse",
-          "mime_type": "image/jpeg",
-          "sha256": "a486add3d4c8efb5c8f9b28c453291c0ed2192d415565f0bec1dc6f9bdc78c3a"
+          "id": "autumn-wuxia",
+          "mime_type": "image/webp",
+          "sha256": "fef7a907dbcdea953fd3cbe337b017abedbe2acf0a3667fc47a20ecbdde3c681"
         }
       ],
       "rights": {
-        "source": "Original fictional character generated for Codex Assistant on 2026-07-18",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
+        "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_10.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -86,40 +464,45 @@
     {
       "schema_version": 1,
       "minimum_engine_version": 1,
-      "id": "gothic-horizon",
-      "name": "Gothic Horizon",
-      "description": "A fictional graphite horizon framed by monumental teal-lit forms.",
-      "category": "project-showcase",
-      "preview_path": "/themes/gothic-horizon.webp",
+      "id": "meteor-evening",
+      "name": "流星晚霞",
+      "description": "流星划过橙蓝晚霞与湿润街巷的暮色主题。",
+      "category": "original-character",
+      "preview_path": "/themes/meteor-evening.webp",
       "backdrop": {
         "kind": "image",
-        "asset_id": "gothic-horizon",
-        "overlay": "#071015",
+        "asset_id": "meteor-evening",
+        "overlay": "#262d50",
         "focal_x": 50,
-        "focal_y": 50
+        "focal_y": 58
       },
       "palette": {
-        "surface": "#0b1118",
-        "surface_strong": "#101923",
-        "text": "#eafcff",
-        "accent": "#67e8f9",
-        "border": "#155e75"
+        "surface": "#e8e0dc",
+        "surface_strong": "#faf5f1",
+        "text": "#302d37",
+        "accent": "#d5764f",
+        "border": "#bd8a7b"
       },
-      "effects": { "surface_opacity": 82, "blur_px": 20, "contrast_percent": 110, "motion": false },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 22,
+        "contrast_percent": 104,
+        "motion": false
+      },
       "assets": [
         {
-          "id": "gothic-horizon",
+          "id": "meteor-evening",
           "mime_type": "image/webp",
-          "sha256": "bb7e0774e4bc9ac1affe7736030f6b0e7be8a9c877eca221e0682da32098abed"
+          "sha256": "d5c8ca4e5c1c6b176ee7a6ec75ac19b9686a73bb9e7849c1d6a1eb150c4e0630"
         }
       ],
       "rights": {
-        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
+        "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_19.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -127,40 +510,45 @@
     {
       "schema_version": 1,
       "minimum_engine_version": 1,
-      "id": "roseglass-atelier",
-      "name": "Roseglass Atelier",
-      "description": "Layered rose glass and quiet champagne light for a bright workspace.",
-      "category": "abstract",
-      "preview_path": "/themes/roseglass-atelier.webp",
+      "id": "violet-blade",
+      "name": "紫夜剑影",
+      "description": "紫色刀光、月夜与暗影构成的高对比主题。",
+      "category": "original-character",
+      "preview_path": "/themes/violet-blade.webp",
       "backdrop": {
         "kind": "image",
-        "asset_id": "roseglass-atelier",
-        "overlay": "#5b2635",
+        "asset_id": "violet-blade",
+        "overlay": "#160d35",
         "focal_x": 50,
-        "focal_y": 50
+        "focal_y": 55
       },
       "palette": {
-        "surface": "#4a2330",
-        "surface_strong": "#5d2b3a",
-        "text": "#fff8f6",
-        "accent": "#ffb4c3",
-        "border": "#f29aac"
+        "surface": "#211b36",
+        "surface_strong": "#2c2347",
+        "text": "#f8f3ff",
+        "accent": "#9b6df0",
+        "border": "#7054a8"
       },
-      "effects": { "surface_opacity": 72, "blur_px": 28, "contrast_percent": 98, "motion": false },
+      "effects": {
+        "surface_opacity": 84,
+        "blur_px": 20,
+        "contrast_percent": 112,
+        "motion": false
+      },
       "assets": [
         {
-          "id": "roseglass-atelier",
+          "id": "violet-blade",
           "mime_type": "image/webp",
-          "sha256": "caf553b9a731734ac5306970a387f5dfb86bbb580024aaad6cfe734285bac04f"
+          "sha256": "465cd70184d786305a2248658ce28e29605fee9c8dc45a84abc91614099f746c"
         }
       ],
       "rights": {
-        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
+        "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_48.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -168,40 +556,45 @@
     {
       "schema_version": 1,
       "minimum_engine_version": 1,
-      "id": "blush-circuit",
-      "name": "Blush Circuit",
-      "description": "Fine coral signal paths around a calm plum workspace.",
-      "category": "abstract",
-      "preview_path": "/themes/blush-circuit.webp",
+      "id": "fuji-autumn",
+      "name": "富士秋光",
+      "description": "富士远景、秋叶与金色落日构成的温暖主题。",
+      "category": "original-character",
+      "preview_path": "/themes/fuji-autumn.webp",
       "backdrop": {
         "kind": "image",
-        "asset_id": "blush-circuit",
-        "overlay": "#2b0d24",
+        "asset_id": "fuji-autumn",
+        "overlay": "#57351f",
         "focal_x": 50,
-        "focal_y": 50
+        "focal_y": 62
       },
       "palette": {
-        "surface": "#2d1328",
-        "surface_strong": "#3a1731",
-        "text": "#fff1f5",
-        "accent": "#fb7185",
-        "border": "#f472b6"
+        "surface": "#eee4d8",
+        "surface_strong": "#fff9f2",
+        "text": "#3b3028",
+        "accent": "#c4773f",
+        "border": "#d0a17d"
       },
-      "effects": { "surface_opacity": 80, "blur_px": 20, "contrast_percent": 104, "motion": true },
+      "effects": {
+        "surface_opacity": 80,
+        "blur_px": 22,
+        "contrast_percent": 100,
+        "motion": false
+      },
       "assets": [
         {
-          "id": "blush-circuit",
+          "id": "fuji-autumn",
           "mime_type": "image/webp",
-          "sha256": "c1ac0d757d4b7f0918f2d444ef6fc82f06f966e27306655ac42b0610acf9c145"
+          "sha256": "82bfd5ec2337589bd818a400a1611888098ec60a9ca85ef1895c51d5cbe330c2"
         }
       ],
       "rights": {
-        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
+        "source": "User-approved source: ChatGPT Image 2026年7月26日 13_38_21.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -209,286 +602,45 @@
     {
       "schema_version": 1,
       "minimum_engine_version": 1,
-      "id": "fortune-foundry",
-      "name": "Fortune Foundry",
-      "description": "Warm geometric metals and amber rings in a restrained fictional foundry.",
-      "category": "project-showcase",
-      "preview_path": "/themes/fortune-foundry.webp",
+      "id": "spring-street",
+      "name": "春日花街",
+      "description": "春日花街、白裙与柔和日光构成的清新主题。",
+      "category": "original-character",
+      "preview_path": "/themes/spring-street.webp",
       "backdrop": {
         "kind": "image",
-        "asset_id": "fortune-foundry",
-        "overlay": "#221408",
-        "focal_x": 50,
-        "focal_y": 50
+        "asset_id": "spring-street",
+        "overlay": "#755454",
+        "focal_x": 58,
+        "focal_y": 55
       },
       "palette": {
-        "surface": "#25170c",
-        "surface_strong": "#33200f",
-        "text": "#fff7df",
-        "accent": "#fbbf24",
-        "border": "#d97706"
+        "surface": "#f3e9e7",
+        "surface_strong": "#fffafa",
+        "text": "#3d2f31",
+        "accent": "#c67f8e",
+        "border": "#ddaab3"
       },
-      "effects": { "surface_opacity": 82, "blur_px": 18, "contrast_percent": 108, "motion": false },
+      "effects": {
+        "surface_opacity": 78,
+        "blur_px": 24,
+        "contrast_percent": 96,
+        "motion": false
+      },
       "assets": [
         {
-          "id": "fortune-foundry",
+          "id": "spring-street",
           "mime_type": "image/webp",
-          "sha256": "aafb0a7c97c7fda90e4df00a6d937233f4af34f38481583005ba85871b5de633"
+          "sha256": "39c6d27c7fffeb97a7b4c57cacaa5178f61de73b3474a8d4f6c8c313b96b5856"
         }
       ],
       "rights": {
-        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
+        "source": "User-approved source: ChatGPT Image 2026年7月26日 14_00_18.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "crimson-relay",
-      "name": "Crimson Relay",
-      "description": "Fast crimson light ribbons crossing a precise graphite field.",
-      "category": "abstract",
-      "preview_path": "/themes/crimson-relay.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "crimson-relay",
-        "overlay": "#12080a",
-        "focal_x": 50,
-        "focal_y": 50
-      },
-      "palette": {
-        "surface": "#1b0d10",
-        "surface_strong": "#251014",
-        "text": "#fff5f5",
-        "accent": "#ef4444",
-        "border": "#dc2626"
-      },
-      "effects": { "surface_opacity": 84, "blur_px": 16, "contrast_percent": 112, "motion": true },
-      "assets": [
-        {
-          "id": "crimson-relay",
-          "mime_type": "image/webp",
-          "sha256": "d9b3ec779b6aa37495292a488eb2f50fc7a266baadb63ccc34337863cc203907"
-        }
-      ],
-      "rights": {
-        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
-        "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "crystal-daylight",
-      "name": "Crystal Daylight",
-      "description": "Frosted blue prisms and open daylight for a clear, quiet workspace.",
-      "category": "project-showcase",
-      "preview_path": "/themes/crystal-daylight.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "crystal-daylight",
-        "overlay": "#c7e7f2",
-        "focal_x": 50,
-        "focal_y": 50
-      },
-      "palette": {
-        "surface": "#dceff5",
-        "surface_strong": "#eef9fc",
-        "text": "#082f49",
-        "accent": "#0891b2",
-        "border": "#22d3ee"
-      },
-      "effects": { "surface_opacity": 78, "blur_px": 22, "contrast_percent": 94, "motion": false },
-      "assets": [
-        {
-          "id": "crystal-daylight",
-          "mime_type": "image/webp",
-          "sha256": "3ace777021e049fc21189ce0297e14bfea813f9f6bea54a05912a1a4d6b7ff7e"
-        }
-      ],
-      "rights": {
-        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
-        "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "pocket-cosmos",
-      "name": "Pocket Cosmos",
-      "description": "Tiny fictional orbital worlds suspended in deep navy glass.",
-      "category": "project-showcase",
-      "preview_path": "/themes/pocket-cosmos.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "pocket-cosmos",
-        "overlay": "#07152c",
-        "focal_x": 50,
-        "focal_y": 50
-      },
-      "palette": {
-        "surface": "#0b1730",
-        "surface_strong": "#101d3b",
-        "text": "#eef5ff",
-        "accent": "#60a5fa",
-        "border": "#8b5cf6"
-      },
-      "effects": { "surface_opacity": 80, "blur_px": 20, "contrast_percent": 106, "motion": true },
-      "assets": [
-        {
-          "id": "pocket-cosmos",
-          "mime_type": "image/webp",
-          "sha256": "8fb290521e92c186b6837bba0eddbecfd44ce000d8e217170f8f14343aed2da2"
-        }
-      ],
-      "rights": {
-        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
-        "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "violet-afterdark",
-      "name": "Violet Afterdark",
-      "description": "A fictional translucent skyline glowing through quiet indigo night.",
-      "category": "project-showcase",
-      "preview_path": "/themes/violet-afterdark.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "violet-afterdark",
-        "overlay": "#0c0b2d",
-        "focal_x": 50,
-        "focal_y": 50
-      },
-      "palette": {
-        "surface": "#171238",
-        "surface_strong": "#21184b",
-        "text": "#f5f3ff",
-        "accent": "#a78bfa",
-        "border": "#7c3aed"
-      },
-      "effects": { "surface_opacity": 80, "blur_px": 24, "contrast_percent": 106, "motion": false },
-      "assets": [
-        {
-          "id": "violet-afterdark",
-          "mime_type": "image/webp",
-          "sha256": "26e1eeaf51f8f434f94c3146be82f389d02465bf81eef5de9f1a430ea704249b"
-        }
-      ],
-      "rights": {
-        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
-        "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "cyan-chorus",
-      "name": "Cyan Chorus",
-      "description": "Synchronized cyan light waves around a calm teal center.",
-      "category": "abstract",
-      "preview_path": "/themes/cyan-chorus.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "cyan-chorus",
-        "overlay": "#063445",
-        "focal_x": 50,
-        "focal_y": 50
-      },
-      "palette": {
-        "surface": "#073849",
-        "surface_strong": "#0a465a",
-        "text": "#ecfeff",
-        "accent": "#22d3ee",
-        "border": "#06b6d4"
-      },
-      "effects": { "surface_opacity": 76, "blur_px": 22, "contrast_percent": 104, "motion": true },
-      "assets": [
-        {
-          "id": "cyan-chorus",
-          "mime_type": "image/webp",
-          "sha256": "93606da13e104310e3258acc5d9605d51bfe495d3c7678e420c21f43e7ebde1f"
-        }
-      ],
-      "rights": {
-        "source": "Original abstract artwork generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
-        "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "noir-stage",
-      "name": "Noir Stage",
-      "description": "Minimal black drapery and warm spotlights framing a quiet center.",
-      "category": "project-showcase",
-      "preview_path": "/themes/noir-stage.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "noir-stage",
-        "overlay": "#080808",
-        "focal_x": 50,
-        "focal_y": 50
-      },
-      "palette": {
-        "surface": "#111111",
-        "surface_strong": "#191919",
-        "text": "#fffaf0",
-        "accent": "#e5c07b",
-        "border": "#8f6f3e"
-      },
-      "effects": { "surface_opacity": 86, "blur_px": 18, "contrast_percent": 112, "motion": false },
-      "assets": [
-        {
-          "id": "noir-stage",
-          "mime_type": "image/webp",
-          "sha256": "7b5b554993b17fd33439bc00145d40915845ae3ac96d8ee42efed1586f8d4f9b"
-        }
-      ],
-      "rights": {
-        "source": "Original fictional environment generated for Codex Assistant on 2026-07-19",
-        "rightsholder": "Codex Assistant project",
-        "license": "Project-owned distribution asset",
-        "commercial_redistribution": true,
-        "attribution": "Original artwork created for Codex Assistant",
-        "reviewed_at": "2026-07-19",
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-27",
         "manual_signoff": true,
         "status": "verified"
       }

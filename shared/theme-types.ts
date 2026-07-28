@@ -1,5 +1,3 @@
-import type { RoutingOperationReceipt } from "./routing-types";
-
 export type ThemeSessionStatus = "inactive" | "paused" | "ready" | "degraded";
 export type ThemeCategory = "abstract" | "original-character" | "project-showcase" | "local-import";
 export type ThemeRightsStatus = "verified" | "local-only" | "rejected";
@@ -72,7 +70,91 @@ export interface ThemeUiSnapshot {
   session_status: ThemeSessionStatus;
   selected_theme_id: string | null;
   applied_theme_id: string | null;
+  catalog_notice?: string | null;
   packs: ThemePack[];
 }
 
-export type ThemeOperationReceipt = RoutingOperationReceipt;
+export type ThemeEnvironmentStatus =
+  | "ready"
+  | "codex-not-running"
+  | "restart-required"
+  | "unsupported";
+export type ThemeNextAction =
+  | "apply-now"
+  | "launch-codex-for-theme"
+  | "confirm-restart"
+  | "install-codex"
+  | "close-extra-windows"
+  | "update-assistant"
+  | "use-supported-windows"
+  | "none";
+export type ThemeEnvironmentCheckCode =
+  | "supported-windows"
+  | "supported-architecture"
+  | "official-store-codex"
+  | "compatible-adapter"
+  | "single-codex-window"
+  | "verified-theme-session"
+  | "saved-theme";
+export type ThemeEnvironmentCheckState = "pass" | "action" | "fail";
+
+export interface ThemeEnvironmentCheck {
+  code: ThemeEnvironmentCheckCode;
+  state: ThemeEnvironmentCheckState;
+}
+
+export interface ThemeEnvironmentReport {
+  contract_version: 2;
+  status: ThemeEnvironmentStatus;
+  checks: ThemeEnvironmentCheck[];
+  os_build: number | null;
+  architecture: "x64" | "arm64" | "unsupported";
+  codex_version: string | null;
+  verified_process_count: number;
+  session_reachable: boolean;
+  selected_theme_id: string | null;
+  next_action: ThemeNextAction;
+  can_apply_now: boolean;
+}
+
+export interface ThemeImportReceipt {
+  theme_id: string;
+}
+
+export type ThemeOperationStatus = "applied" | "noop" | "blocked" | "failed";
+export type ThemeRestartMode = "safe" | "force-after-grace";
+export type ThemeRestartIntent = "theme-session" | "activate-theme";
+export type ThemeReasonCode =
+  | "active-work"
+  | "monitor-uncertain"
+  | "unsupported-host"
+  | "cdp-unavailable"
+  | "theme-state-unavailable"
+  | "confirmation-required"
+  | "confirmation-expired"
+  | "impact-changed"
+  | "operation-conflict"
+  | "identity-changed"
+  | "termination-failed"
+  | "old-tree-still-running"
+  | "cdp-verification-failed"
+  | "dom-incompatible"
+  | "multiple-windows"
+  | "partial-apply-failed"
+  | "terminal-partial-failure";
+
+export interface ForceRestartImpact {
+  confirmation_ticket: string;
+  intent: ThemeRestartIntent;
+  active_work_count: number;
+  monitor_confident: boolean;
+  grace_period_ms: 5000;
+  expires_at_ms: number;
+}
+
+export interface ThemeOperationReceipt {
+  operation_id: string;
+  status: ThemeOperationStatus;
+  reason_codes: ThemeReasonCode[];
+  restart_required: boolean;
+}

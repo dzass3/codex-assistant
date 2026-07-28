@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "iris-gentleman",
+  "name": "鸢尾绅士",
+  "description": "冷紫鸢尾与静谧庭院构成的优雅浅色主题。",
+  "category": "original-character",
+  "preview_path": "/themes/iris-gentleman.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "iris-gentleman",
+    "overlay": "#3d406c",
+    "focal_x": 73,
+    "focal_y": 49
+  },
+  "palette": {
+    "surface": "#e9eaf6",
+    "surface_strong": "#f8f8ff",
+    "text": "#292b47",
+    "accent": "#7776b8",
+    "border": "#aaa9d8"
+  },
+  "effects": {
+    "surface_opacity": 78,
+    "blur_px": 24,
+    "contrast_percent": 97,
+    "motion": false
+  },
+  "assets": [
+    {
+      "id": "iris-gentleman",
+      "mime_type": "image/webp",
+      "sha256": "411886546ecd2ac3b7cd9b52e7a2bd18c1ddb67b678f5c5e6304eebcccc180e0"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (9).png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

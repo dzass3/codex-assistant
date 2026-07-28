@@ -139,20 +139,6 @@ export function HomepageMotion() {
       });
     }
 
-    const orbit = document.querySelector<HTMLElement>(".hero-orbit");
-    document.querySelectorAll<HTMLElement>(".model-node[data-model]").forEach((node) => {
-      const onPointerEnter = () => {
-        orbit?.setAttribute("data-active-model", node.dataset.model ?? "");
-      };
-      const onPointerLeave = () => orbit?.setAttribute("data-active-model", "");
-      node.addEventListener("pointerenter", onPointerEnter);
-      node.addEventListener("pointerleave", onPointerLeave);
-      cleanups.push(() => {
-        node.removeEventListener("pointerenter", onPointerEnter);
-        node.removeEventListener("pointerleave", onPointerLeave);
-      });
-    });
-
     const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(".site-header nav a"));
     const observedSections = navLinks
       .map((link) => document.querySelector<HTMLElement>(link.hash))

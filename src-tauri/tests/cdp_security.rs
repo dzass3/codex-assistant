@@ -1,7 +1,7 @@
 use codex_assistant_lib::control_layer::cdp::{
     browser_endpoint, create_owned_session_record, fetch_browser_endpoint, fetch_page_targets,
     validate_session_record, BrowserAnchor, CdpDiscoveryError, CdpSecurityError,
-    OwnedSessionRecord, OwnedSessionStore, SessionStoreError, TargetDescriptor, TargetRegistry,
+    OwnedSessionRecord, OwnedSessionStore, SessionStoreError, TargetDescriptor,
 };
 use tempfile::tempdir;
 use tokio::{
@@ -214,36 +214,6 @@ async fn target_discovery_projects_only_verified_page_identity_from_the_fixed_li
     assert!(!format!("{targets:?}").contains("PRIVATE PAGE TITLE"));
     assert!(!format!("{targets:?}").contains("private-task"));
     server.await.unwrap();
-}
-
-#[test]
-fn target_registry_reconciles_attach_detach_and_rejects_duplicate_snapshots() {
-    let endpoint = browser_endpoint(
-        49_321,
-        &format!(
-            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:49321/devtools/browser/{BROWSER_ID}"}}"#
-        ),
-    )
-    .unwrap();
-    let page = TargetDescriptor {
-        target_id: "page-1".into(),
-        target_type: "page".into(),
-        websocket_url: "ws://127.0.0.1:49321/devtools/page/page-1".into(),
-    };
-    let mut registry = TargetRegistry::new(&endpoint);
-    let attached = registry.reconcile(&endpoint, vec![page.clone()]).unwrap();
-    assert_eq!(attached.attach.len(), 1);
-    assert!(attached.detach.is_empty());
-    let unchanged = registry.reconcile(&endpoint, vec![page.clone()]).unwrap();
-    assert!(unchanged.attach.is_empty());
-    assert!(unchanged.detach.is_empty());
-    let detached = registry.reconcile(&endpoint, Vec::new()).unwrap();
-    assert_eq!(detached.detach, ["page-1"]);
-
-    assert_eq!(
-        registry.reconcile(&endpoint, vec![page.clone(), page]),
-        Err(CdpSecurityError::DuplicateTargetIdentity)
-    );
 }
 
 #[test]

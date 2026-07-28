@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use super::model::{
-    AgentObservation, AgentStatus, ModelSource, MonitorSnapshot, ReconcileInput, SpawnFact,
-    SummaryCounts, ThreadFact,
+    AgentObservation, AgentStatus, HealthLevel, ModelSource, MonitorSnapshot, ObserverStatus,
+    ReconcileInput, SpawnFact, SummaryCounts, ThreadFact,
 };
 
 pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
@@ -30,6 +30,8 @@ pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
                 thread,
                 spawns.get(thread.thread_id.as_str()).copied(),
                 &parents,
+                input.codex_running,
+                input.session_started_at_ms,
                 now_ms,
             )
         })
@@ -43,8 +45,24 @@ pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
     });
 
     let counts = count_agents(&agents);
+    let observer_status = if input.health.state_database.level == HealthLevel::Error
+        || input.health.rollout_observer.level == HealthLevel::Error
+    {
+        ObserverStatus::Error
+    } else if counts.uncertain > 0 || counts.tracking_errors > 0 {
+        ObserverStatus::Uncertain
+    } else if input.health.state_database.level == HealthLevel::Degraded
+        || input.health.rollout_observer.level == HealthLevel::Degraded
+    {
+        ObserverStatus::Delayed
+    } else {
+        ObserverStatus::Live
+    };
     MonitorSnapshot {
         generated_at_ms: now_ms,
+        codex_running: input.codex_running,
+        session_started_at_ms: input.session_started_at_ms,
+        observer_status,
         agents,
         counts,
         health: input.health,
@@ -55,6 +73,8 @@ fn observe_thread(
     thread: &ThreadFact,
     spawn: Option<&SpawnFact>,
     parents: &HashMap<&str, Option<&str>>,
+    codex_running: bool,
+    session_started_at_ms: Option<i64>,
     now_ms: i64,
 ) -> AgentObservation {
     let requested_model = spawn.and_then(|fact| fact.requested_model.clone());
@@ -73,7 +93,7 @@ fn observe_thread(
         .or_else(|| thread.database_effort.clone())
         .or_else(|| spawn.and_then(|fact| fact.requested_effort.clone()));
     let is_subagent = thread.parent_thread_id.is_some();
-    let status = infer_status(thread, is_subagent);
+    let lifecycle_status = infer_status(thread, is_subagent);
     let updated_at_ms = [
         thread.updated_at_ms,
         thread.latest_task_started_ms,
@@ -84,7 +104,26 @@ fn observe_thread(
     .into_iter()
     .flatten()
     .max();
-    let freshness_ms = updated_at_ms.map(|updated| now_ms.saturating_sub(updated).max(0));
+    let freshness_ms = updated_at_ms.and_then(|updated| {
+        (updated >= 0 && updated <= now_ms.saturating_add(5 * 60 * 1_000))
+            .then(|| now_ms.saturating_sub(updated).max(0))
+    });
+    let current_session_evidence = session_started_at_ms
+        .zip(updated_at_ms)
+        .is_some_and(|(session_start, updated)| updated >= session_start);
+    let status = match lifecycle_status {
+        AgentStatus::Starting | AgentStatus::Running if !codex_running => {
+            AgentStatus::HistoricalUnclosed
+        }
+        AgentStatus::Starting | AgentStatus::Running if current_session_evidence => {
+            lifecycle_status
+        }
+        AgentStatus::Starting | AgentStatus::Running if session_started_at_ms.is_some() => {
+            AgentStatus::HistoricalUnclosed
+        }
+        AgentStatus::Starting | AgentStatus::Running => AgentStatus::Uncertain,
+        other => other,
+    };
     let model_drift = requested_model
         .as_deref()
         .zip(effective_model.as_deref())
@@ -93,8 +132,7 @@ fn observe_thread(
     AgentObservation {
         thread_id: thread.thread_id.clone(),
         parent_thread_id: thread.parent_thread_id.clone(),
-        agent_path: thread.agent_path.clone(),
-        display_name: display_name(thread, spawn),
+        display_name: display_name(thread),
         role: thread.role.clone(),
         project: thread.project.clone(),
         originator: thread.originator.clone(),
@@ -140,20 +178,38 @@ fn infer_status(thread: &ThreadFact, is_subagent: bool) -> AgentStatus {
     AgentStatus::Idle
 }
 
-fn display_name(thread: &ThreadFact, spawn: Option<&SpawnFact>) -> String {
-    thread
-        .nickname
-        .clone()
-        .or_else(|| thread.title.clone())
-        .or_else(|| spawn.and_then(|fact| fact.task_name.clone()))
-        .or_else(|| {
-            thread
-                .agent_path
-                .as_deref()
-                .and_then(|path| path.rsplit('/').find(|part| !part.is_empty()))
-                .map(str::to_owned)
-        })
-        .unwrap_or_else(|| thread.thread_id.chars().take(8).collect())
+fn display_name(thread: &ThreadFact) -> String {
+    let opaque = thread
+        .thread_id
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .take(8)
+        .collect::<String>();
+    let opaque = if opaque.is_empty() {
+        "unknown"
+    } else {
+        &opaque
+    };
+    if thread.parent_thread_id.is_none() {
+        return bounded_label(thread.project.as_deref()).map_or_else(
+            || format!("根任务 {opaque}"),
+            |project| format!("{project} · {opaque}"),
+        );
+    }
+    bounded_label(thread.nickname.as_deref())
+        .or_else(|| bounded_label(thread.role.as_deref()))
+        .map_or_else(
+            || format!("子代理 {opaque}"),
+            |label| format!("{label} · {opaque}"),
+        )
+}
+
+fn bounded_label(value: Option<&str>) -> Option<String> {
+    let value = value?.trim();
+    if value.is_empty() || value.chars().any(char::is_control) {
+        return None;
+    }
+    Some(value.chars().take(48).collect())
 }
 
 fn depth_for(thread_id: &str, parents: &HashMap<&str, Option<&str>>) -> u32 {
@@ -181,6 +237,8 @@ fn count_agents(agents: &[AgentObservation]) -> SummaryCounts {
         match agent.status {
             AgentStatus::Starting => counts.starting += 1,
             AgentStatus::Running => counts.running += 1,
+            AgentStatus::Uncertain => counts.uncertain += 1,
+            AgentStatus::HistoricalUnclosed => counts.historical_unclosed += 1,
             AgentStatus::Idle => counts.idle += 1,
             AgentStatus::Interrupted => counts.interrupted += 1,
             AgentStatus::TrackingError => counts.tracking_errors += 1,
@@ -217,7 +275,6 @@ mod tests {
             ThreadFact {
                 thread_id: "child".into(),
                 parent_thread_id: Some("root".into()),
-                agent_path: Some("/root/worker".into()),
                 nickname: Some("Locke".into()),
                 database_model: Some("gpt-5.6-sol".into()),
                 rollout_model: Some("gpt-5.6-terra".into()),
@@ -239,10 +296,11 @@ mod tests {
                     child_thread_id: "child".into(),
                     requested_model: Some("gpt-5.6-sol".into()),
                     requested_effort: Some("xhigh".into()),
-                    task_name: Some("worker".into()),
                     occurred_at_ms: Some(900),
                 }],
                 health: health(),
+                codex_running: true,
+                session_started_at_ms: Some(7_000),
             },
             10_000,
         );
@@ -298,6 +356,63 @@ mod tests {
             ..pending
         };
         assert_eq!(infer_status(&broken, true), AgentStatus::TrackingError);
+    }
+
+    #[test]
+    fn session_boundary_prevents_historical_unclosed_work_from_being_live() {
+        let old_unclosed = ThreadFact {
+            thread_id: "old".into(),
+            latest_task_started_ms: Some(1_000),
+            updated_at_ms: Some(1_000),
+            ..ThreadFact::default()
+        };
+        let historical = reconcile(
+            ReconcileInput {
+                threads: vec![old_unclosed.clone()],
+                spawns: vec![],
+                health: health(),
+                codex_running: true,
+                session_started_at_ms: Some(9_000),
+            },
+            10_000,
+        );
+        assert_eq!(historical.agents[0].status, AgentStatus::HistoricalUnclosed);
+        assert_eq!(historical.counts.running, 0);
+        assert_eq!(historical.counts.historical_unclosed, 1);
+
+        let uncertain = reconcile(
+            ReconcileInput {
+                threads: vec![old_unclosed],
+                spawns: vec![],
+                health: health(),
+                codex_running: true,
+                session_started_at_ms: None,
+            },
+            10_000,
+        );
+        assert_eq!(uncertain.agents[0].status, AgentStatus::Uncertain);
+        assert_eq!(uncertain.counts.uncertain, 1);
+    }
+
+    #[test]
+    fn current_session_activity_restores_running_and_future_time_fails_safe() {
+        let snapshot = reconcile(
+            ReconcileInput {
+                threads: vec![ThreadFact {
+                    thread_id: "current".into(),
+                    latest_task_started_ms: Some(9_500),
+                    updated_at_ms: Some(10_000 + 10 * 60 * 1_000),
+                    ..ThreadFact::default()
+                }],
+                spawns: vec![],
+                health: health(),
+                codex_running: true,
+                session_started_at_ms: Some(9_000),
+            },
+            10_000,
+        );
+        assert_eq!(snapshot.agents[0].status, AgentStatus::Running);
+        assert_eq!(snapshot.agents[0].freshness_ms, None);
     }
 
     #[test]

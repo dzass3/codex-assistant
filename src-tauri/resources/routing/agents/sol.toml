@@ -1,5 +1,0 @@
-name = "codex_assistant_sol"
-description = "High-risk, architectural, and escalation native work"
-model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
-developer_instructions = "Use for high-risk, architectural, security-sensitive, destructive, or escalated work as a visible native child. Verify implementation; trigger independent review when quality requires it for high-risk or complex code changes. Do not create detached executors or simulated subagent cards, and never send task content to routing metadata tools."

@@ -1,19 +1,16 @@
 [default]
-description = "Allow the sanitized Codex Assistant command surface"
+description = "Allow the local read-only observer and theme command surface"
 permissions = [
   "allow-get-monitor-snapshot",
   "allow-refresh-monitor",
   "allow-get-monitor-settings",
   "allow-set-codex-home",
-  "allow-get-routing-snapshot",
-  "allow-install-routing",
-  "allow-restore-routing",
   "allow-prepare-force-restart",
   "allow-cancel-force-restart",
-  "allow-request-codex-restart",
-  "allow-begin-routing-preflight",
-  "allow-set-root-routing-enabled",
   "allow-get-theme-snapshot",
+  "allow-get-theme-environment",
+  "allow-get-theme-preview-data-url",
+  "allow-import-local-theme",
   "allow-start-theme-session",
   "allow-activate-theme",
   "allow-restore-theme",
@@ -21,80 +18,65 @@ permissions = [
 
 [[permission]]
 identifier = "allow-get-monitor-snapshot"
-description = "Read the latest sanitized monitor snapshot"
+description = "Read one sanitized metadata-only agent snapshot"
 commands.allow = ["get_monitor_snapshot"]
 
 [[permission]]
 identifier = "allow-refresh-monitor"
-description = "Refresh read-only Codex metadata sources"
+description = "Refresh read-only local agent metadata"
 commands.allow = ["refresh_monitor"]
 
 [[permission]]
 identifier = "allow-get-monitor-settings"
-description = "Read masked monitor settings"
+description = "Read the sanitized local observer source label"
 commands.allow = ["get_monitor_settings"]
 
 [[permission]]
 identifier = "allow-set-codex-home"
-description = "Choose the local Codex metadata directory"
+description = "Select a bounded local Codex metadata source directory"
 commands.allow = ["set_codex_home"]
 
 [[permission]]
-identifier = "allow-get-routing-snapshot"
-description = "Read the sanitized Smart Routing status"
-commands.allow = ["get_routing_snapshot"]
-
-[[permission]]
-identifier = "allow-install-routing"
-description = "Install the owned Smart Routing configuration"
-commands.allow = ["install_routing"]
-
-[[permission]]
-identifier = "allow-restore-routing"
-description = "Restore the owned Smart Routing configuration"
-commands.allow = ["restore_routing"]
-
-[[permission]]
-identifier = "allow-request-codex-restart"
-description = "Request the verified one-time Codex restart"
-commands.allow = ["request_codex_restart"]
+identifier = "allow-get-theme-environment"
+description = "Inspect the local official Codex and themed-launch readiness"
+commands.allow = ["get_theme_environment"]
 
 [[permission]]
 identifier = "allow-prepare-force-restart"
-description = "Prepare one sanitized single-use confirmation for a verified destructive restart"
+description = "Prepare one single-use confirmation for a verified Codex restart"
 commands.allow = ["prepare_force_restart"]
 
 [[permission]]
 identifier = "allow-cancel-force-restart"
-description = "Cancel a confirmed destructive restart during its reversible grace period"
+description = "Cancel a confirmed restart during its reversible grace period"
 commands.allow = ["cancel_force_restart"]
 
 [[permission]]
-identifier = "allow-begin-routing-preflight"
-description = "Begin native capability verification for one visible root task"
-commands.allow = ["begin_routing_preflight"]
-
-[[permission]]
-identifier = "allow-set-root-routing-enabled"
-description = "Enable or disable Smart Routing for one visible root task"
-commands.allow = ["set_root_routing_enabled"]
-
-[[permission]]
 identifier = "allow-get-theme-snapshot"
-description = "Read the rights-audited declarative theme catalog and current theme state"
+description = "Read the rights-audited theme catalog and current theme state"
 commands.allow = ["get_theme_snapshot"]
 
 [[permission]]
+identifier = "allow-get-theme-preview-data-url"
+description = "Read one validated local-only theme preview"
+commands.allow = ["get_theme_preview_data_url"]
+
+[[permission]]
+identifier = "allow-import-local-theme"
+description = "Import one bounded local image as a device-only theme"
+commands.allow = ["import_local_theme"]
+
+[[permission]]
 identifier = "allow-start-theme-session"
-description = "Start one verified Codex theme control session"
+description = "Start one verified Codex theme session"
 commands.allow = ["start_theme_session"]
 
 [[permission]]
 identifier = "allow-activate-theme"
-description = "Establish a verified session if needed and apply one bundled rights-audited theme"
+description = "Apply one bundled or local rights-audited theme"
 commands.allow = ["activate_theme"]
 
 [[permission]]
 identifier = "allow-restore-theme"
-description = "Remove Codex Assistant theme styles and restore the official appearance"
+description = "Remove Codex Assistant styles and restore the official appearance"
 commands.allow = ["restore_theme"]

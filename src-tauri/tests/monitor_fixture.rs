@@ -91,7 +91,7 @@ fn create_state_database(home: &Path, root_rollout: &Path, child_rollout: &Path)
                 root_rollout.to_string_lossy(),
                 "desktop",
                 r"C:\private\sample-project",
-                "Root task",
+                PRIVATE_PROMPT,
                 "gpt-5.6-sol",
                 "xhigh"
             ],
@@ -123,7 +123,7 @@ fn create_state_database(home: &Path, root_rollout: &Path, child_rollout: &Path)
 
 fn write_rollouts(root: &Path, child: &Path) {
     let spawn_arguments = json!({
-        "task_name": "implementation",
+        "task_name": PRIVATE_TOOL_ARGS,
         "model": "gpt-5.6-sol",
         "reasoning_effort": "high",
         "message": PRIVATE_PROMPT,

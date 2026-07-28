@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "autumn-wuxia",
+  "name": "云岭秋侠",
+  "description": "云岭、古城与秋叶构成的沉静武侠主题。",
+  "category": "original-character",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月25日 00_06_10.png",
+    "mime_type": "image/png",
+    "sha256": "d8407bd29d4244e1f2ed597cf63a099e0046653f11dc2c299afaa16927c89074",
+    "width": 1086,
+    "height": 1448,
+    "bytes": 2617764
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/autumn-wuxia.webp",
+    "max_width": 1086,
+    "max_height": 1448,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/autumn-wuxia.webp",
+    "max_width": 405,
+    "max_height": 720,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/autumn-wuxia.webp",
+    "overlay": "#283246",
+    "focal_x": 50,
+    "focal_y": 61,
+    "palette": {
+      "surface": "#e7e4df",
+      "surface_strong": "#f8f6f2",
+      "text": "#2e3038",
+      "accent": "#a45f3d",
+      "border": "#b58a72"
+    },
+    "effects": {
+      "surface_opacity": 82,
+      "blur_px": 20,
+      "contrast_percent": 103,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_10.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-27",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}
