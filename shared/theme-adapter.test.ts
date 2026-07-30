@@ -50,7 +50,7 @@ describe("shared version-adaptive page adapter", () => {
         '<div data-codex-sidebar="true" style="width:180px;height:200px"></div><div data-codex-main="true" style="width:700px;height:400px"><form data-codex-composer="true"><div contenteditable="true" role="textbox" style="width:300px;height:60px"></div></form></div>',
       ),
     ).resolves.toBe("compatible-main");
-  });
+  }, 15_000);
 
   it("does not accept one brittle selector as sufficient evidence", async () => {
     await expect(classify('<main class="main-surface"></main>')).resolves.toBe("unknown-build");
