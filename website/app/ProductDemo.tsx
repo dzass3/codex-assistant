@@ -40,7 +40,7 @@ export function ProductDemo() {
       <section id="panel-catalog" role="tabpanel" hidden={active !== "catalog"}>
         <div className="panel-heading">
           <div><small>RIGHTS-REVIEWED CATALOG</small><h3>选择主题，验证后再应用</h3></div>
-          <span className="verified-pill">14 个内置主题</span>
+          <span className="verified-pill">12 个内置主题</span>
         </div>
         <div className="theme-grid">
           <article className="demo-theme aurora-theme">

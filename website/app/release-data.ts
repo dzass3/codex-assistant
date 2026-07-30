@@ -1,42 +1,42 @@
-export const releaseVersion = "0.11.8";
+export const releaseVersion = "0.11.9";
 export const releaseTagUrl =
-  "https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8";
+  "https://github.com/dzass3/codex-assistant/releases/tag/v0.11.9";
 
 const assetBase =
-  "https://github.com/dzass3/codex-assistant/releases/download/v0.11.8";
+  "https://github.com/dzass3/codex-assistant/releases/download/v0.11.9";
 
 export const releaseAssets = [
   {
     architecture: "x64",
     format: "EXE",
     recommended: true,
-    fileName: "Codex.Assistant_0.11.8_x64-setup.exe",
-    bytes: 7_710_295,
-    sha256: "63959AFCC716775DF2E418798A19BF15BFE915E57B835629473CEAE87FFFC256",
+    fileName: "Codex.Assistant_0.11.9_x64-setup.exe",
+    bytes: 7_054_583,
+    sha256: "B4C4627E8E8157064F5E7C3F85268310A86ACBFA12ACA9774EF49071D4627AFA",
   },
   {
     architecture: "x64",
     format: "MSI",
     recommended: false,
-    fileName: "Codex.Assistant_0.11.8_x64_en-US.msi",
-    bytes: 12_460_032,
-    sha256: "DED11FBF67BF8D3E228B4767165A57144C5D7D16F83D84E851DF723902086F87",
+    fileName: "Codex.Assistant_0.11.9_x64_en-US.msi",
+    bytes: 12_021_760,
+    sha256: "31F2E4B86F29F91DC426248D07492C5119803E5436C3453C589C348B1FF30238",
   },
   {
     architecture: "ARM64",
     format: "EXE",
     recommended: true,
-    fileName: "Codex.Assistant_0.11.8_arm64-setup.exe",
-    bytes: 7_426_966,
-    sha256: "E7C2D52FEBEC29E22F5B5E8E59A2F76CE0BCA407A90567777CA24C1A6B9C79ED",
+    fileName: "Codex.Assistant_0.11.9_arm64-setup.exe",
+    bytes: 6_755_175,
+    sha256: "0CA870ADF44BEA0224183AADC83E42B740C257D55D1D9458B56578B969A950A5",
   },
   {
     architecture: "ARM64",
     format: "MSI",
     recommended: false,
-    fileName: "Codex.Assistant_0.11.8_arm64_en-US.msi",
-    bytes: 12_308_480,
-    sha256: "1FEEAA9A2BFF6FA6E36FF12D6AAE5E905EC4F4AF5A243992423D10EE2B6C2700",
+    fileName: "Codex.Assistant_0.11.9_arm64_en-US.msi",
+    bytes: 11_870_208,
+    sha256: "D011402C30341D80A66C93FF404844A3060F024F0CD506A8C80908C9F993D25A",
   },
 ].map((asset) => ({
   ...asset,
