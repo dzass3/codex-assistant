@@ -7,6 +7,7 @@ use codex_assistant_lib::{
     },
 };
 use sha2::{Digest, Sha256};
+use std::sync::{Arc, Barrier};
 use tempfile::tempdir;
 
 fn app_at(path: &std::path::Path) -> ThemeApplication {
@@ -57,7 +58,7 @@ fn theme_session_apply_and_restore_use_only_theme_state() {
     let app = app_at(root.path());
     let initial = app.snapshot();
     assert_eq!(initial.session_status, ThemeSessionStatus::Inactive);
-    assert_eq!(initial.packs.len(), 14);
+    assert_eq!(initial.packs.len(), 12);
 
     assert_eq!(
         app.start_session_with(0, || Ok(session())).status,
@@ -108,7 +109,7 @@ fn retired_bundled_preference_is_cleared_once_without_touching_local_themes() {
     write_local_theme(root.path());
     std::fs::write(
         root.path().join("theme-state.json"),
-        br#"{"schema_version":1,"selected_theme_id":"aurora-grid"}"#,
+        br#"{"schema_version":1,"selected_theme_id":"violet-blade"}"#,
     )
     .unwrap();
 
@@ -117,7 +118,7 @@ fn retired_bundled_preference_is_cleared_once_without_touching_local_themes() {
     assert!(snapshot.selected_theme_id.is_none());
     assert_eq!(
         snapshot.catalog_notice.as_deref(),
-        Some("原主题已下架，请从 14 个新主题中重新选择")
+        Some("原主题已下架，请从 12 个新主题中重新选择")
     );
     assert!(snapshot.packs.iter().any(|pack| pack.id == "arina-pink"));
     drop(migrated);
@@ -261,6 +262,82 @@ fn failed_switch_never_misreports_the_new_theme_as_applied() {
 }
 
 #[test]
+fn concurrent_restore_is_blocked_until_theme_application_commits() {
+    let root = tempdir().unwrap();
+    let app = Arc::new(app_at(root.path()));
+    app.start_session_with(0, || Ok(session()));
+    app.apply_theme_with("wisteria-bride", |_| Ok(1));
+
+    let apply_entered = Arc::new(Barrier::new(2));
+    let release_apply = Arc::new(Barrier::new(2));
+    let worker = {
+        let app = Arc::clone(&app);
+        let apply_entered = Arc::clone(&apply_entered);
+        let release_apply = Arc::clone(&release_apply);
+        std::thread::spawn(move || {
+            app.apply_theme_with("crimson-palace", |_| {
+                apply_entered.wait();
+                release_apply.wait();
+                Ok(1)
+            })
+        })
+    };
+
+    apply_entered.wait();
+    let restore = app.restore_with(|| Ok(1));
+    assert_eq!(restore.status, OperationStatus::Blocked);
+    assert_eq!(
+        restore.reason_codes,
+        vec![ThemeReasonCode::OperationConflict]
+    );
+    release_apply.wait();
+    assert_eq!(worker.join().unwrap().status, OperationStatus::Applied);
+
+    let snapshot = app.snapshot();
+    assert_eq!(
+        snapshot.selected_theme_id.as_deref(),
+        Some("crimson-palace")
+    );
+    assert_eq!(snapshot.applied_theme_id.as_deref(), Some("crimson-palace"));
+}
+
+#[test]
+fn session_reconciliation_does_not_clear_an_inflight_theme_commit() {
+    let root = tempdir().unwrap();
+    let app = Arc::new(app_at(root.path()));
+    app.start_session_with(0, || Ok(session()));
+    app.apply_theme_with("wisteria-bride", |_| Ok(1));
+
+    let apply_entered = Arc::new(Barrier::new(2));
+    let release_apply = Arc::new(Barrier::new(2));
+    let worker = {
+        let app = Arc::clone(&app);
+        let apply_entered = Arc::clone(&apply_entered);
+        let release_apply = Arc::clone(&release_apply);
+        std::thread::spawn(move || {
+            app.apply_theme_with("crimson-palace", |_| {
+                apply_entered.wait();
+                release_apply.wait();
+                Ok(1)
+            })
+        })
+    };
+
+    apply_entered.wait();
+    assert!(app.reconcile_session_with(|_| false));
+    release_apply.wait();
+    assert_eq!(worker.join().unwrap().status, OperationStatus::Applied);
+
+    let snapshot = app.snapshot();
+    assert_eq!(snapshot.session_status, ThemeSessionStatus::Ready);
+    assert_eq!(
+        snapshot.selected_theme_id.as_deref(),
+        Some("crimson-palace")
+    );
+    assert_eq!(snapshot.applied_theme_id.as_deref(), Some("crimson-palace"));
+}
+
+#[test]
 fn session_restart_is_blocked_while_native_work_is_active() {
     let root = tempdir().unwrap();
     let app = app_at(root.path());
@@ -289,7 +366,7 @@ fn stale_session_pauses_and_restore_clears_the_saved_preference() {
     let root = tempdir().unwrap();
     let app = app_at(root.path());
     app.start_session_with(0, || Ok(session()));
-    app.apply_theme_with("violet-blade", |_| Ok(1));
+    app.apply_theme_with("fuji-autumn", |_| Ok(1));
     app.reconcile_session_with(|_| false);
     assert_eq!(app.snapshot().session_status, ThemeSessionStatus::Paused);
     let restored = app.restore_with(|| panic!("paused theme has no live style"));

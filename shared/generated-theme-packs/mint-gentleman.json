@@ -5,6 +5,12 @@
   "name": "薄荷礼服",
   "description": "薄荷绿礼服与晨光花廊组成的清透主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "nature", "minimal"],
+    "badges": [],
+    "published_at": "2026-07-24",
+    "sort_order": 20
+  },
   "preview_path": "/themes/mint-gentleman.webp",
   "backdrop": {
     "kind": "image",
@@ -26,6 +32,11 @@
     "contrast_percent": 95,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 86,
+    "complexity": 18,
+    "saturation": 8
+  },
   "assets": [
     {
       "id": "mint-gentleman",
@@ -39,7 +50,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

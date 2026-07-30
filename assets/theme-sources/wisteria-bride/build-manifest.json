@@ -29,13 +29,18 @@
     "bytes": 24702,
     "quality": 78
   },
+  "adaptation": {
+    "luminance": 82,
+    "complexity": 22,
+    "saturation": 14
+  },
   "rights": {
     "source": "User-approved source: ChatGPT Image 2026年7月24日 11_20_32 (3).png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

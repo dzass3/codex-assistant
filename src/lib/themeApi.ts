@@ -1,6 +1,7 @@
 import type {
   ForceRestartImpact,
   ThemeAsset,
+  ThemeAdaptation,
   ThemeBackdrop,
   ThemeCategory,
   ThemeEffects,
@@ -10,6 +11,9 @@ import type {
   ThemeEnvironmentReport,
   ThemeEnvironmentStatus,
   ThemeImportReceipt,
+  ThemeMarketplaceMetadata,
+  ThemeGenre,
+  ThemeEditorialBadge,
   ThemeOperationReceipt,
   ThemePack,
   ThemePalette,
@@ -60,6 +64,16 @@ const CATEGORIES = new Set<ThemeCategory>([
   "project-showcase",
   "local-import",
 ]);
+const MARKETPLACE_GENRES = new Set<ThemeGenre>([
+  "anime",
+  "fantasy",
+  "nature",
+  "cyber",
+  "minimal",
+  "dark",
+  "space",
+]);
+const MARKETPLACE_BADGES = new Set<ThemeEditorialBadge>(["popular", "featured", "new"]);
 const ENVIRONMENT_STATUSES = new Set<ThemeEnvironmentStatus>([
   "ready",
   "codex-not-running",
@@ -208,6 +222,45 @@ function effects(value: unknown): ThemeEffects | null {
     : null;
 }
 
+function marketplace(value: unknown): ThemeMarketplaceMetadata | null {
+  const raw = record(value);
+  if (
+    raw === null ||
+    !exactKeys(raw, ["genres", "badges", "published_at", "sort_order"]) ||
+    !Array.isArray(raw.genres) ||
+    raw.genres.length === 0 ||
+    !Array.isArray(raw.badges)
+  ) {
+    return null;
+  }
+  const genres = raw.genres.filter(
+    (entry): entry is ThemeGenre =>
+      typeof entry === "string" && MARKETPLACE_GENRES.has(entry as ThemeGenre),
+  );
+  const badges = raw.badges.filter(
+    (entry): entry is ThemeEditorialBadge =>
+      typeof entry === "string" && MARKETPLACE_BADGES.has(entry as ThemeEditorialBadge),
+  );
+  const sortOrder = integer(raw.sort_order, 1, 10_000);
+  if (
+    genres.length !== raw.genres.length ||
+    badges.length !== raw.badges.length ||
+    new Set(genres).size !== genres.length ||
+    new Set(badges).size !== badges.length ||
+    typeof raw.published_at !== "string" ||
+    !DATE.test(raw.published_at) ||
+    sortOrder === null
+  ) {
+    return null;
+  }
+  return {
+    genres,
+    badges,
+    published_at: raw.published_at,
+    sort_order: sortOrder,
+  };
+}
+
 function asset(value: unknown): ThemeAsset | null {
   const raw = record(value);
   if (raw === null || !exactKeys(raw, ["id", "mime_type", "sha256"])) return null;
@@ -219,6 +272,17 @@ function asset(value: unknown): ThemeAsset | null {
     typeof raw.sha256 === "string" &&
     SHA256.test(raw.sha256)
     ? { id, mime_type: raw.mime_type, sha256: raw.sha256 }
+    : null;
+}
+
+function adaptation(value: unknown): ThemeAdaptation | null {
+  const raw = record(value);
+  if (raw === null || !exactKeys(raw, ["luminance", "complexity", "saturation"])) return null;
+  const luminance = integer(raw.luminance, 0, 100);
+  const complexity = integer(raw.complexity, 0, 100);
+  const saturation = integer(raw.saturation, 0, 100);
+  return luminance !== null && complexity !== null && saturation !== null
+    ? { luminance, complexity, saturation }
     : null;
 }
 
@@ -273,24 +337,27 @@ function rights(value: unknown, category: ThemeCategory): ThemeRights | null {
 
 function pack(value: unknown): ThemePack | null {
   const raw = record(value);
-  if (
-    raw === null ||
-    !exactKeys(raw, [
-      "schema_version",
-      "minimum_engine_version",
-      "id",
-      "name",
-      "description",
-      "category",
-      "preview_path",
-      "backdrop",
-      "palette",
-      "effects",
-      "assets",
-      "rights",
-    ])
-  )
-    return null;
+  const packKeys = [
+    "schema_version",
+    "minimum_engine_version",
+    "id",
+    "name",
+    "description",
+    "category",
+    "preview_path",
+    "backdrop",
+    "palette",
+    "effects",
+    "assets",
+    "rights",
+  ] as const;
+  if (raw === null) return null;
+  const expectedKeys = [
+    ...packKeys,
+    ...(raw.marketplace === undefined ? [] : ["marketplace"]),
+    ...(raw.adaptation === undefined ? [] : ["adaptation"]),
+  ];
+  if (!exactKeys(raw, expectedKeys)) return null;
   const id = slug(raw.id);
   const name = boundedText(raw.name, 80);
   const description = boundedText(raw.description, 240);
@@ -311,6 +378,8 @@ function pack(value: unknown): ThemePack | null {
   const parsedBackdrop = backdrop(raw.backdrop);
   const parsedPalette = palette(raw.palette);
   const parsedEffects = effects(raw.effects);
+  const parsedAdaptation = raw.adaptation === undefined ? null : adaptation(raw.adaptation);
+  const parsedMarketplace = raw.marketplace === undefined ? null : marketplace(raw.marketplace);
   const assets = Array.isArray(raw.assets) ? raw.assets.map(asset) : null;
   const parsedRights = category === null ? null : rights(raw.rights, category);
   const minimumEngineVersion = integer(raw.minimum_engine_version, 1, 1);
@@ -325,6 +394,9 @@ function pack(value: unknown): ThemePack | null {
     parsedBackdrop === null ||
     parsedPalette === null ||
     parsedEffects === null ||
+    (raw.adaptation !== undefined && parsedAdaptation === null) ||
+    (raw.marketplace !== undefined && parsedMarketplace === null) ||
+    (category === "local-import" && parsedMarketplace !== null) ||
     assets === null ||
     assets.some((entry) => entry === null) ||
     parsedRights === null
@@ -348,8 +420,10 @@ function pack(value: unknown): ThemePack | null {
     backdrop: parsedBackdrop,
     palette: parsedPalette,
     effects: parsedEffects,
+    ...(parsedAdaptation === null ? {} : { adaptation: parsedAdaptation }),
     assets: parsedAssets,
     rights: parsedRights,
+    ...(parsedMarketplace === null ? {} : { marketplace: parsedMarketplace }),
   };
 }
 

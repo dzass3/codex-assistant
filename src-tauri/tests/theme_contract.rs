@@ -1,13 +1,101 @@
 use codex_assistant_lib::theme::{
-    apply_theme_on_pages_for_version, bundled_theme_packs, select_theme_adapter,
-    theme_application_source, theme_application_source_with_asset,
+    apply_theme_on_pages_for_version, bundled_theme_packs, restore_theme_on_pages,
+    select_theme_adapter, theme_application_source, theme_application_source_with_asset,
     theme_page_classification_source, theme_restore_source, theme_verification_source,
     validate_theme_pack, RightsStatus, ThemeBackdrop, ThemeCategory, ThemeEngineError,
     ThemeScriptRegistration,
 };
 use futures_util::{SinkExt, StreamExt};
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+async fn successfully_applied_registration(
+    target_id: &str,
+    identifier: &str,
+) -> ThemeScriptRegistration {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let endpoint = codex_assistant_lib::control_layer::cdp::browser_endpoint(
+        port,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/browser/7d47a800-c734-4f9a-a56c-55d875ea1cab"}}"#
+        ),
+    )
+    .unwrap();
+    let server_target_id = target_id.to_owned();
+    let script_identifier = identifier.to_owned();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0_u8; 2_048];
+        let count = stream.read(&mut request).await.unwrap();
+        assert!(
+            String::from_utf8_lossy(&request[..count]).starts_with("GET /json/list HTTP/1.1\r\n")
+        );
+        let body = format!(
+            r#"[{{"id":"{server_target_id}","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/{server_target_id}"}}]"#
+        );
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        drop(stream);
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        let compatibility = socket.next().await.unwrap().unwrap().into_text().unwrap();
+        let compatibility: serde_json::Value = serde_json::from_str(&compatibility).unwrap();
+        socket
+            .send(Message::Text(
+                format!(
+                    r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                    compatibility["id"]
+                )
+                .into(),
+            ))
+            .await
+            .unwrap();
+        drop(socket);
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        while let Some(Ok(message)) = socket.next().await {
+            let call: serde_json::Value =
+                serde_json::from_str(message.into_text().unwrap().as_str()).unwrap();
+            let result = match call["method"].as_str().unwrap() {
+                "Page.enable" => "{}".to_owned(),
+                "Page.addScriptToEvaluateOnNewDocument" => {
+                    format!(r#"{{"identifier":"{script_identifier}"}}"#)
+                }
+                "Runtime.evaluate" => r#"{"result":{"type":"boolean","value":true}}"#.to_owned(),
+                other => panic!("unexpected successful apply method: {other}"),
+            };
+            socket
+                .send(Message::Text(
+                    format!(r#"{{"id":{},"result":{result}}}"#, call["id"]).into(),
+                ))
+                .await
+                .unwrap();
+        }
+    });
+    let previous_pack = bundled_theme_packs().remove(1);
+    let mut result =
+        apply_theme_on_pages_for_version(&endpoint, "26.721.4979.0", &previous_pack, &[], 1_000)
+            .await
+            .unwrap();
+    server.await.unwrap();
+    assert_eq!(result.applied_pages, 1);
+    result.scripts.remove(0)
+}
 
 #[test]
 fn bundled_themes_are_declarative_project_owned_and_pass_the_rights_gate() {
@@ -29,9 +117,7 @@ fn bundled_themes_are_declarative_project_owned_and_pass_the_rights_gate() {
             "seaside-blue",
             "autumn-wuxia",
             "meteor-evening",
-            "violet-blade",
             "fuji-autumn",
-            "spring-street",
         ]
     );
     assert!(packs
@@ -50,6 +136,8 @@ fn bundled_themes_are_declarative_project_owned_and_pass_the_rights_gate() {
         "violet-afterdark",
         "cyan-chorus",
         "noir-stage",
+        "violet-blade",
+        "spring-street",
     ] {
         assert!(
             !packs.iter().any(|pack| pack.id == retired),
@@ -197,14 +285,15 @@ fn adapter_registry_accepts_only_the_reviewed_official_build_family() {
 }
 
 #[test]
-fn theme_css_never_recolors_or_overlays_codex_semantic_content() {
+fn theme_css_scopes_chrome_token_adaptation_and_never_overlays_semantic_content() {
     for pack in bundled_theme_packs() {
         let source = theme_application_source(&pack).expect("theme source");
         for forbidden in [
-            "--color-token-foreground:",
-            "--color-token-text-primary:",
-            "--color-token-text-secondary:",
-            "--color-token-text-tertiary:",
+            ":root{--color-token-",
+            "html{--color-token-",
+            "body{--color-token-",
+            "main.main-surface{--color-token-",
+            "[data-response-annotation-target]{--color-token-",
             "fill:currentColor!important",
             r#"button[class~=\"bg-token-foreground\"]"#,
             r#"button[class~=\"bg-token-button-background\"]"#,
@@ -216,6 +305,20 @@ fn theme_css_never_recolors_or_overlays_codex_semantic_content() {
                 pack.id
             );
         }
+        for scoped_surface in [
+            "aside.app-shell-left-panel",
+            ".composer-surface-chrome",
+            "[data-codex-output-panel]",
+            r#"[role=\"menu\"]"#,
+            "[data-local-conversation-item-target-ids]",
+        ] {
+            assert!(
+                source.contains(scoped_surface),
+                "{} is missing bounded chrome adaptation for {scoped_surface}",
+                pack.id
+            );
+        }
+        assert!(source.contains("--color-token-conversation-body:var(--text-primary)!important"));
         assert!(source.contains("body::before"));
         assert!(source.contains("pointer-events:none"));
         assert!(source.contains("[data-codex-assistant-welcome-action]{pointer-events:auto"));
@@ -324,7 +427,9 @@ fn every_theme_uses_one_fixed_cover_layer_without_distortion() {
 fn all_theme_backgrounds_are_crisp_and_focal_responsive() {
     for pack in bundled_theme_packs() {
         let source = theme_application_source(&pack).expect("theme source");
-        assert!(source.contains("filter:brightness(0.92) saturate(1.08) contrast(1.04)"));
+        assert!(source.contains("filter:brightness("));
+        assert!(source.contains("saturate("));
+        assert!(source.contains("contrast("));
         assert!(source.contains("@media(max-width:1200px)"));
         assert!(source.contains("@media(min-aspect-ratio:21/9)"));
         assert!(!source.contains("body::before{filter:blur("));
@@ -336,14 +441,16 @@ fn image_themes_use_one_light_dark_scrim_without_uniform_white_opacity() {
     let packs = bundled_theme_packs();
     let theme = packs
         .iter()
-        .find(|pack| pack.id == "spring-street")
+        .find(|pack| pack.id == "seaside-blue")
         .expect("image theme");
     let source = theme_application_source(theme).expect("theme source");
 
     assert!(
         source.contains("body::after")
-            && source.contains("linear-gradient(90deg,rgba(18,12,17,0.18) 0%,rgba(18,12,17,0.06) 42%,rgba(18,12,17,0.02) 72%,rgba(18,12,17,0.12) 100%)"),
-        "the artwork must keep detail beneath one restrained dark balance layer"
+            && source.contains("linear-gradient(90deg,var(--bg-overlay-strong)")
+            && source.contains("var(--bg-overlay-medium)")
+            && source.contains("var(--bg-overlay-light)"),
+        "the artwork must keep detail beneath an adaptive regional balance layer"
     );
     assert!(source.contains("body::after{content:\\\"\\\";position:fixed;inset:0"));
     assert!(source.contains("body::after") && source.contains("pointer-events:none"));
@@ -353,11 +460,11 @@ fn image_themes_use_one_light_dark_scrim_without_uniform_white_opacity() {
 
 #[test]
 fn main_application_surfaces_stay_transparent_over_the_global_backdrop() {
-    let portrait = bundled_theme_packs()
+    let image_theme = bundled_theme_packs()
         .into_iter()
-        .find(|pack| pack.id == "spring-street")
-        .expect("portrait theme");
-    let source = theme_application_source(&portrait).expect("portrait source");
+        .find(|pack| pack.id == "seaside-blue")
+        .expect("image theme");
+    let source = theme_application_source(&image_theme).expect("image source");
 
     assert!(
         source.contains("body main.main-surface,body main[role=\\\"main\\\"]")
@@ -434,7 +541,7 @@ fn image_theme_emits_a_parseable_data_url_without_app_protocol_fallback() {
 }
 
 #[test]
-fn image_theme_preserves_backdrop_visibility_with_a_dark_glass_frame() {
+fn image_theme_preserves_backdrop_visibility_with_compositor_safe_surfaces() {
     let mut pack = bundled_theme_packs()
         .into_iter()
         .find(|pack| matches!(pack.backdrop, ThemeBackdrop::Image { .. }))
@@ -443,19 +550,20 @@ fn image_theme_preserves_backdrop_visibility_with_a_dark_glass_frame() {
     let source = theme_application_source(&pack).expect("theme source");
 
     for required in [
-        "--codex-assistant-theme-chrome:rgba(31,21,28,0.46)",
-        "--codex-assistant-theme-chrome-strong:rgba(35,23,31,0.58)",
-        "--codex-assistant-theme-chrome-text:rgba(255,248,251,0.94)",
-        "--codex-assistant-theme-reading:rgba(255,250,252,0.76)",
-        "--codex-assistant-theme-rose:#C67D91",
-        "backdrop-filter:blur(18px) saturate(130%)",
+        "--codex-assistant-theme-chrome:var(--surface-1)",
+        "--codex-assistant-theme-chrome-strong:var(--surface-2)",
+        "--codex-assistant-theme-chrome-text:rgba(248,249,252,0.98)",
+        "--codex-assistant-theme-chrome-muted:rgba(214,220,230,0.72)",
+        "--codex-assistant-theme-reading:rgba(248,249,252,",
+        "--accent-primary:",
+        "backdrop-filter:none!important",
         "body .app-header-tint",
         "body [data-codex-output-panel",
         "body [class*=\\\"origin-top-right\\\"][class*=\\\"pointer-events-none\\\"]>[class*=\\\"pointer-events-auto\\\"]>[class*=\\\"bg-token-dropdown-background\\\"]",
         "body main .composer-surface-chrome",
-        "border-radius:16px",
+        "--radius-panel:16px",
         "[data-user-message-bubble",
-        "border-radius:14px",
+        "--radius-card:14px",
         "data-codex-assistant-theme-welcome",
         "data-codex-assistant-welcome-action",
     ] {
@@ -464,10 +572,18 @@ fn image_theme_preserves_backdrop_visibility_with_a_dark_glass_frame() {
             "missing unified dark-glass contract: {required}"
         );
     }
-    assert!(source.contains("background:rgba(31,21,28,0.46)!important"));
-    assert!(source.contains("background:rgba(29,22,28,0.72)!important"));
+    assert!(source.contains("background:var(--surface-1)!important"));
+    assert!(source.contains("background:var(--surface-3)!important"));
     assert!(source.contains("transition:background-color 160ms ease"));
     assert!(source.contains("scrollbar-width:thin"));
+    assert!(
+        source.contains("target.closest(HOT_CONTENT_SELECTOR)"),
+        "streaming content must not rerun full-page classification"
+    );
+    assert!(
+        source.contains("requestAnimationFrame"),
+        "structural route checks must be coalesced to one animation frame"
+    );
     let verification = theme_verification_source(&pack).expect("verification source");
     assert!(verification.contains("backdropStyle.backgroundSize===\"cover\""));
 }
@@ -484,7 +600,7 @@ fn composer_theme_uses_one_native_glass_surface_without_an_inner_editor_shell() 
         ),
         "the terminal composer override must beat Codex's dropdown/input utility classes"
     );
-    assert!(source.contains("border-width:1px!important"));
+    assert!(source.contains("border:1px solid rgba(255,255,255,0.15)!important"));
     assert!(!source.contains("contenteditable{background"));
 }
 
@@ -495,9 +611,9 @@ fn current_codex_message_and_output_markup_receive_local_reading_materials() {
 
     assert!(
         source.contains(
-            "[data-content-search-unit-key$=\\\":assistant\\\"]>[data-response-annotation-target]"
+            "[data-content-search-unit-key$=\\\":assistant\\\"]>:first-child"
         ),
-        "current assistant messages need a bounded reading card instead of page-wide wash"
+        "streaming assistant messages need a bounded reading card before annotation metadata arrives"
     );
     assert!(
         source.contains(
@@ -507,13 +623,128 @@ fn current_codex_message_and_output_markup_receive_local_reading_materials() {
     );
     assert!(
         source.contains(
-            "[class*=\\\"origin-top-right\\\"][class*=\\\"pointer-events-none\\\"]>[class*=\\\"pointer-events-auto\\\"]>[class*=\\\"bg-token-dropdown-background\\\"] :where(strong,span,p,a,button,[role=\\\"button\\\"])"
+            "[class*=\\\"origin-top-right\\\"][class*=\\\"pointer-events-none\\\"]>[class*=\\\"pointer-events-auto\\\"]>[class*=\\\"bg-token-dropdown-background\\\"] :where(p,span,li,time,code,small)"
         ),
         "current output-panel leaf text must remain legible on dark glass"
     );
     assert!(
         source.contains("[data-local-conversation-item-target-ids]"),
         "current tool calls and file results need a bounded reading card"
+    );
+    assert!(
+        source.contains("body main.main-surface .loading-shimmer-pure-text"),
+        "streaming preparation text needs a stable status surface on every background"
+    );
+    assert!(
+        source.contains("color:rgba(248,249,252,0.96)!important"),
+        "streaming preparation text must not inherit translucent official foreground tokens"
+    );
+    assert!(
+        source.contains("SHIMMER_SELECTOR"),
+        "dynamically inserted preparation states need a bounded presentation enhancer"
+    );
+    assert!(
+        source.contains("restoreShimmers"),
+        "the preparation enhancer must restore official inline styles exactly"
+    );
+}
+
+#[test]
+fn every_bundled_theme_uses_readable_chrome_without_live_viewport_blur() {
+    for pack in bundled_theme_packs() {
+        let source = theme_application_source(&pack).expect("theme source");
+        let blur_declarations = source.matches("backdrop-filter:blur(").count();
+
+        assert_eq!(
+            blur_declarations, 0,
+            "{} emits {blur_declarations} live backdrop filters; viewport glass makes Codex lag",
+            pack.id
+        );
+        assert!(
+            source.contains("body .app-header-tint[class*=\\\"group/application-menu-top-bar\\\"]"),
+            "{} must keep the Windows caption controls visible on a light title bar",
+            pack.id
+        );
+        assert!(
+            source.contains(
+                "body main.main-surface .composer-surface-chrome :where(button,[role=\\\"button\\\"],svg,svg *)"
+            ),
+            "{} must give every composer control an explicit readable foreground",
+            pack.id
+        );
+        assert!(
+            source.contains("background:rgba(248,249,252,var(--opacity-card))!important"),
+            "{} must use the adaptive shared reading surface on every backdrop",
+            pack.id
+        );
+        assert!(
+            source.contains("backdrop-filter:none!important"),
+            "{} must explicitly prevent nested reading/output layers from reintroducing blur",
+            pack.id
+        );
+    }
+}
+
+#[test]
+fn bundled_themes_emit_one_adaptive_surface_system_with_multiple_background_profiles() {
+    let mut adaptive_signatures = std::collections::BTreeSet::new();
+
+    for pack in bundled_theme_packs() {
+        let source = theme_application_source(&pack).expect("theme source");
+
+        for required in [
+            "--bg-overlay-strong:",
+            "--bg-overlay-medium:",
+            "--bg-overlay-light:",
+            "--surface-1:",
+            "--surface-2:",
+            "--surface-3:",
+            "--surface-hover:",
+            "--surface-active:",
+            "--text-primary:",
+            "--text-secondary:",
+            "--text-muted:",
+            "--accent-primary:",
+            "--accent-success:",
+            "--accent-warning:",
+            "--accent-danger:",
+            "--opacity-sidebar:",
+            "--opacity-header:",
+            "--opacity-card:",
+            "--opacity-popover:",
+            "--blur-sidebar:",
+            "--blur-header:",
+            "--blur-card:",
+            "--blur-popover:",
+            "--shadow-surface:",
+            "--shadow-card:",
+            "--shadow-floating:",
+            "--radius-panel:",
+            "--radius-card:",
+            "--radius-chip:",
+            "--radius-input:",
+            "--codex-assistant-background-luminance:",
+            "--codex-assistant-background-complexity:",
+            "--codex-assistant-background-saturation:",
+        ] {
+            assert!(
+                source.contains(required),
+                "{} is missing the shared adaptive token {required}",
+                pack.id
+            );
+        }
+
+        let signature = source
+            .split("--codex-assistant-background-luminance:")
+            .nth(1)
+            .and_then(|value| value.split("}}").next())
+            .expect("adaptive background signature");
+        adaptive_signatures.insert(signature.to_owned());
+    }
+
+    assert!(
+        adaptive_signatures.len() >= 3,
+        "the bundled catalog must exercise bright, dark, and complex background profiles"
     );
 }
 
@@ -524,12 +755,20 @@ fn theme_details_create_depth_for_headers_cards_composer_and_sidebar() {
 
     for required in [
         "body .app-header-tint,body header[role=\\\"banner\\\"]",
-        "background:rgba(31,21,28,0.46)!important",
+        "background:var(--surface-2)!important",
         "body aside.app-shell-left-panel,body aside[aria-label]",
-        "box-shadow:12px 0 30px rgba(10,6,9,0.16)",
+        "box-shadow:var(--shadow-surface)!important",
         "body main.main-surface [class*=\\\"bg-token-dropdown-background\\\"]",
         "body main .composer-surface-chrome:focus-within",
-        "0 0 0 2px rgba(198,125,145,0.20)",
+        "0 0 0 2px color-mix(in srgb,var(--accent-primary) 25%,transparent)",
+        "[class~=\\\"from-token-main-surface-primary\\\"][class~=\\\"to-transparent\\\"]",
+        "[class~=\\\"after:from-token-main-surface-primary\\\"]::after",
+        "[data-composer-attachment-pill=\\\"true\\\"]",
+        "html[data-codex-assistant-page-class=\\\"compatible-shell\\\"]",
+        "body:has([data-settings-panel-slug])",
+        ".app-shell-main-content-viewport .main-surface.flex.h-full.min-h-0.flex-col",
+        "[class*=\\\"rounded-2xl\\\"][class*=\\\"border-token-border\\\"]",
+        "[class*=\\\"bg-token-bg-fog\\\"][data-state=\\\"open\\\"]",
     ] {
         assert!(
             source.contains(required),
@@ -626,12 +865,80 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
 
         let (stream, _) = listener.accept().await.unwrap();
         let mut socket = accept_async(stream).await.unwrap();
-        for index in 0..4 {
+        for index in 0..6 {
             let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
             let call: serde_json::Value = serde_json::from_str(&call).unwrap();
             match index {
                 0 => assert_eq!(call["method"], "Page.enable"),
                 1 => {
+                    assert_eq!(call["method"], "Page.addScriptToEvaluateOnNewDocument");
+                    assert!(call["params"]["source"]
+                        .as_str()
+                        .unwrap()
+                        .contains("data-codex-assistant-theme"));
+                }
+                2 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
+                    assert!(
+                        expression.contains("data-codex-assistant-theme"),
+                        "the application command must inject the owned theme"
+                    );
+                    assert!(
+                        !expression.contains("const inserted="),
+                        "application and verification must be separate renderer commands"
+                    );
+                    socket
+                        .send(Message::Text(
+                            format!(
+                                r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                                call["id"]
+                            )
+                            .into(),
+                        ))
+                    .await
+                    .unwrap();
+                    continue;
+                }
+                3 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
+                    assert!(expression.contains("requestAnimationFrame"));
+                    assert_eq!(call["params"]["awaitPromise"], true);
+                    assert!(!expression.contains("getComputedStyle"));
+                    socket
+                        .send(Message::Text(
+                            format!(
+                                r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                                call["id"]
+                            )
+                            .into(),
+                        ))
+                        .await
+                        .unwrap();
+                    continue;
+                }
+                4 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
+                    assert!(
+                        expression.contains("getComputedStyle"),
+                        "the third renderer command must verify computed presentation"
+                    );
+                    assert!(call["params"].get("awaitPromise").is_none());
+                    socket
+                        .send(Message::Text(
+                            format!(
+                                r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                                call["id"]
+                            )
+                            .into(),
+                        ))
+                        .await
+                        .unwrap();
+                    continue;
+                }
+                _ => {
                     assert_eq!(call["method"], "Page.removeScriptToEvaluateOnNewDocument");
                     assert_eq!(call["params"]["identifier"], "stale-script");
                     socket
@@ -646,38 +953,8 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
                         .unwrap();
                     continue;
                 }
-                2 => {
-                    assert_eq!(call["method"], "Page.addScriptToEvaluateOnNewDocument");
-                    assert!(call["params"]["source"]
-                        .as_str()
-                        .unwrap()
-                        .contains("data-codex-assistant-theme"));
-                }
-                _ => {
-                    assert_eq!(call["method"], "Runtime.evaluate");
-                    let expression = call["params"]["expression"].as_str().unwrap();
-                    assert!(
-                        expression.contains("data-codex-assistant-theme"),
-                        "application and verification must share one renderer turn"
-                    );
-                    assert!(
-                        expression.contains("getComputedStyle"),
-                        "application and verification must share one renderer turn"
-                    );
-                    socket
-                        .send(Message::Text(
-                            format!(
-                                r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
-                                call["id"]
-                            )
-                            .into(),
-                        ))
-                        .await
-                        .unwrap();
-                    continue;
-                }
             }
-            let result = if index == 2 {
+            let result = if index == 1 {
                 r#"{"identifier":"theme-script-1"}"#
             } else {
                 "{}"
@@ -691,10 +968,7 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
         }
     });
     let pack = bundled_theme_packs().remove(0);
-    let previous = [ThemeScriptRegistration {
-        target_id: "page-1".to_owned(),
-        identifier: "stale-script".to_owned(),
-    }];
+    let previous = [successfully_applied_registration("page-1", "stale-script").await];
 
     let result =
         apply_theme_on_pages_for_version(&endpoint, "26.721.4979.0", &pack, &previous, 1_000)
@@ -702,8 +976,8 @@ async fn theme_apply_uses_verified_page_targets_and_boolean_compatibility_acknow
             .unwrap();
     assert_eq!(result.applied_pages, 1);
     assert_eq!(result.scripts.len(), 1);
-    assert_eq!(result.scripts[0].target_id, "page-1");
-    assert_eq!(result.scripts[0].identifier, "theme-script-1");
+    assert_eq!(result.scripts[0].target_id(), "page-1");
+    assert_eq!(result.scripts[0].identifier(), "theme-script-1");
     server.await.unwrap();
 }
 
@@ -762,7 +1036,7 @@ async fn incompatible_utility_page_does_not_block_main_task_theme() {
 
         let (stream, _) = listener.accept().await.unwrap();
         let mut socket = accept_async(stream).await.unwrap();
-        for index in 0..3 {
+        for index in 0..5 {
             let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
             let call: serde_json::Value = serde_json::from_str(&call).unwrap();
             let result = match index {
@@ -774,11 +1048,26 @@ async fn incompatible_utility_page_does_not_block_main_task_theme() {
                     assert_eq!(call["method"], "Page.addScriptToEvaluateOnNewDocument");
                     r#"{"identifier":"theme-script-main"}"#
                 }
-                _ => {
+                2 => {
                     assert_eq!(call["method"], "Runtime.evaluate");
                     let expression = call["params"]["expression"].as_str().unwrap();
                     assert!(expression.contains("data-codex-assistant-theme"));
+                    assert!(!expression.contains("const inserted="));
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+                3 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
+                    assert!(expression.contains("requestAnimationFrame"));
+                    assert_eq!(call["params"]["awaitPromise"], true);
+                    assert!(!expression.contains("getComputedStyle"));
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+                _ => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
                     assert!(expression.contains("getComputedStyle"));
+                    assert!(call["params"].get("awaitPromise").is_none());
                     r#"{"result":{"type":"boolean","value":true}}"#
                 }
             };
@@ -798,12 +1087,12 @@ async fn incompatible_utility_page_does_not_block_main_task_theme() {
 
     assert_eq!(result.applied_pages, 1);
     assert_eq!(result.scripts.len(), 1);
-    assert_eq!(result.scripts[0].target_id, "main-task");
+    assert_eq!(result.scripts[0].target_id(), "main-task");
     server.await.unwrap();
 }
 
 #[tokio::test]
-async fn theme_is_not_applied_until_computed_style_is_verified() {
+async fn visible_false_rolls_back_candidate_and_restores_previous_renderer_theme() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let endpoint = codex_assistant_lib::control_layer::cdp::browser_endpoint(
@@ -855,7 +1144,7 @@ async fn theme_is_not_applied_until_computed_style_is_verified() {
 
         let (stream, _) = listener.accept().await.unwrap();
         let mut socket = accept_async(stream).await.unwrap();
-        for index in 0..5 {
+        for index in 0..13 {
             let call = socket.next().await.unwrap().unwrap().into_text().unwrap();
             let call: serde_json::Value = serde_json::from_str(&call).unwrap();
             let result = match index {
@@ -871,16 +1160,35 @@ async fn theme_is_not_applied_until_computed_style_is_verified() {
                     assert_eq!(call["method"], "Runtime.evaluate");
                     let expression = call["params"]["expression"].as_str().unwrap();
                     assert!(expression.contains("data-codex-assistant-theme"));
+                    assert!(!expression.contains("const inserted="));
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+                3 | 5 | 7 | 9 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
+                    assert!(expression.contains("requestAnimationFrame"));
+                    assert_eq!(call["params"]["awaitPromise"], true);
+                    assert!(!expression.contains("getComputedStyle"));
+                    r#"{"result":{"type":"boolean","value":true}}"#
+                }
+                4 | 6 | 8 | 10 => {
+                    assert_eq!(call["method"], "Runtime.evaluate");
+                    let expression = call["params"]["expression"].as_str().unwrap();
                     assert!(expression.contains("getComputedStyle"));
+                    assert!(call["params"].get("awaitPromise").is_none());
                     r#"{"result":{"type":"boolean","value":false}}"#
                 }
-                3 => {
+                11 => {
                     assert_eq!(call["method"], "Page.removeScriptToEvaluateOnNewDocument");
                     assert_eq!(call["params"]["identifier"], "theme-script-main");
                     "{}"
                 }
                 _ => {
                     assert_eq!(call["method"], "Runtime.evaluate");
+                    assert!(call["params"]["expression"]
+                        .as_str()
+                        .unwrap()
+                        .contains("mint-gentleman"));
                     r#"{"result":{"type":"boolean","value":true}}"#
                 }
             };
@@ -893,9 +1201,10 @@ async fn theme_is_not_applied_until_computed_style_is_verified() {
         }
     });
     let pack = bundled_theme_packs().remove(0);
+    let previous = [successfully_applied_registration("main-task", "previous-script").await];
 
     let result =
-        apply_theme_on_pages_for_version(&endpoint, "26.721.4979.0", &pack, &[], 1_000).await;
+        apply_theme_on_pages_for_version(&endpoint, "26.721.4979.0", &pack, &previous, 1_000).await;
 
     assert!(matches!(result, Err(ThemeEngineError::PartialApplication)));
     server.await.unwrap();
@@ -973,4 +1282,349 @@ async fn unsupported_version_fails_before_any_target_discovery() {
     let pack = bundled_theme_packs().remove(0);
     let result = apply_theme_on_pages_for_version(&endpoint, "27.1.0.0", &pack, &[], 1_000).await;
     assert!(matches!(result, Err(ThemeEngineError::UnsupportedVersion)));
+}
+
+#[derive(Clone, Copy)]
+enum PostRegistrationFailure {
+    Injection,
+    AnimationFrame,
+    Verification,
+    CandidateRemoval,
+}
+
+async fn assert_post_registration_failure_rolls_back(failure: PostRegistrationFailure) {
+    let previous = [successfully_applied_registration("main-task", "previous-script").await];
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let endpoint = codex_assistant_lib::control_layer::cdp::browser_endpoint(
+        port,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/browser/7d47a800-c734-4f9a-a56c-55d875ea1cab"}}"#
+        ),
+    )
+    .unwrap();
+    let observed = Arc::new(Mutex::new(Vec::new()));
+    let server_observed = Arc::clone(&observed);
+    let server = tokio::spawn(async move {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::time::{timeout, Duration};
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0_u8; 2_048];
+        let count = stream.read(&mut request).await.unwrap();
+        assert!(
+            String::from_utf8_lossy(&request[..count]).starts_with("GET /json/list HTTP/1.1\r\n")
+        );
+        let body = format!(
+            r#"[{{"id":"main-task","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/main-task"}}]"#
+        );
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        drop(stream);
+
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        let compatibility = socket.next().await.unwrap().unwrap().into_text().unwrap();
+        let compatibility: serde_json::Value = serde_json::from_str(&compatibility).unwrap();
+        socket
+            .send(Message::Text(
+                format!(
+                    r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                    compatibility["id"]
+                )
+                .into(),
+            ))
+            .await
+            .unwrap();
+        drop(socket);
+
+        let mut adapter_failed = false;
+        while let Ok(Ok((stream, _))) = timeout(Duration::from_millis(300), listener.accept()).await
+        {
+            let mut socket = accept_async(stream).await.unwrap();
+            while let Some(Ok(message)) = socket.next().await {
+                let call: serde_json::Value =
+                    serde_json::from_str(message.into_text().unwrap().as_str()).unwrap();
+                let method = call["method"].as_str().unwrap();
+                let params = &call["params"];
+                let mut result = "{}";
+                let mut error = None;
+                match method {
+                    "Page.addScriptToEvaluateOnNewDocument" => {
+                        server_observed
+                            .lock()
+                            .unwrap()
+                            .push("candidate-registered".to_owned());
+                        result = r#"{"identifier":"candidate-script"}"#;
+                    }
+                    "Page.removeScriptToEvaluateOnNewDocument" => {
+                        let identifier = params["identifier"].as_str().unwrap();
+                        server_observed
+                            .lock()
+                            .unwrap()
+                            .push(format!("removed:{identifier}"));
+                        if matches!(failure, PostRegistrationFailure::CandidateRemoval)
+                            && identifier == "candidate-script"
+                            && !adapter_failed
+                        {
+                            adapter_failed = true;
+                            error = Some(r#"{"code":-32000,"message":"candidate removal failed"}"#);
+                        }
+                    }
+                    "Runtime.evaluate" => {
+                        let expression = params["expression"].as_str().unwrap();
+                        let is_visible_false_stage =
+                            matches!(failure, PostRegistrationFailure::CandidateRemoval)
+                                && expression.contains("getComputedStyle")
+                                && !expression.contains("MutationObserver");
+                        let is_failure_stage = match failure {
+                            PostRegistrationFailure::Injection => {
+                                expression.contains("MutationObserver")
+                            }
+                            PostRegistrationFailure::AnimationFrame => {
+                                expression.contains("requestAnimationFrame")
+                            }
+                            PostRegistrationFailure::Verification => {
+                                expression.contains("getComputedStyle")
+                                    && !expression.contains("MutationObserver")
+                            }
+                            PostRegistrationFailure::CandidateRemoval => false,
+                        };
+                        if is_visible_false_stage {
+                            result = r#"{"result":{"type":"boolean","value":false}}"#;
+                        } else if is_failure_stage && !adapter_failed {
+                            adapter_failed = true;
+                            server_observed
+                                .lock()
+                                .unwrap()
+                                .push("adapter-failed".to_owned());
+                            error = Some(r#"{"code":-32000,"message":"adapter operation failed"}"#);
+                        } else {
+                            if expression.contains("mint-gentleman") {
+                                server_observed
+                                    .lock()
+                                    .unwrap()
+                                    .push("renderer-rolled-back".to_owned());
+                            }
+                            result = r#"{"result":{"type":"boolean","value":true}}"#;
+                        }
+                    }
+                    "Page.enable" => {}
+                    other => panic!("unexpected CDP method: {other}"),
+                }
+                let response = if let Some(error) = error {
+                    format!(r#"{{"id":{},"error":{error}}}"#, call["id"])
+                } else {
+                    format!(r#"{{"id":{},"result":{result}}}"#, call["id"])
+                };
+                socket.send(Message::Text(response.into())).await.unwrap();
+                if error.is_some() {
+                    break;
+                }
+            }
+        }
+    });
+    let pack = bundled_theme_packs().remove(0);
+    let result =
+        apply_theme_on_pages_for_version(&endpoint, "26.721.4979.0", &pack, &previous, 1_000).await;
+    server.await.unwrap();
+
+    assert!(matches!(
+        result,
+        Err(ThemeEngineError::Cdp(
+            codex_assistant_lib::control_layer::cdp::CdpClientError::RemoteFailure
+        ))
+    ));
+    let observed = observed.lock().unwrap();
+    assert!(observed.iter().any(|event| event == "candidate-registered"));
+    assert!(observed
+        .iter()
+        .any(|event| event == "removed:candidate-script"));
+    assert!(observed.iter().any(|event| event == "renderer-rolled-back"));
+    assert!(!observed
+        .iter()
+        .any(|event| event == "removed:previous-script"));
+}
+
+#[tokio::test]
+async fn animation_frame_adapter_error_rolls_back_candidate_and_preserves_previous_script() {
+    assert_post_registration_failure_rolls_back(PostRegistrationFailure::AnimationFrame).await;
+}
+
+#[tokio::test]
+async fn injection_adapter_error_rolls_back_candidate_and_preserves_previous_script() {
+    assert_post_registration_failure_rolls_back(PostRegistrationFailure::Injection).await;
+}
+
+#[tokio::test]
+async fn verification_adapter_error_rolls_back_candidate_and_preserves_previous_script() {
+    assert_post_registration_failure_rolls_back(PostRegistrationFailure::Verification).await;
+}
+
+#[tokio::test]
+async fn candidate_removal_error_restores_previous_renderer_and_is_reported() {
+    assert_post_registration_failure_rolls_back(PostRegistrationFailure::CandidateRemoval).await;
+}
+
+#[tokio::test]
+async fn failed_post_commit_cleanup_is_tracked_until_official_restore() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    async fn serve_discovery(listener: &TcpListener, port: u16) {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0_u8; 2_048];
+        let count = stream.read(&mut request).await.unwrap();
+        assert!(
+            String::from_utf8_lossy(&request[..count]).starts_with("GET /json/list HTTP/1.1\r\n")
+        );
+        let body = format!(
+            r#"[{{"id":"main-task","type":"page","webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/page/main-task"}}]"#
+        );
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn serve_compatibility(listener: &TcpListener) {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        let request = socket.next().await.unwrap().unwrap().into_text().unwrap();
+        let request: serde_json::Value = serde_json::from_str(&request).unwrap();
+        assert_eq!(request["method"], "Runtime.evaluate");
+        socket
+            .send(Message::Text(
+                format!(
+                    r#"{{"id":{},"result":{{"result":{{"type":"boolean","value":true}}}}}}"#,
+                    request["id"]
+                )
+                .into(),
+            ))
+            .await
+            .unwrap();
+    }
+
+    async fn serve_successful_transaction(
+        listener: &TcpListener,
+        script_identifier: &str,
+        failed_cleanup: Option<&str>,
+    ) {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        while let Some(Ok(message)) = socket.next().await {
+            let call: serde_json::Value =
+                serde_json::from_str(message.into_text().unwrap().as_str()).unwrap();
+            let method = call["method"].as_str().unwrap();
+            let mut error = None;
+            let result = match method {
+                "Page.enable" => "{}".to_owned(),
+                "Page.addScriptToEvaluateOnNewDocument" => {
+                    format!(r#"{{"identifier":"{script_identifier}"}}"#)
+                }
+                "Runtime.evaluate" => r#"{"result":{"type":"boolean","value":true}}"#.to_owned(),
+                "Page.removeScriptToEvaluateOnNewDocument" => {
+                    let identifier = call["params"]["identifier"].as_str().unwrap();
+                    assert_eq!(Some(identifier), failed_cleanup);
+                    error = Some(r#"{"code":-32000,"message":"cleanup failed"}"#);
+                    "{}".to_owned()
+                }
+                other => panic!("unexpected transaction method: {other}"),
+            };
+            let response = if let Some(error) = error {
+                format!(r#"{{"id":{},"error":{error}}}"#, call["id"])
+            } else {
+                format!(r#"{{"id":{},"result":{result}}}"#, call["id"])
+            };
+            socket.send(Message::Text(response.into())).await.unwrap();
+        }
+    }
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let endpoint = codex_assistant_lib::control_layer::cdp::browser_endpoint(
+        port,
+        &format!(
+            r#"{{"webSocketDebuggerUrl":"ws://127.0.0.1:{port}/devtools/browser/7d47a800-c734-4f9a-a56c-55d875ea1cab"}}"#
+        ),
+    )
+    .unwrap();
+    let restored_identifiers = Arc::new(Mutex::new(Vec::new()));
+    let server_restored_identifiers = Arc::clone(&restored_identifiers);
+    let server = tokio::spawn(async move {
+        serve_discovery(&listener, port).await;
+        serve_compatibility(&listener).await;
+        serve_successful_transaction(&listener, "script-a", None).await;
+
+        serve_discovery(&listener, port).await;
+        serve_compatibility(&listener).await;
+        serve_successful_transaction(&listener, "script-b", Some("script-a")).await;
+
+        serve_discovery(&listener, port).await;
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        while let Some(Ok(message)) = socket.next().await {
+            let call: serde_json::Value =
+                serde_json::from_str(message.into_text().unwrap().as_str()).unwrap();
+            let result = match call["method"].as_str().unwrap() {
+                "Page.removeScriptToEvaluateOnNewDocument" => {
+                    server_restored_identifiers
+                        .lock()
+                        .unwrap()
+                        .push(call["params"]["identifier"].as_str().unwrap().to_owned());
+                    "{}"
+                }
+                "Runtime.evaluate" => r#"{"result":{"type":"boolean","value":true}}"#,
+                other => panic!("unexpected restore method: {other}"),
+            };
+            socket
+                .send(Message::Text(
+                    format!(r#"{{"id":{},"result":{result}}}"#, call["id"]).into(),
+                ))
+                .await
+                .unwrap();
+        }
+    });
+
+    let mut packs = bundled_theme_packs();
+    let first = packs.remove(1);
+    let second = packs.remove(0);
+    let first_result =
+        apply_theme_on_pages_for_version(&endpoint, "26.721.4979.0", &first, &[], 1_000)
+            .await
+            .unwrap();
+    let second_result = apply_theme_on_pages_for_version(
+        &endpoint,
+        "26.721.4979.0",
+        &second,
+        &first_result.scripts,
+        1_000,
+    )
+    .await
+    .unwrap();
+    let restored = restore_theme_on_pages(&endpoint, &second_result.scripts, 1_000)
+        .await
+        .unwrap();
+    server.await.unwrap();
+
+    assert_eq!(restored, 1);
+    assert_eq!(
+        restored_identifiers.lock().unwrap().as_slice(),
+        ["script-b", "script-a"]
+    );
 }

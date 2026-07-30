@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ThemeEnvironmentReport,
   ThemeOperationReceipt,
@@ -50,6 +50,11 @@ const receipt: ThemeOperationReceipt = {
 };
 
 describe("useTheme", () => {
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.mocked(themeApi.getSnapshot).mockReset();
     vi.mocked(themeApi.getEnvironment).mockReset();
@@ -128,6 +133,28 @@ describe("useTheme", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("preserves the actionable monitor failure when restart impact cannot be prepared", async () => {
+    vi.mocked(themeApi.getSnapshot).mockResolvedValue(validSnapshot);
+    vi.mocked(themeApi.activate).mockResolvedValue({
+      operation_id: "d2719d93-b823-4a7f-934f-23cbe01c8ab4",
+      status: "blocked",
+      reason_codes: ["monitor-uncertain"],
+      restart_required: false,
+    });
+    vi.mocked(themeApi.prepareForceRestart).mockRejectedValue(new Error("CdpUnavailable"));
+    const { result } = renderHook(() => useTheme());
+    await waitFor(() => expect(result.current.snapshot).toEqual(validSnapshot));
+
+    await act(() => result.current.activate("wisteria-bride"));
+
+    expect(result.current.receipt).toMatchObject({
+      status: "blocked",
+      reason_codes: ["monitor-uncertain"],
+    });
+    expect(result.current.error).toMatch(/监控数据不完整|普通重启已阻止/);
+    expect(result.current.error).not.toMatch(/主题操作失败/);
+  });
+
   it("serializes session and apply mutations then refreshes confirmed state", async () => {
     let finishStart: ((value: ThemeOperationReceipt) => void) | undefined;
     vi.mocked(themeApi.getSnapshot).mockResolvedValue(validSnapshot);
@@ -158,6 +185,30 @@ describe("useTheme", () => {
     expect(themeApi.activate).toHaveBeenCalledWith("aurora-grid");
     expect(themeApi.getSnapshot).toHaveBeenCalledTimes(3);
     expect(result.current.operation).toBeNull();
+  });
+
+  it("releases a stalled activation instead of leaving every theme card busy forever", async () => {
+    vi.useFakeTimers();
+    vi.mocked(themeApi.getSnapshot).mockResolvedValue(validSnapshot);
+    vi.mocked(themeApi.activate).mockReturnValue(new Promise(() => undefined));
+    const { result, unmount } = renderHook(() => useTheme());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.snapshot).toEqual(validSnapshot);
+
+    act(() => {
+      void result.current.activate("aurora-grid");
+    });
+    expect(result.current.operation).toBe("activate");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120_001);
+    });
+
+    expect(result.current.operation).toBeNull();
+    expect(result.current.error).toMatch(/超时|重新尝试/);
+    unmount();
   });
 
   it("restores the official appearance through the narrow restore operation", async () => {

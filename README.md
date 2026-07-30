@@ -6,7 +6,7 @@
 ![Codex Assistant social preview](website/public/og.png)
 
 [官网](https://codex-assistant-windows.dzass2.chatgpt.site) ·
-[下载 v0.11.8](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8) ·
+[下载 v0.11.9](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.9) ·
 [问题反馈](https://github.com/dzass3/codex-assistant/issues)
 
 ## 中文
@@ -14,7 +14,7 @@
 ### 功能
 
 - 只读显示根任务和子代理的层级、运行状态、实际模型、推理强度与模型漂移。
-- 一键应用 14 套随安装包分发、已经完成人工权利核验的主题。
+- 一键应用 12 套随安装包分发、已经完成人工权利核验的主题。
 - 导入你有权使用的 PNG、JPEG 或 WebP 图片；素材只保存在当前设备。
 - 应用前检测 Windows、处理器架构、Microsoft Store 官方 Codex、窗口数量、版本适配器与主题控制会话。
 - 主题只装饰经过验证的视觉层，不修改 Microsoft Store 包、`app.asar`、WindowsApps 文件、官方数据库或代码签名。
@@ -32,19 +32,19 @@ Smart Routing 不属于当前产品。Codex Assistant 不创建、控制、改�
 
 ### 安装
 
-在 [v0.11.8 Release](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8) 中按设备选择：
+在 [v0.11.9 Release](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.9) 中按设备选择：
 
 | 架构  | 推荐安装包                               | MSI                                      |
 | ----- | ---------------------------------------- | ---------------------------------------- |
-| x64   | `Codex.Assistant_0.11.8_x64-setup.exe`   | `Codex.Assistant_0.11.8_x64_en-US.msi`   |
-| ARM64 | `Codex.Assistant_0.11.8_arm64-setup.exe` | `Codex.Assistant_0.11.8_arm64_en-US.msi` |
+| x64   | `Codex Assistant_0.11.9_x64-setup.exe`   | `Codex Assistant_0.11.9_x64_en-US.msi`   |
+| ARM64 | `Codex Assistant_0.11.9_arm64-setup.exe` | `Codex Assistant_0.11.9_arm64_en-US.msi` |
 
-> **未签名提示：** 0.11.8 安装包尚未购买代码签名证书，Windows 可能显示 SmartScreen 或“未知发布者”提示。请只从本仓库 Release 或官网进入下载，并使用 Release 中的 `SHA256SUMS.txt` 校验文件。
+> **未签名提示：** 0.11.9 安装包尚未购买代码签名证书，Windows 可能显示 SmartScreen 或“未知发布者”提示。请只从本仓库 Release 或官网进入下载，并使用 Release 中的 `SHA256SUMS.txt` 校验文件。
 
 PowerShell 校验示例：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath '.\Codex.Assistant_0.11.8_x64-setup.exe'
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\Codex Assistant_0.11.9_x64-setup.exe'
 ```
 
 ### 应用与恢复主题
@@ -101,7 +101,7 @@ npm test
 ### What it does
 
 - Observes root tasks and native subagents using read-only, allow-listed local metadata.
-- Ships 14 rights-reviewed themes and supports local PNG, JPEG, and WebP imports.
+- Ships 12 rights-reviewed themes and supports local PNG, JPEG, and WebP imports.
 - Checks Windows, CPU architecture, the official Microsoft Store Codex package, window count, version adapter, and the local theme-control session before applying a theme.
 - Decorates verified visual surfaces without patching the Store package, `app.asar`, WindowsApps files, official databases, or code signatures.
 - Fails closed and restores a consistent official appearance when compatibility checks do not pass.
@@ -116,9 +116,9 @@ Smart Routing is not part of this product. The observer does not create, control
 
 ### Install and verify
 
-Download the matching EXE or MSI from the [v0.11.8 release](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.8).
+Download the matching EXE or MSI from the [v0.11.9 release](https://github.com/dzass3/codex-assistant/releases/tag/v0.11.9).
 
-> **Unsigned build:** version 0.11.8 is not code-signed. Windows may show SmartScreen or “Unknown publisher.” Download only through this repository or the official project website, then compare the SHA-256 value with `SHA256SUMS.txt`.
+> **Unsigned build:** version 0.11.9 is not code-signed. Windows may show SmartScreen or “Unknown publisher.” Download only through this repository or the official project website, then compare the SHA-256 value with `SHA256SUMS.txt`.
 
 ### Apply or restore a theme
 

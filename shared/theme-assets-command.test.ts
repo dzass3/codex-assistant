@@ -20,6 +20,12 @@ const definition = join(repositoryRoot, "assets/theme-sources/wisteria-bride/the
 const temporaryRoots: string[] = [];
 
 interface ThemeSourceFixture {
+  marketplace: {
+    genres: string[];
+    badges: string[];
+    published_at: string;
+    sort_order: number;
+  };
   source: {
     sha256: string;
     mime_type: string;
@@ -107,6 +113,12 @@ describe("bundled theme asset command", () => {
       id: "wisteria-bride",
       name: "紫藤花嫁",
       preview_path: "/themes/wisteria-bride.webp",
+      marketplace: {
+        genres: ["anime", "fantasy"],
+        badges: ["popular", "featured"],
+        published_at: "2026-07-24",
+        sort_order: 10,
+      },
       backdrop: { kind: "image", asset_id: "wisteria-bride" },
       assets: [
         {
@@ -134,6 +146,30 @@ describe("bundled theme asset command", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/rights/i);
+  });
+
+  it.each([
+    {
+      label: "unknown genre",
+      mutate: (value: ThemeSourceFixture) => value.marketplace.genres.push("retro"),
+    },
+    {
+      label: "duplicate badge",
+      mutate: (value: ThemeSourceFixture) => value.marketplace.badges.push("popular"),
+    },
+    {
+      label: "invalid publication date",
+      mutate: (value: ThemeSourceFixture) => {
+        value.marketplace.published_at = "July 24";
+      },
+    },
+  ])("rejects invalid marketplace metadata: $label", ({ mutate }) => {
+    const fixture = definitionFixture(mutate);
+
+    const result = runBuild(join(fixture.root, "output"), fixture.definition);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/definition|marketplace/i);
   });
 
   it("builds another valid stable theme definition without command changes", () => {

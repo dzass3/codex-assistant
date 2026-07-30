@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
 use codex_assistant_lib::control_layer::windows_package::{
-    authorize_restart, cdp_launch_arguments, discover_store_package, parse_package_query,
-    plan_leaf_first_termination, query_process_identity, query_tcp_listener, reserve_loopback_port,
-    store_activation_arguments, validate_app_server_set, validate_no_owned_runtime_processes,
-    validate_replacement_set, validate_stable_pid_samples, validate_tree_drain, verify_listener,
-    verify_package, verify_process, IdentityError, ListenerProbe, PackageProbe, ProcessProbe,
-    ProcessTreeEntry, RestartGuard, RuntimeProcessProbe, SetupPhase, SignatureStatus,
+    authorize_restart, cdp_launch_arguments, discover_store_package, filter_visible_ui_candidates,
+    parse_package_query, plan_leaf_first_termination, query_process_identity, query_tcp_listener,
+    reserve_loopback_port, store_activation_arguments, validate_app_server_set,
+    validate_no_owned_runtime_processes, validate_replacement_set, validate_stable_pid_samples,
+    validate_tree_drain, verify_listener, verify_package, verify_process,
+    verify_ui_process_identities, IdentityError, ListenerProbe, PackageProbe, ProcessIdentity,
+    ProcessProbe, ProcessTreeEntry, RestartGuard, RuntimeProcessProbe, SetupPhase, SignatureStatus,
     VerifiedProcess, CODEX_APP_USER_MODEL_ID, CODEX_PACKAGE_FAMILY,
 };
 
@@ -224,6 +225,49 @@ fn replacement_proof_requires_one_new_verified_ui_process() {
 }
 
 #[test]
+fn ui_process_discovery_propagates_candidate_identity_uncertainty() {
+    let verified_package = verify_package(package()).expect("official package");
+    let identity_results: Vec<Result<ProcessIdentity, IdentityError>> =
+        vec![Err(IdentityError::ProcessQuery)];
+
+    assert_eq!(
+        verify_ui_process_identities(&verified_package, "S-1-5-21-1000", identity_results,),
+        Err(IdentityError::ProcessIdentityQuery)
+    );
+}
+
+#[test]
+fn ui_process_discovery_preserves_verified_process_errors() {
+    let verified_package = verify_package(package()).expect("official package");
+    let wrong_owner = ProcessIdentity {
+        pid: 41_000,
+        owner_sid: "S-1-5-21-2000".into(),
+        canonical_image_path: verified_package.executable.clone(),
+        package_family: Some(CODEX_PACKAGE_FAMILY.into()),
+    };
+
+    assert_eq!(
+        verify_ui_process_identities(&verified_package, "S-1-5-21-1000", [Ok(wrong_owner)],),
+        Err(IdentityError::ProcessOwner)
+    );
+}
+
+#[test]
+fn ui_process_discovery_queries_only_visible_chatgpt_candidates() {
+    let process_names = std::collections::HashMap::from([
+        (10_u32, "AdministratorTool.exe".to_owned()),
+        (41_000_u32, "ChatGPT.exe".to_owned()),
+        (42_000_u32, "chatgpt.EXE".to_owned()),
+        (43_000_u32, "codex-assistant.exe".to_owned()),
+    ]);
+
+    assert_eq!(
+        filter_visible_ui_candidates([10, 41_000, 42_000, 43_000], &process_names),
+        vec![41_000, 42_000]
+    );
+}
+
+#[test]
 fn cdp_launch_is_random_loopback_only_and_never_shell_encoded() {
     let reservation = reserve_loopback_port().expect("ephemeral loopback reservation");
     assert_eq!(reservation.address().to_string(), "127.0.0.1");
@@ -303,6 +347,31 @@ fn discovers_the_real_installed_store_package_without_mutating_it() {
     assert_eq!(
         package
             .executable
+            .file_name()
+            .and_then(|name| name.to_str()),
+        Some("ChatGPT.exe")
+    );
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "requires one visible Microsoft Store Codex window"]
+fn discovers_the_real_visible_store_codex_without_mutating_it() {
+    use codex_assistant_lib::control_layer::windows_package::discover_verified_ui_processes;
+
+    let package = discover_store_package().expect("installed official Codex package");
+    let current_user = query_process_identity(std::process::id()).expect("current user identity");
+    let processes =
+        discover_verified_ui_processes(&package, &current_user.owner_sid).expect("UI discovery");
+
+    assert_eq!(
+        processes.len(),
+        1,
+        "expected one visible official Codex window"
+    );
+    assert_eq!(
+        processes[0]
+            .image_path
             .file_name()
             .and_then(|name| name.to_str()),
         Some("ChatGPT.exe")

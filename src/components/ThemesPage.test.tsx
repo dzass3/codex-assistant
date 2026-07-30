@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import bundledCatalogJson from "../../shared/theme-catalog.json";
 import type { ThemeEnvironmentReport, ThemePack, ThemeUiSnapshot } from "../../shared/theme-types";
@@ -29,6 +29,12 @@ const aurora: ThemePack = {
   name: "Aurora Grid",
   description: "Project-owned abstract aurora.",
   category: "abstract",
+  marketplace: {
+    genres: ["nature", "minimal"],
+    badges: ["featured"],
+    published_at: "2026-07-18",
+    sort_order: 20,
+  },
   preview_path: "/themes/aurora-grid.svg",
   backdrop: {
     kind: "gradient",
@@ -58,6 +64,12 @@ const muse: ThemePack = {
   name: "Observatory Muse",
   description: "Original fictional technologist.",
   category: "original-character",
+  marketplace: {
+    genres: ["cyber", "dark"],
+    badges: ["popular", "new"],
+    published_at: "2026-07-19",
+    sort_order: 10,
+  },
   preview_path: "/themes/original-observatory-muse.jpg",
   backdrop: {
     kind: "image",
@@ -112,6 +124,7 @@ function state(snapshot: ThemeUiSnapshot, overrides: Record<string, unknown> = {
     error: null,
     connected: true,
     operation: null,
+    operationThemeId: null,
     receipt: null,
     pendingForce: null,
     refresh: vi.fn(),
@@ -128,6 +141,7 @@ function state(snapshot: ThemeUiSnapshot, overrides: Record<string, unknown> = {
 
 describe("ThemesPage", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.mocked(useTheme).mockReset();
     vi.mocked(themeApi.getPreviewDataUrl).mockReset();
   });
@@ -143,15 +157,43 @@ describe("ThemesPage", () => {
     vi.mocked(useTheme).mockReturnValue(value);
     render(<ThemesPage />);
 
-    expect(screen.getByRole("heading", { name: "一键换肤" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Codex Theme Gallery" })).toBeInTheDocument();
     expect(screen.getByText(/首次应用可能需要你确认重启官方 ChatGPT\/Codex/)).toBeInTheDocument();
-    const applyButtons = screen.getAllByRole("button", { name: "应用主题" });
-    expect(applyButtons[0]).toBeEnabled();
-    fireEvent.click(applyButtons[0]);
+    const auroraCard = screen
+      .getByRole("heading", { name: "Aurora Grid" })
+      .closest<HTMLElement>(".theme-card");
+    const applyButton = within(auroraCard!).getByRole("button", { name: "应用主题" });
+    expect(applyButton).toBeEnabled();
+    fireEvent.click(applyButton);
     expect(value.activate).toHaveBeenCalledWith("aurora-grid");
 
     fireEvent.click(screen.getByRole("button", { name: "启动主题会话" }));
     expect(value.startSession).toHaveBeenCalledOnce();
+  });
+
+  it("marks only the selected card as applying while the bounded operation is in progress", () => {
+    vi.mocked(useTheme).mockReturnValue(
+      state(
+        {
+          contract_version: 2,
+          session_status: "ready",
+          selected_theme_id: null,
+          applied_theme_id: null,
+          packs: [aurora, muse],
+        },
+        { operation: "activate", operationThemeId: "aurora-grid" },
+      ),
+    );
+    render(<ThemesPage />);
+
+    const auroraCard = screen
+      .getByRole("heading", { name: "Aurora Grid" })
+      .closest<HTMLElement>(".theme-card");
+    const museCard = screen
+      .getByRole("heading", { name: "Observatory Muse" })
+      .closest<HTMLElement>(".theme-card");
+    expect(within(auroraCard!).getByRole("button", { name: "正在启动并应用…" })).toBeDisabled();
+    expect(within(museCard!).getByRole("button", { name: "应用主题" })).toBeDisabled();
   });
 
   it("shows only rights-verified bundled themes and applies one by its fixed identifier", () => {
@@ -165,14 +207,98 @@ describe("ThemesPage", () => {
     vi.mocked(useTheme).mockReturnValue(value);
     render(<ThemesPage />);
 
-    expect(screen.getAllByText("版权已核验")).toHaveLength(2);
+    expect(screen.getAllByText("Official")).toHaveLength(2);
     expect(screen.getByAltText("Observatory Muse 主题预览")).toHaveAttribute(
       "src",
       "/themes/original-observatory-muse.jpg",
     );
-    fireEvent.click(screen.getAllByRole("button", { name: "应用主题" })[1]);
+    const museCard = screen
+      .getByRole("heading", { name: "Observatory Muse" })
+      .closest<HTMLElement>(".theme-card");
+    fireEvent.click(within(museCard!).getByRole("button", { name: "应用主题" }));
     expect(value.activate).toHaveBeenCalledWith("observatory-muse");
     expect(screen.getByText(/名人、动漫\/IP 和第三方仓库截图不会随应用分发/)).toBeInTheDocument();
+  });
+
+  it("combines marketplace and genre filters and can clear an empty result", () => {
+    vi.mocked(useTheme).mockReturnValue(
+      state({
+        contract_version: 2,
+        session_status: "ready",
+        selected_theme_id: null,
+        applied_theme_id: null,
+        packs: [aurora, muse],
+      }),
+    );
+    render(<ThemesPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "热门" }));
+    expect(screen.getByRole("heading", { name: "Observatory Muse" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Aurora Grid" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nature" }));
+    expect(screen.getByText("没有符合当前筛选的主题")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+
+    expect(screen.getByRole("heading", { name: "Observatory Muse" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Aurora Grid" })).toBeVisible();
+  });
+
+  it("favorites a theme locally and filters the gallery without changing activation", () => {
+    const value = state({
+      contract_version: 2,
+      session_status: "ready",
+      selected_theme_id: null,
+      applied_theme_id: null,
+      packs: [aurora, muse],
+    });
+    vi.mocked(useTheme).mockReturnValue(value);
+    render(<ThemesPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "收藏 Aurora Grid" }));
+    fireEvent.click(screen.getByRole("button", { name: "收藏" }));
+
+    expect(screen.getByRole("heading", { name: "Aurora Grid" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Observatory Muse" })).not.toBeInTheDocument();
+    expect(value.activate).not.toHaveBeenCalled();
+  });
+
+  it("previews a complete themed workspace without applying until the modal action", () => {
+    const value = state({
+      contract_version: 2,
+      session_status: "ready",
+      selected_theme_id: null,
+      applied_theme_id: null,
+      packs: [aurora],
+    });
+    vi.mocked(useTheme).mockReturnValue(value);
+    render(<ThemesPage />);
+
+    const previewTrigger = screen.getByRole("button", { name: "预览 Aurora Grid" });
+    previewTrigger.focus();
+    fireEvent.click(previewTrigger);
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Aurora Grid 主题实时预览",
+    });
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByText("Sidebar")).toBeVisible();
+    expect(within(dialog).getByText("Chat")).toBeVisible();
+    expect(within(dialog).getByText("Input")).toBeVisible();
+    expect(within(dialog).getByText("Terminal")).toBeVisible();
+    expect(value.activate).not.toHaveBeenCalled();
+
+    expect(within(dialog).getByRole("button", { name: "关闭主题预览" })).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(within(dialog).getByRole("button", { name: "应用 Aurora Grid" })).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(previewTrigger).toHaveFocus();
+
+    fireEvent.click(previewTrigger);
+    fireEvent.click(screen.getByRole("button", { name: "应用 Aurora Grid" }));
+    expect(value.activate).toHaveBeenCalledWith("aurora-grid");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows the real offline Wisteria Bride card and activates its stable identifier", () => {
@@ -210,14 +336,14 @@ describe("ThemesPage", () => {
       session_status: "inactive",
       selected_theme_id: null,
       applied_theme_id: null,
-      catalog_notice: "原主题已下架，请从 14 个新主题中重新选择",
+      catalog_notice: "原主题已下架，请从 12 个新主题中重新选择",
       packs: [wisteriaBride],
     });
     vi.mocked(useTheme).mockReturnValue(value);
 
     render(<ThemesPage />);
 
-    expect(screen.getByText("原主题已下架，请从 14 个新主题中重新选择")).toHaveAttribute(
+    expect(screen.getByText("原主题已下架，请从 12 个新主题中重新选择")).toHaveAttribute(
       "role",
       "status",
     );
@@ -263,7 +389,15 @@ describe("ThemesPage", () => {
       "data:image/jpeg;base64,YQ==",
     );
     expect(screen.getByText("仅限本机")).toBeVisible();
-    expect(screen.queryByText("版权已核验")).not.toBeInTheDocument();
+    expect(screen.queryByText("Official")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "最新" }));
+    expect(screen.getByRole("heading", { name: "Arina 粉晶花园" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "收藏 Arina 粉晶花园" }));
+    fireEvent.click(screen.getByRole("button", { name: "收藏" }));
+    expect(screen.getByRole("heading", { name: "Arina 粉晶花园" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "官方" }));
+    expect(screen.getByText("没有符合当前筛选的主题")).toBeVisible();
   });
 
   it("imports a selected local image through the visible import control", async () => {

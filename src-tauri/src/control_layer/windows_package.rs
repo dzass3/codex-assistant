@@ -114,6 +114,7 @@ pub enum IdentityError {
     PortUnavailable,
     InvalidPort,
     ProcessQuery,
+    ProcessIdentityQuery,
     ListenerMissing,
     AmbiguousListener,
     ProcessTreeIncomplete,
@@ -1196,16 +1197,79 @@ fn visible_top_level_process_ids() -> Result<Vec<u32>, IdentityError> {
     Ok(processes)
 }
 
+pub fn filter_visible_ui_candidates(
+    visible_process_ids: impl IntoIterator<Item = u32>,
+    process_names: &std::collections::HashMap<u32, String>,
+) -> Vec<u32> {
+    visible_process_ids
+        .into_iter()
+        .filter(|pid| {
+            process_names
+                .get(pid)
+                .is_some_and(|name| name.eq_ignore_ascii_case(CODEX_EXECUTABLE_NAME))
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn snapshot_process_names() -> Result<std::collections::HashMap<u32, String>, IdentityError> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+        System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        },
+    };
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == INVALID_HANDLE_VALUE {
+        return Err(IdentityError::ProcessQuery);
+    }
+    let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+    entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+    let mut names = std::collections::HashMap::new();
+    let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry) } != 0;
+    while has_entry {
+        if entry.th32ProcessID != 0 {
+            let terminator = entry
+                .szExeFile
+                .iter()
+                .position(|character| *character == 0)
+                .unwrap_or(entry.szExeFile.len());
+            if let Ok(name) = String::from_utf16(&entry.szExeFile[..terminator]) {
+                names.insert(entry.th32ProcessID, name);
+            }
+        }
+        has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
+    }
+    unsafe { CloseHandle(snapshot) };
+    if names.is_empty() {
+        return Err(IdentityError::ProcessQuery);
+    }
+    Ok(names)
+}
+
 #[cfg(windows)]
 pub fn discover_verified_ui_processes(
     package: &VerifiedPackage,
     current_user_sid: &str,
 ) -> Result<Vec<VerifiedProcess>, IdentityError> {
+    let visible_process_ids = visible_top_level_process_ids()?;
+    let process_names = snapshot_process_names()?;
+    let identities = filter_visible_ui_candidates(visible_process_ids, &process_names)
+        .into_iter()
+        .map(query_process_identity);
+    verify_ui_process_identities(package, current_user_sid, identities)
+}
+
+pub fn verify_ui_process_identities(
+    package: &VerifiedPackage,
+    current_user_sid: &str,
+    identities: impl IntoIterator<Item = Result<ProcessIdentity, IdentityError>>,
+) -> Result<Vec<VerifiedProcess>, IdentityError> {
     let mut verified = Vec::new();
-    for pid in visible_top_level_process_ids()? {
-        let Ok(identity) = query_process_identity(pid) else {
-            continue;
-        };
+    for identity in identities {
+        let identity = identity.map_err(|_| IdentityError::ProcessIdentityQuery)?;
         if identity.package_family.as_deref() != Some(CODEX_PACKAGE_FAMILY)
             || !same_windows_path(&identity.canonical_image_path, &package.executable)
         {

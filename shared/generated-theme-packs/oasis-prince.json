@@ -5,6 +5,12 @@
   "name": "绿洲暮光",
   "description": "绿洲水岸与暮光金辉构成的蓝金主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy", "nature"],
+    "badges": [],
+    "published_at": "2026-07-24",
+    "sort_order": 70
+  },
   "preview_path": "/themes/oasis-prince.webp",
   "backdrop": {
     "kind": "image",
@@ -26,6 +32,11 @@
     "contrast_percent": 100,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 46,
+    "complexity": 42,
+    "saturation": 45
+  },
   "assets": [
     {
       "id": "oasis-prince",
@@ -39,7 +50,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

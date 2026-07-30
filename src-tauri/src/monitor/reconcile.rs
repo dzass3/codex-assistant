@@ -2,10 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use super::model::{
     AgentObservation, AgentStatus, HealthLevel, ModelSource, MonitorSnapshot, ObserverStatus,
-    ReconcileInput, SpawnFact, SummaryCounts, ThreadFact,
+    ProcessActivityProjection, ProcessSessionEvidence, ReconcileInput, SpawnFact, SummaryCounts,
+    ThreadFact,
 };
 
 pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
+    let process_projection = input.process_session.project(None);
     let spawns: HashMap<&str, &SpawnFact> = input
         .spawns
         .iter()
@@ -30,8 +32,7 @@ pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
                 thread,
                 spawns.get(thread.thread_id.as_str()).copied(),
                 &parents,
-                input.codex_running,
-                input.session_started_at_ms,
+                input.process_session,
                 now_ms,
             )
         })
@@ -49,7 +50,10 @@ pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
         || input.health.rollout_observer.level == HealthLevel::Error
     {
         ObserverStatus::Error
-    } else if counts.uncertain > 0 || counts.tracking_errors > 0 {
+    } else if !process_projection.monitor_confident
+        || counts.uncertain > 0
+        || counts.tracking_errors > 0
+    {
         ObserverStatus::Uncertain
     } else if input.health.state_database.level == HealthLevel::Degraded
         || input.health.rollout_observer.level == HealthLevel::Degraded
@@ -60,8 +64,8 @@ pub fn reconcile(input: ReconcileInput, now_ms: i64) -> MonitorSnapshot {
     };
     MonitorSnapshot {
         generated_at_ms: now_ms,
-        codex_running: input.codex_running,
-        session_started_at_ms: input.session_started_at_ms,
+        codex_running: process_projection.codex_running,
+        session_started_at_ms: process_projection.session_started_at_ms,
         observer_status,
         agents,
         counts,
@@ -73,8 +77,7 @@ fn observe_thread(
     thread: &ThreadFact,
     spawn: Option<&SpawnFact>,
     parents: &HashMap<&str, Option<&str>>,
-    codex_running: bool,
-    session_started_at_ms: Option<i64>,
+    process_session: ProcessSessionEvidence,
     now_ms: i64,
 ) -> AgentObservation {
     let requested_model = spawn.and_then(|fact| fact.requested_model.clone());
@@ -108,18 +111,17 @@ fn observe_thread(
         (updated >= 0 && updated <= now_ms.saturating_add(5 * 60 * 1_000))
             .then(|| now_ms.saturating_sub(updated).max(0))
     });
-    let current_session_evidence = session_started_at_ms
-        .zip(updated_at_ms)
-        .is_some_and(|(session_start, updated)| updated >= session_start);
+    let process_projection = process_session.project(updated_at_ms);
     let status = match lifecycle_status {
-        AgentStatus::Starting | AgentStatus::Running if !codex_running => {
+        AgentStatus::Starting | AgentStatus::Running
+            if process_projection.activity == ProcessActivityProjection::Historical =>
+        {
             AgentStatus::HistoricalUnclosed
         }
-        AgentStatus::Starting | AgentStatus::Running if current_session_evidence => {
+        AgentStatus::Starting | AgentStatus::Running
+            if process_projection.activity == ProcessActivityProjection::Current =>
+        {
             lifecycle_status
-        }
-        AgentStatus::Starting | AgentStatus::Running if session_started_at_ms.is_some() => {
-            AgentStatus::HistoricalUnclosed
         }
         AgentStatus::Starting | AgentStatus::Running => AgentStatus::Uncertain,
         other => other,
@@ -254,7 +256,8 @@ fn count_agents(agents: &[AgentObservation]) -> SummaryCounts {
 mod tests {
     use super::*;
     use crate::monitor::model::{
-        HealthEntry, HealthLevel, ReconcileInput, SourceHealth, SpawnFact, ThreadFact,
+        HealthEntry, HealthLevel, ProcessSessionConfidence, ProcessSessionEvidence, ReconcileInput,
+        RestartSafetyProjection, SourceHealth, SpawnFact, ThreadFact,
     };
 
     fn health() -> SourceHealth {
@@ -288,6 +291,250 @@ mod tests {
     }
 
     #[test]
+    fn verified_absence_projects_historical_liveness_and_allows_a_confident_restart() {
+        let snapshot = reconcile(
+            ReconcileInput {
+                threads: vec![ThreadFact {
+                    thread_id: "unclosed".into(),
+                    latest_task_started_ms: Some(9_500),
+                    updated_at_ms: Some(9_500),
+                    ..ThreadFact::default()
+                }],
+                spawns: vec![],
+                health: health(),
+                process_session: ProcessSessionEvidence::VerifiedAbsent,
+            },
+            10_000,
+        );
+        let restart = RestartSafetyProjection::from_snapshot(&snapshot);
+
+        assert_eq!(
+            (
+                snapshot.codex_running,
+                snapshot.session_started_at_ms,
+                snapshot.agents[0].status,
+                snapshot.observer_status,
+                restart.active_work_count,
+                restart.monitor_confident,
+                restart.blocking_reason(),
+            ),
+            (
+                false,
+                None,
+                AgentStatus::HistoricalUnclosed,
+                ObserverStatus::Live,
+                0,
+                true,
+                None,
+            )
+        );
+    }
+
+    #[test]
+    fn one_verified_process_projects_current_liveness_and_blocks_for_active_work() {
+        let snapshot = reconcile(
+            ReconcileInput {
+                threads: vec![ThreadFact {
+                    thread_id: "current".into(),
+                    latest_task_started_ms: Some(9_500),
+                    updated_at_ms: Some(9_500),
+                    ..ThreadFact::default()
+                }],
+                spawns: vec![],
+                health: health(),
+                process_session: ProcessSessionEvidence::OneVerifiedOfficial {
+                    process_id: 41,
+                    started_at_ms: 9_000,
+                },
+            },
+            10_000,
+        );
+        let restart = RestartSafetyProjection::from_snapshot(&snapshot);
+
+        assert_eq!(
+            (
+                snapshot.codex_running,
+                snapshot.session_started_at_ms,
+                snapshot.agents[0].status,
+                snapshot.observer_status,
+                restart.active_work_count,
+                restart.monitor_confident,
+                restart.blocking_reason(),
+            ),
+            (
+                true,
+                Some(9_000),
+                AgentStatus::Running,
+                ObserverStatus::Live,
+                1,
+                true,
+                Some("active-work"),
+            )
+        );
+    }
+
+    #[test]
+    fn multiple_verified_processes_are_visible_but_never_restart_confident() {
+        let snapshot = reconcile(
+            ReconcileInput {
+                threads: vec![ThreadFact {
+                    thread_id: "ambiguous-session".into(),
+                    latest_task_started_ms: Some(9_500),
+                    updated_at_ms: Some(9_500),
+                    ..ThreadFact::default()
+                }],
+                spawns: vec![],
+                health: health(),
+                process_session: ProcessSessionEvidence::MultipleVerifiedOfficial {
+                    process_count: 2,
+                },
+            },
+            10_000,
+        );
+        let restart = RestartSafetyProjection::from_snapshot(&snapshot);
+
+        assert_eq!(
+            (
+                snapshot.codex_running,
+                snapshot.session_started_at_ms,
+                snapshot.agents[0].status,
+                snapshot.observer_status,
+                restart.active_work_count,
+                restart.monitor_confident,
+                restart.blocking_reason(),
+            ),
+            (
+                true,
+                None,
+                AgentStatus::Uncertain,
+                ObserverStatus::Uncertain,
+                0,
+                false,
+                Some("monitor-uncertain"),
+            )
+        );
+    }
+
+    #[test]
+    fn discovery_error_remains_distinct_and_blocks_restart() {
+        let evidence = ProcessSessionEvidence::DiscoveryUncertain;
+        let evidence_projection = evidence.project(None);
+        let snapshot = reconcile(
+            ReconcileInput {
+                threads: vec![],
+                spawns: vec![],
+                health: health(),
+                process_session: evidence,
+            },
+            10_000,
+        );
+        let restart = RestartSafetyProjection::from_snapshot(&snapshot);
+
+        assert_eq!(
+            (
+                evidence_projection.confidence,
+                snapshot.codex_running,
+                snapshot.observer_status,
+                restart.monitor_confident,
+                restart.blocking_reason(),
+            ),
+            (
+                ProcessSessionConfidence::DiscoveryUncertain,
+                false,
+                ObserverStatus::Uncertain,
+                false,
+                Some("monitor-uncertain"),
+            )
+        );
+    }
+
+    #[test]
+    fn current_user_or_process_identity_error_remains_distinct_and_blocks_restart() {
+        let evidence = ProcessSessionEvidence::IdentityUncertain;
+        let evidence_projection = evidence.project(None);
+        let snapshot = reconcile(
+            ReconcileInput {
+                threads: vec![],
+                spawns: vec![],
+                health: health(),
+                process_session: evidence,
+            },
+            10_000,
+        );
+        let restart = RestartSafetyProjection::from_snapshot(&snapshot);
+
+        assert_eq!(
+            (
+                evidence_projection.confidence,
+                snapshot.codex_running,
+                snapshot.observer_status,
+                restart.monitor_confident,
+                restart.blocking_reason(),
+            ),
+            (
+                ProcessSessionConfidence::IdentityUncertain,
+                false,
+                ObserverStatus::Uncertain,
+                false,
+                Some("monitor-uncertain"),
+            )
+        );
+    }
+
+    #[test]
+    fn timestamps_and_replacement_identity_bound_current_session_liveness() {
+        let snapshot_at = |process_session, observed_at_ms| {
+            reconcile(
+                ReconcileInput {
+                    threads: vec![ThreadFact {
+                        thread_id: "bounded".into(),
+                        latest_task_started_ms: Some(observed_at_ms),
+                        updated_at_ms: Some(observed_at_ms),
+                        ..ThreadFact::default()
+                    }],
+                    spawns: vec![],
+                    health: health(),
+                    process_session,
+                },
+                10_000,
+            )
+        };
+        let original = ProcessSessionEvidence::OneVerifiedOfficial {
+            process_id: 41,
+            started_at_ms: 9_000,
+        };
+        let replacement = ProcessSessionEvidence::OneVerifiedOfficial {
+            process_id: 42,
+            started_at_ms: 9_800,
+        };
+        let stale = snapshot_at(original, 8_500);
+        let current = snapshot_at(original, 9_500);
+        let future = snapshot_at(original, 700_000);
+        let after_identity_change = snapshot_at(replacement, 9_500);
+
+        assert_eq!(
+            (
+                original.project(None).process_id,
+                replacement.project(None).process_id,
+                stale.agents[0].status,
+                current.agents[0].status,
+                future.agents[0].status,
+                future.agents[0].freshness_ms,
+                after_identity_change.agents[0].status,
+            ),
+            (
+                Some(41),
+                Some(42),
+                AgentStatus::HistoricalUnclosed,
+                AgentStatus::Running,
+                AgentStatus::Running,
+                None,
+                AgentStatus::HistoricalUnclosed,
+            )
+        );
+    }
+
+    #[test]
     fn rollout_model_wins_and_drift_is_visible() {
         let snapshot = reconcile(
             ReconcileInput {
@@ -299,8 +546,10 @@ mod tests {
                     occurred_at_ms: Some(900),
                 }],
                 health: health(),
-                codex_running: true,
-                session_started_at_ms: Some(7_000),
+                process_session: ProcessSessionEvidence::OneVerifiedOfficial {
+                    process_id: 70,
+                    started_at_ms: 7_000,
+                },
             },
             10_000,
         );
@@ -371,8 +620,10 @@ mod tests {
                 threads: vec![old_unclosed.clone()],
                 spawns: vec![],
                 health: health(),
-                codex_running: true,
-                session_started_at_ms: Some(9_000),
+                process_session: ProcessSessionEvidence::OneVerifiedOfficial {
+                    process_id: 90,
+                    started_at_ms: 9_000,
+                },
             },
             10_000,
         );
@@ -385,8 +636,7 @@ mod tests {
                 threads: vec![old_unclosed],
                 spawns: vec![],
                 health: health(),
-                codex_running: true,
-                session_started_at_ms: None,
+                process_session: ProcessSessionEvidence::DiscoveryUncertain,
             },
             10_000,
         );
@@ -406,8 +656,10 @@ mod tests {
                 }],
                 spawns: vec![],
                 health: health(),
-                codex_running: true,
-                session_started_at_ms: Some(9_000),
+                process_session: ProcessSessionEvidence::OneVerifiedOfficial {
+                    process_id: 90,
+                    started_at_ms: 9_000,
+                },
             },
             10_000,
         );

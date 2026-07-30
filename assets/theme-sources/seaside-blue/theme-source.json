@@ -4,26 +4,32 @@
   "name": "海风晴夏",
   "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "nature", "minimal"],
+    "badges": ["popular"],
+    "published_at": "2026-07-30",
+    "sort_order": 90
+  },
   "source": {
     "file": "source.png",
-    "original_file_name": "ChatGPT Image 2026年7月24日 20_02_56.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 11_14_46.png",
     "mime_type": "image/png",
-    "sha256": "884d1da4a3c3bc6f63481a52d8c4e39fa11556236d9c9e6976a05032238e45bc",
-    "width": 941,
-    "height": 1672,
-    "bytes": 2460129
+    "sha256": "f37045bfa4889cc2f4c27cd8027e17f7f638aa3f326a139425036f5e16f22311",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2389094
   },
   "runtime": {
     "path": "src-tauri/resources/themes/seaside-blue.webp",
-    "max_width": 941,
-    "max_height": 1672,
+    "max_width": 1672,
+    "max_height": 941,
     "quality": 88,
     "max_bytes": 1450000
   },
   "preview": {
     "path": "public/themes/seaside-blue.webp",
-    "max_width": 405,
-    "max_height": 720,
+    "max_width": 720,
+    "max_height": 405,
     "quality": 78,
     "max_bytes": 250000
   },
@@ -31,8 +37,8 @@
     "minimum_engine_version": 1,
     "preview_path": "/themes/seaside-blue.webp",
     "overlay": "#246a9b",
-    "focal_x": 50,
-    "focal_y": 48,
+    "focal_x": 70,
+    "focal_y": 46,
     "palette": {
       "surface": "#e2f1fa",
       "surface_strong": "#f5fbff",
@@ -48,12 +54,12 @@
     }
   },
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_14_46.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

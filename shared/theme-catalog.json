@@ -8,6 +8,12 @@
       "name": "紫藤花嫁",
       "description": "紫藤花境与柔和玻璃材质构成的明亮人物主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "fantasy"],
+        "badges": ["popular", "featured"],
+        "published_at": "2026-07-24",
+        "sort_order": 10
+      },
       "preview_path": "/themes/wisteria-bride.webp",
       "backdrop": {
         "kind": "image",
@@ -29,6 +35,11 @@
         "contrast_percent": 96,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 82,
+        "complexity": 22,
+        "saturation": 14
+      },
       "assets": [
         {
           "id": "wisteria-bride",
@@ -42,7 +53,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -54,6 +65,12 @@
       "name": "薄荷礼服",
       "description": "薄荷绿礼服与晨光花廊组成的清透主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "nature", "minimal"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 20
+      },
       "preview_path": "/themes/mint-gentleman.webp",
       "backdrop": {
         "kind": "image",
@@ -75,6 +92,11 @@
         "contrast_percent": 95,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 86,
+        "complexity": 18,
+        "saturation": 8
+      },
       "assets": [
         {
           "id": "mint-gentleman",
@@ -88,7 +110,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -100,6 +122,12 @@
       "name": "鸢尾绅士",
       "description": "冷紫鸢尾与静谧庭院构成的优雅浅色主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "nature"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 30
+      },
       "preview_path": "/themes/iris-gentleman.webp",
       "backdrop": {
         "kind": "image",
@@ -121,6 +149,11 @@
         "contrast_percent": 97,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 78,
+        "complexity": 28,
+        "saturation": 13
+      },
       "assets": [
         {
           "id": "iris-gentleman",
@@ -134,7 +167,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -146,6 +179,12 @@
       "name": "赤月华庭",
       "description": "赤月、灯火与华庭夜色交织的深红主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["fantasy", "dark"],
+        "badges": ["popular"],
+        "published_at": "2026-07-24",
+        "sort_order": 40
+      },
       "preview_path": "/themes/crimson-palace.webp",
       "backdrop": {
         "kind": "image",
@@ -167,6 +206,11 @@
         "contrast_percent": 108,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 37,
+        "complexity": 27,
+        "saturation": 42
+      },
       "assets": [
         {
           "id": "crimson-palace",
@@ -180,7 +224,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -192,6 +236,12 @@
       "name": "森灵花语",
       "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["fantasy", "nature"],
+        "badges": ["featured"],
+        "published_at": "2026-07-24",
+        "sort_order": 50
+      },
       "preview_path": "/themes/verdant-fairy.webp",
       "backdrop": {
         "kind": "image",
@@ -213,6 +263,11 @@
         "contrast_percent": 98,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 68,
+        "complexity": 36,
+        "saturation": 29
+      },
       "assets": [
         {
           "id": "verdant-fairy",
@@ -226,7 +281,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -238,6 +293,12 @@
       "name": "金沙王庭",
       "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["fantasy"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 60
+      },
       "preview_path": "/themes/desert-prince.webp",
       "backdrop": {
         "kind": "image",
@@ -259,6 +320,11 @@
         "contrast_percent": 98,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 60,
+        "complexity": 35,
+        "saturation": 47
+      },
       "assets": [
         {
           "id": "desert-prince",
@@ -272,7 +338,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -284,6 +350,12 @@
       "name": "绿洲暮光",
       "description": "绿洲水岸与暮光金辉构成的蓝金主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["fantasy", "nature"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 70
+      },
       "preview_path": "/themes/oasis-prince.webp",
       "backdrop": {
         "kind": "image",
@@ -305,6 +377,11 @@
         "contrast_percent": 100,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 46,
+        "complexity": 42,
+        "saturation": 45
+      },
       "assets": [
         {
           "id": "oasis-prince",
@@ -318,7 +395,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -330,6 +407,12 @@
       "name": "樱月夜宴",
       "description": "樱花、满月与紫粉夜色构成的梦幻主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "fantasy", "dark", "space"],
+        "badges": ["popular"],
+        "published_at": "2026-07-24",
+        "sort_order": 80
+      },
       "preview_path": "/themes/sakura-moon.webp",
       "backdrop": {
         "kind": "image",
@@ -351,6 +434,11 @@
         "contrast_percent": 99,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 50,
+        "complexity": 34,
+        "saturation": 34
+      },
       "assets": [
         {
           "id": "sakura-moon",
@@ -364,7 +452,7 @@
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -376,13 +464,19 @@
       "name": "海风晴夏",
       "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "nature", "minimal"],
+        "badges": ["popular"],
+        "published_at": "2026-07-30",
+        "sort_order": 90
+      },
       "preview_path": "/themes/seaside-blue.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "seaside-blue",
         "overlay": "#246a9b",
-        "focal_x": 50,
-        "focal_y": 48
+        "focal_x": 70,
+        "focal_y": 46
       },
       "palette": {
         "surface": "#e2f1fa",
@@ -397,20 +491,25 @@
         "contrast_percent": 96,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 65,
+        "complexity": 33,
+        "saturation": 36
+      },
       "assets": [
         {
           "id": "seaside-blue",
           "mime_type": "image/webp",
-          "sha256": "232109f8ef11eadb02c3a9406eee5be581212717a645c24fe8d5268899f6c8d0"
+          "sha256": "90aaf13a93c8d7f41737adce08dd3241b942b9dfe58ff15f30b7e12b234a4296"
         }
       ],
       "rights": {
-        "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 11_14_46.png",
         "rightsholder": "Codex Assistant asset contributor",
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -422,13 +521,19 @@
       "name": "云岭秋侠",
       "description": "云岭、古城与秋叶构成的沉静武侠主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["fantasy", "nature"],
+        "badges": ["featured"],
+        "published_at": "2026-07-30",
+        "sort_order": 100
+      },
       "preview_path": "/themes/autumn-wuxia.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "autumn-wuxia",
         "overlay": "#283246",
-        "focal_x": 50,
-        "focal_y": 61
+        "focal_x": 45,
+        "focal_y": 54
       },
       "palette": {
         "surface": "#e7e4df",
@@ -443,20 +548,25 @@
         "contrast_percent": 103,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 35,
+        "complexity": 32,
+        "saturation": 31
+      },
       "assets": [
         {
           "id": "autumn-wuxia",
           "mime_type": "image/webp",
-          "sha256": "fef7a907dbcdea953fd3cbe337b017abedbe2acf0a3667fc47a20ecbdde3c681"
+          "sha256": "9059f8763dbb8702279b7773ee277aaff057c517d20dd1435423295691d658b5"
         }
       ],
       "rights": {
-        "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_10.png",
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 11_38_00.png",
         "rightsholder": "Codex Assistant asset contributor",
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -468,13 +578,19 @@
       "name": "流星晚霞",
       "description": "流星划过橙蓝晚霞与湿润街巷的暮色主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "space"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 110
+      },
       "preview_path": "/themes/meteor-evening.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "meteor-evening",
         "overlay": "#262d50",
-        "focal_x": 50,
-        "focal_y": 58
+        "focal_x": 36,
+        "focal_y": 60
       },
       "palette": {
         "surface": "#e8e0dc",
@@ -489,66 +605,25 @@
         "contrast_percent": 104,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 21,
+        "complexity": 33,
+        "saturation": 66
+      },
       "assets": [
         {
           "id": "meteor-evening",
           "mime_type": "image/webp",
-          "sha256": "d5c8ca4e5c1c6b176ee7a6ec75ac19b9686a73bb9e7849c1d6a1eb150c4e0630"
+          "sha256": "ba803b81e404b6af14fa4e23df064690d6e0b5618182852288c68e7d3c00d998"
         }
       ],
       "rights": {
-        "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_19.png",
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 11_40_41.png",
         "rightsholder": "Codex Assistant asset contributor",
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "violet-blade",
-      "name": "紫夜剑影",
-      "description": "紫色刀光、月夜与暗影构成的高对比主题。",
-      "category": "original-character",
-      "preview_path": "/themes/violet-blade.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "violet-blade",
-        "overlay": "#160d35",
-        "focal_x": 50,
-        "focal_y": 55
-      },
-      "palette": {
-        "surface": "#211b36",
-        "surface_strong": "#2c2347",
-        "text": "#f8f3ff",
-        "accent": "#9b6df0",
-        "border": "#7054a8"
-      },
-      "effects": {
-        "surface_opacity": 84,
-        "blur_px": 20,
-        "contrast_percent": 112,
-        "motion": false
-      },
-      "assets": [
-        {
-          "id": "violet-blade",
-          "mime_type": "image/webp",
-          "sha256": "465cd70184d786305a2248658ce28e29605fee9c8dc45a84abc91614099f746c"
-        }
-      ],
-      "rights": {
-        "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_48.png",
-        "rightsholder": "Codex Assistant asset contributor",
-        "license": "Redistribution permission confirmed for the Codex Assistant installer",
-        "commercial_redistribution": true,
-        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }
@@ -560,13 +635,19 @@
       "name": "富士秋光",
       "description": "富士远景、秋叶与金色落日构成的温暖主题。",
       "category": "original-character",
+      "marketplace": {
+        "genres": ["nature", "minimal"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 130
+      },
       "preview_path": "/themes/fuji-autumn.webp",
       "backdrop": {
         "kind": "image",
         "asset_id": "fuji-autumn",
         "overlay": "#57351f",
-        "focal_x": 50,
-        "focal_y": 62
+        "focal_x": 64,
+        "focal_y": 56
       },
       "palette": {
         "surface": "#eee4d8",
@@ -581,66 +662,25 @@
         "contrast_percent": 100,
         "motion": false
       },
+      "adaptation": {
+        "luminance": 34,
+        "complexity": 35,
+        "saturation": 42
+      },
       "assets": [
         {
           "id": "fuji-autumn",
           "mime_type": "image/webp",
-          "sha256": "82bfd5ec2337589bd818a400a1611888098ec60a9ca85ef1895c51d5cbe330c2"
+          "sha256": "158cdcbe65499f85cd3fd9b86449ac3bf4e533f749353615213c8c82a069907b"
         }
       ],
       "rights": {
-        "source": "User-approved source: ChatGPT Image 2026年7月26日 13_38_21.png",
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 11_43_35.png",
         "rightsholder": "Codex Assistant asset contributor",
         "license": "Redistribution permission confirmed for the Codex Assistant installer",
         "commercial_redistribution": true,
         "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
-        "manual_signoff": true,
-        "status": "verified"
-      }
-    },
-    {
-      "schema_version": 1,
-      "minimum_engine_version": 1,
-      "id": "spring-street",
-      "name": "春日花街",
-      "description": "春日花街、白裙与柔和日光构成的清新主题。",
-      "category": "original-character",
-      "preview_path": "/themes/spring-street.webp",
-      "backdrop": {
-        "kind": "image",
-        "asset_id": "spring-street",
-        "overlay": "#755454",
-        "focal_x": 58,
-        "focal_y": 55
-      },
-      "palette": {
-        "surface": "#f3e9e7",
-        "surface_strong": "#fffafa",
-        "text": "#3d2f31",
-        "accent": "#c67f8e",
-        "border": "#ddaab3"
-      },
-      "effects": {
-        "surface_opacity": 78,
-        "blur_px": 24,
-        "contrast_percent": 96,
-        "motion": false
-      },
-      "assets": [
-        {
-          "id": "spring-street",
-          "mime_type": "image/webp",
-          "sha256": "39c6d27c7fffeb97a7b4c57cacaa5178f61de73b3474a8d4f6c8c313b96b5856"
-        }
-      ],
-      "rights": {
-        "source": "User-approved source: ChatGPT Image 2026年7月26日 14_00_18.png",
-        "rightsholder": "Codex Assistant asset contributor",
-        "license": "Redistribution permission confirmed for the Codex Assistant installer",
-        "commercial_redistribution": true,
-        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-        "reviewed_at": "2026-07-27",
+        "reviewed_at": "2026-07-30",
         "manual_signoff": true,
         "status": "verified"
       }

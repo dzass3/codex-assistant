@@ -5,6 +5,12 @@
   "name": "森灵花语",
   "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy", "nature"],
+    "badges": ["featured"],
+    "published_at": "2026-07-24",
+    "sort_order": 50
+  },
   "preview_path": "/themes/verdant-fairy.webp",
   "backdrop": {
     "kind": "image",
@@ -26,6 +32,11 @@
     "contrast_percent": 98,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 68,
+    "complexity": 36,
+    "saturation": 29
+  },
   "assets": [
     {
       "id": "verdant-fairy",
@@ -39,7 +50,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

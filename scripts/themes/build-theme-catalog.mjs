@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { isValidThemeMarketplace } from "./theme-marketplace-validation.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const outputRoot = repositoryRoot;
@@ -13,10 +14,10 @@ const plan = JSON.parse(readFileSync(planPath, "utf8"));
 if (
   plan?.schema_version !== 1 ||
   !Array.isArray(plan.themes) ||
-  plan.themes.length !== 14 ||
-  new Set(plan.themes.map((theme) => theme.id)).size !== 14
+  plan.themes.length !== 12 ||
+  new Set(plan.themes.map((theme) => theme.id)).size !== 12
 ) {
-  throw new Error("approved theme catalog plan must contain exactly 14 unique themes");
+  throw new Error("approved theme catalog plan must contain exactly 12 unique themes");
 }
 
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "codex-assistant-theme-catalog-"));
@@ -72,6 +73,7 @@ function definitionFromPlan(theme) {
     name: theme.name,
     description: theme.description,
     category: "original-character",
+    marketplace: theme.marketplace,
     source: {
       file: "source.png",
       original_file_name: theme.source_file,
@@ -111,7 +113,7 @@ function definitionFromPlan(theme) {
       commercial_redistribution: true,
       attribution:
         "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-      reviewed_at: "2026-07-27",
+      reviewed_at: "2026-07-30",
       manual_signoff: true,
       status: "verified",
     },
@@ -128,7 +130,8 @@ function validatePlanTheme(theme) {
     !Number.isSafeInteger(theme.bytes) ||
     !Number.isSafeInteger(theme.width) ||
     !Number.isSafeInteger(theme.height) ||
-    !["landscape", "portrait"].includes(theme.layout)
+    !["landscape", "portrait"].includes(theme.layout) ||
+    !isValidThemeMarketplace(theme.marketplace)
   ) {
     throw new Error(`invalid approved theme plan entry: ${theme?.id ?? "unknown"}`);
   }
@@ -159,8 +162,14 @@ function removeRetiredBundledAssets() {
     "public/themes/original-observatory-muse.jpg",
     "public/themes/pocket-cosmos.webp",
     "public/themes/roseglass-atelier.webp",
+    "public/themes/spring-street.webp",
+    "public/themes/violet-blade.webp",
     "public/themes/violet-afterdark.webp",
     "src-tauri/resources/themes/original-observatory-muse.jpg",
+    "src-tauri/resources/themes/spring-street.webp",
+    "src-tauri/resources/themes/violet-blade.webp",
+    "assets/theme-sources/spring-street",
+    "assets/theme-sources/violet-blade",
   ];
   for (const ownedPath of retired) {
     if (isAbsolute(ownedPath)) throw new Error("retired theme path must be repository-relative");
@@ -168,6 +177,6 @@ function removeRetiredBundledAssets() {
     if (relative(outputRoot, target).startsWith("..")) {
       throw new Error("retired theme path escaped the repository");
     }
-    rmSync(target, { force: true });
+    rmSync(target, { recursive: true, force: true });
   }
 }

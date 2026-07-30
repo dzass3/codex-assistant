@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { chromium } from "playwright";
+import { isValidThemeMarketplace } from "./theme-marketplace-validation.mjs";
 
 const GENERATOR = "codex-assistant-theme-assets-v1";
 
@@ -57,9 +58,11 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   let runtime;
   let preview;
+  let adaptation;
   try {
     const page = await browser.newPage();
     const dataUrl = `data:image/png;base64,${sourceBytes.toString("base64")}`;
+    adaptation = await analyzeBackdrop(page, dataUrl);
     runtime = await encodeWebp(page, dataUrl, definition.runtime);
     preview = await encodeWebp(page, dataUrl, definition.preview);
   } finally {
@@ -78,7 +81,7 @@ async function main() {
   writeBytes(runtimePath, runtime.bytes);
   writeBytes(previewPath, preview.bytes);
 
-  const pack = expectedPack(definition, sha256(runtime.bytes));
+  const pack = expectedPack(definition, sha256(runtime.bytes), adaptation);
   writeJson(packPath, pack);
 
   const manifest = {
@@ -96,6 +99,7 @@ async function main() {
     },
     runtime: derivedRecord(definition.runtime, runtime),
     preview: derivedRecord(definition.preview, preview),
+    adaptation,
     rights: definition.rights,
   };
   writeJson(manifestPath, manifest);
@@ -168,7 +172,8 @@ function validateDefinition(definition) {
     definition.source.height <= 0 ||
     definition.runtime?.path !== `src-tauri/resources/themes/${definition.id}.webp` ||
     definition.preview?.path !== `public/themes/${definition.id}.webp` ||
-    definition.pack?.preview_path !== `/themes/${definition.id}.webp`
+    definition.pack?.preview_path !== `/themes/${definition.id}.webp` ||
+    !isValidThemeMarketplace(definition.marketplace)
   ) {
     throw new Error("theme source definition is invalid");
   }
@@ -236,6 +241,70 @@ async function encodeWebp(page, source, variant) {
   };
 }
 
+async function analyzeBackdrop(page, source) {
+  return page.evaluate(async (sourceUrl) => {
+    const image = new Image();
+    image.src = sourceUrl;
+    await image.decode();
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d", {
+      alpha: false,
+      colorSpace: "srgb",
+      willReadFrequently: true,
+    });
+    if (!context) throw new Error("image analyzer is unavailable");
+    context.drawImage(image, 0, 0, size, size);
+    const pixels = context.getImageData(0, 0, size, size).data;
+    const luminance = new Float64Array(size * size);
+    let luminanceTotal = 0;
+    let saturationTotal = 0;
+    for (let index = 0; index < luminance.length; index += 1) {
+      const offset = index * 4;
+      const red = pixels[offset] / 255;
+      const green = pixels[offset + 1] / 255;
+      const blue = pixels[offset + 2] / 255;
+      const maximum = Math.max(red, green, blue);
+      const minimum = Math.min(red, green, blue);
+      const value = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+      luminance[index] = value;
+      luminanceTotal += value;
+      saturationTotal += maximum === 0 ? 0 : (maximum - minimum) / maximum;
+    }
+    const average = luminanceTotal / luminance.length;
+    let varianceTotal = 0;
+    let edgeTotal = 0;
+    let edgeCount = 0;
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const index = y * size + x;
+        const value = luminance[index];
+        varianceTotal += (value - average) ** 2;
+        if (x + 1 < size) {
+          edgeTotal += Math.abs(value - luminance[index + 1]);
+          edgeCount += 1;
+        }
+        if (y + 1 < size) {
+          edgeTotal += Math.abs(value - luminance[index + size]);
+          edgeCount += 1;
+        }
+      }
+    }
+    const deviation = Math.sqrt(varianceTotal / luminance.length);
+    const edgeDensity = edgeCount === 0 ? 0 : edgeTotal / edgeCount;
+    return {
+      luminance: Math.max(0, Math.min(100, Math.round(average * 100))),
+      complexity: Math.max(0, Math.min(100, Math.round(edgeDensity * 260 + deviation * 95))),
+      saturation: Math.max(
+        0,
+        Math.min(100, Math.round((saturationTotal / luminance.length) * 100)),
+      ),
+    };
+  }, source);
+}
+
 function enforceDerivedBudget(derived, variant, label) {
   if (derived.bytes.byteLength === 0 || derived.bytes.byteLength > variant.max_bytes) {
     throw new Error(`${label} WebP exceeds the approved byte budget`);
@@ -292,7 +361,10 @@ function validateCatalogCandidate({ definition, manifest, outputRoot, pack }) {
   verifyDerivedFile(outputRoot, manifest.runtime, "runtime");
   verifyDerivedFile(outputRoot, manifest.preview, "preview");
 
-  if (!isDeepStrictEqual(pack, expectedPack(definition, manifest.runtime.sha256))) {
+  if (
+    !validAdaptation(manifest.adaptation) ||
+    !isDeepStrictEqual(pack, expectedPack(definition, manifest.runtime.sha256, manifest.adaptation))
+  ) {
     throw new Error("generated theme pack metadata is not eligible for catalog assembly");
   }
 }
@@ -361,7 +433,7 @@ function derivedRecord(variant, derived) {
   };
 }
 
-function expectedPack(definition, runtimeHash) {
+function expectedPack(definition, runtimeHash, adaptation) {
   return {
     schema_version: 1,
     minimum_engine_version: definition.pack.minimum_engine_version,
@@ -369,6 +441,7 @@ function expectedPack(definition, runtimeHash) {
     name: definition.name,
     description: definition.description,
     category: definition.category,
+    marketplace: definition.marketplace,
     preview_path: definition.pack.preview_path,
     backdrop: {
       kind: "image",
@@ -379,6 +452,7 @@ function expectedPack(definition, runtimeHash) {
     },
     palette: definition.pack.palette,
     effects: definition.pack.effects,
+    adaptation,
     assets: [
       {
         id: definition.id,
@@ -388,6 +462,16 @@ function expectedPack(definition, runtimeHash) {
     ],
     rights: definition.rights,
   };
+}
+
+function validAdaptation(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    ["luminance", "complexity", "saturation"].every(
+      (key) => Number.isSafeInteger(value[key]) && value[key] >= 0 && value[key] <= 100,
+    )
+  );
 }
 
 function confinedPath(root, child, label) {

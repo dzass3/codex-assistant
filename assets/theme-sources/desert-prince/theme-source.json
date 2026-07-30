@@ -4,6 +4,12 @@
   "name": "金沙王庭",
   "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy"],
+    "badges": [],
+    "published_at": "2026-07-24",
+    "sort_order": 60
+  },
   "source": {
     "file": "source.png",
     "original_file_name": "ChatGPT Image 2026年7月24日 17_57_31 (9).png",
@@ -53,7 +59,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

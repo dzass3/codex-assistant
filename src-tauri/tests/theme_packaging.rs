@@ -16,7 +16,7 @@ fn bundled_theme_rights_manifest_matches_the_shipped_assets() {
     .expect("theme rights manifest must be valid JSON");
     assert_eq!(manifest["schema_version"], 1);
     let entries = manifest["themes"].as_array().expect("theme entries");
-    assert_eq!(entries.len(), 14);
+    assert_eq!(entries.len(), 12);
     for entry in entries {
         assert_eq!(entry["rights"]["status"], "verified");
         assert_eq!(entry["rights"]["commercial_redistribution"], true);
@@ -86,7 +86,7 @@ fn wisteria_bride_catalog_entry_matches_the_reproducible_build_manifest() {
 }
 
 #[test]
-fn approved_fourteen_source_files_match_their_generated_offline_artifacts() {
+fn approved_twelve_source_files_match_their_generated_offline_artifacts() {
     let plan: Value = serde_json::from_slice(
         &fs::read(root().join("../assets/theme-sources/catalog-plan.json"))
             .expect("approved theme catalog plan"),
@@ -97,11 +97,59 @@ fn approved_fourteen_source_files_match_their_generated_offline_artifacts() {
     )
     .expect("valid theme catalog");
     let planned = plan["themes"].as_array().expect("planned themes");
-    assert_eq!(planned.len(), 14);
+    assert_eq!(planned.len(), 12);
     assert_eq!(
         catalog["themes"].as_array().expect("catalog themes").len(),
-        14
+        12
     );
+
+    let replacement_sources = [
+        (
+            "seaside-blue",
+            "ChatGPT Image 2026年7月30日 11_14_46.png",
+            "f37045bfa4889cc2f4c27cd8027e17f7f638aa3f326a139425036f5e16f22311",
+        ),
+        (
+            "autumn-wuxia",
+            "ChatGPT Image 2026年7月30日 11_38_00.png",
+            "04372c9d111c819911999f543fb8cc5bfffa563c8a75450afc824567d0312998",
+        ),
+        (
+            "meteor-evening",
+            "ChatGPT Image 2026年7月30日 11_40_41.png",
+            "593b87e24ee607f2d414a1975ef3d252704c6d5447c9d5d55e37ef1d67ebc4db",
+        ),
+        (
+            "fuji-autumn",
+            "ChatGPT Image 2026年7月30日 11_43_35.png",
+            "36937b6e4bb63d5b44727aa62c4bf7914bc4672eed0fd4112db729964d28e085",
+        ),
+    ];
+    for (id, source_file, sha256) in replacement_sources {
+        let theme = planned
+            .iter()
+            .find(|theme| theme["id"] == id)
+            .unwrap_or_else(|| panic!("missing replacement theme {id}"));
+        assert_eq!(theme["source_file"], source_file);
+        assert_eq!(theme["sha256"], sha256);
+        assert_eq!(theme["width"], 1672);
+        assert_eq!(theme["height"], 941);
+        assert_eq!(theme["layout"], "landscape");
+    }
+    for retired in ["violet-blade", "spring-street"] {
+        assert!(
+            planned.iter().all(|theme| theme["id"] != retired),
+            "retired theme remains in the approved plan: {retired}"
+        );
+        assert!(
+            catalog["themes"]
+                .as_array()
+                .expect("catalog themes")
+                .iter()
+                .all(|theme| theme["id"] != retired),
+            "retired theme remains in the public catalog: {retired}"
+        );
+    }
 
     for theme in planned {
         let id = theme["id"].as_str().expect("stable theme id");
@@ -194,7 +242,15 @@ fn frontend_previews_and_theme_rights_ship_in_the_desktop_bundle() {
     for retired in [
         "../public/themes/aurora-grid.webp",
         "../public/themes/original-observatory-muse.jpg",
+        "../public/themes/violet-blade.webp",
+        "../public/themes/spring-street.webp",
         "resources/themes/original-observatory-muse.jpg",
+        "resources/themes/violet-blade.webp",
+        "resources/themes/spring-street.webp",
+        "../shared/generated-theme-packs/violet-blade.json",
+        "../shared/generated-theme-packs/spring-street.json",
+        "../assets/theme-sources/violet-blade",
+        "../assets/theme-sources/spring-street",
     ] {
         assert!(
             !root().join(retired).exists(),

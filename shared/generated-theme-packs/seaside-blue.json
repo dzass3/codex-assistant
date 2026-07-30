@@ -5,13 +5,19 @@
   "name": "海风晴夏",
   "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "nature", "minimal"],
+    "badges": ["popular"],
+    "published_at": "2026-07-30",
+    "sort_order": 90
+  },
   "preview_path": "/themes/seaside-blue.webp",
   "backdrop": {
     "kind": "image",
     "asset_id": "seaside-blue",
     "overlay": "#246a9b",
-    "focal_x": 50,
-    "focal_y": 48
+    "focal_x": 70,
+    "focal_y": 46
   },
   "palette": {
     "surface": "#e2f1fa",
@@ -26,20 +32,25 @@
     "contrast_percent": 96,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 65,
+    "complexity": 33,
+    "saturation": 36
+  },
   "assets": [
     {
       "id": "seaside-blue",
       "mime_type": "image/webp",
-      "sha256": "232109f8ef11eadb02c3a9406eee5be581212717a645c24fe8d5268899f6c8d0"
+      "sha256": "90aaf13a93c8d7f41737adce08dd3241b942b9dfe58ff15f30b7e12b234a4296"
     }
   ],
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月24日 20_02_56.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_14_46.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

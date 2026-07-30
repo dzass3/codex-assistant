@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.9 — 2026-07-30
+
+- Replaced four bundled themes—海风晴夏, 云岭秋侠, 流星晚霞 and 富士秋光—with newly rights-reviewed 1672×941 landscape artwork while preserving their stable theme IDs, favorites and saved preferences.
+- Retired 紫夜剑影 and 春日花街 from source assets, runtime bundles, previews and installer resources; the public catalog now contains exactly 12 bundled themes.
+- Added fail-closed migration for preferences that reference retired themes: the invalid selection is cleared instead of silently applying a different theme.
+- Rebuilt and verified the complete theme catalog, embedded Rust resources and multi-window mock matrix so every public installer receives the same offline theme set.
+- 更新四套内置主题的横版原图，同时保留原主题 ID、收藏与偏好兼容性；紫夜剑影和春日花街已从公开目录及安装资源中退役。
+- 内置主题目录调整为 12 套；无效的退役主题偏好会安全清除，不会静默替换成其他皮肤。
+
 ## 0.11.8 — 2026-07-28
 
 - Rebuilt all 14 theme surfaces around one crisp fixed global background with focal-aware `cover` positioning and no full-page white wash.

@@ -107,6 +107,95 @@ pub struct SourceHealth {
     pub rollout_observer: HealthEntry,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessSessionEvidence {
+    VerifiedAbsent,
+    OneVerifiedOfficial { process_id: u32, started_at_ms: i64 },
+    MultipleVerifiedOfficial { process_count: usize },
+    DiscoveryUncertain,
+    IdentityUncertain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessActivityProjection {
+    Current,
+    Historical,
+    Uncertain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessSessionConfidence {
+    Verified,
+    MultipleVerifiedProcesses,
+    DiscoveryUncertain,
+    IdentityUncertain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProcessSessionProjection {
+    pub process_id: Option<u32>,
+    pub codex_running: bool,
+    pub session_started_at_ms: Option<i64>,
+    pub activity: ProcessActivityProjection,
+    pub confidence: ProcessSessionConfidence,
+    pub monitor_confident: bool,
+}
+
+impl ProcessSessionEvidence {
+    pub fn project(self, observed_activity_ms: Option<i64>) -> ProcessSessionProjection {
+        match self {
+            Self::VerifiedAbsent => ProcessSessionProjection {
+                process_id: None,
+                codex_running: false,
+                session_started_at_ms: None,
+                activity: ProcessActivityProjection::Historical,
+                confidence: ProcessSessionConfidence::Verified,
+                monitor_confident: true,
+            },
+            Self::OneVerifiedOfficial {
+                process_id,
+                started_at_ms,
+            } => ProcessSessionProjection {
+                process_id: Some(process_id),
+                codex_running: true,
+                session_started_at_ms: Some(started_at_ms),
+                activity: if observed_activity_ms.is_some_and(|observed| observed >= started_at_ms)
+                {
+                    ProcessActivityProjection::Current
+                } else {
+                    ProcessActivityProjection::Historical
+                },
+                confidence: ProcessSessionConfidence::Verified,
+                monitor_confident: true,
+            },
+            Self::MultipleVerifiedOfficial { .. } => ProcessSessionProjection {
+                process_id: None,
+                codex_running: true,
+                session_started_at_ms: None,
+                activity: ProcessActivityProjection::Uncertain,
+                confidence: ProcessSessionConfidence::MultipleVerifiedProcesses,
+                monitor_confident: false,
+            },
+            Self::DiscoveryUncertain => ProcessSessionProjection {
+                process_id: None,
+                codex_running: false,
+                session_started_at_ms: None,
+                activity: ProcessActivityProjection::Uncertain,
+                confidence: ProcessSessionConfidence::DiscoveryUncertain,
+                monitor_confident: false,
+            },
+            Self::IdentityUncertain => ProcessSessionProjection {
+                process_id: None,
+                codex_running: false,
+                session_started_at_ms: None,
+                activity: ProcessActivityProjection::Uncertain,
+                confidence: ProcessSessionConfidence::IdentityUncertain,
+                monitor_confident: false,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SummaryCounts {
     pub roots: usize,
@@ -174,7 +263,8 @@ impl RestartSafetyProjection {
             active_work_count: snapshot.counts.starting + snapshot.counts.running,
             monitor_confident: sources_healthy
                 && snapshot.counts.tracking_errors == 0
-                && snapshot.counts.uncertain == 0,
+                && snapshot.counts.uncertain == 0
+                && snapshot.observer_status == ObserverStatus::Live,
         }
     }
 
@@ -222,6 +312,5 @@ pub struct ReconcileInput {
     pub threads: Vec<ThreadFact>,
     pub spawns: Vec<SpawnFact>,
     pub health: SourceHealth,
-    pub codex_running: bool,
-    pub session_started_at_ms: Option<i64>,
+    pub process_session: ProcessSessionEvidence,
 }

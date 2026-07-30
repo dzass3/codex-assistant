@@ -5,6 +5,12 @@
   "name": "樱月夜宴",
   "description": "樱花、满月与紫粉夜色构成的梦幻主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "fantasy", "dark", "space"],
+    "badges": ["popular"],
+    "published_at": "2026-07-24",
+    "sort_order": 80
+  },
   "preview_path": "/themes/sakura-moon.webp",
   "backdrop": {
     "kind": "image",
@@ -26,6 +32,11 @@
     "contrast_percent": 99,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 50,
+    "complexity": 34,
+    "saturation": 34
+  },
   "assets": [
     {
       "id": "sakura-moon",
@@ -39,7 +50,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

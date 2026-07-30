@@ -34,22 +34,20 @@ const sourceExport = JSON.parse(cargo.stdout.trim());
 assert.ok(sourceExport.themes.length >= 2, "at least two bundled themes are required");
 assert.ok(sourceExport.local_theme.id.startsWith("local-"), "real local import is required");
 
-const completePortraitThemeIds = new Set([
+const replacementLandscapeThemeIds = new Set([
   "seaside-blue",
   "autumn-wuxia",
   "meteor-evening",
-  "violet-blade",
   "fuji-autumn",
-  "spring-street",
 ]);
 
 assert.deepEqual(
   sourceExport.themes
-    .filter((theme) => completePortraitThemeIds.has(theme.id))
+    .filter((theme) => replacementLandscapeThemeIds.has(theme.id))
     .map((theme) => theme.id)
     .toSorted(),
-  [...completePortraitThemeIds].toSorted(),
-  "the complete-portrait layout contract must cover all six reviewed portrait themes",
+  [...replacementLandscapeThemeIds].toSorted(),
+  "the replacement landscape contract must cover all four stable theme ids",
 );
 
 function assertBackdropLayout(theme, backdrop) {
@@ -75,6 +73,24 @@ const mockHtml = `<!doctype html>
       :root {
         --color-token-main-surface-primary: #f7f7f8;
         --color-token-sidebar-surface-primary: #efeff1;
+        --color-token-foreground: rgba(26, 28, 31, 0.85);
+        --color-token-description-foreground: rgba(26, 28, 31, 0.49);
+        --color-token-conversation-body: rgba(26, 28, 31, 0.60);
+        --color-token-conversation-summary-leading: rgba(26, 28, 31, 0.49);
+        --color-token-conversation-summary-trailing: rgba(26, 28, 31, 0.42);
+        --color-token-text-secondary: rgba(26, 28, 31, 0.65);
+        --color-token-text-tertiary: rgba(26, 28, 31, 0.49);
+        --color-token-text-primary: rgb(26, 28, 31);
+        --color-token-editor-foreground: rgb(26, 28, 31);
+        --color-token-icon-foreground: rgb(26, 28, 31);
+        --color-token-application-menu-foreground: rgb(26, 28, 31);
+        --color-token-dropdown-foreground: rgb(26, 28, 31);
+        --color-token-input-foreground: rgb(26, 28, 31);
+        --color-text-button-secondary: rgb(26, 28, 31);
+        --vscode-foreground: rgb(26, 28, 31);
+        --vscode-sideBar-foreground: rgb(26, 28, 31);
+        --vscode-menu-foreground: rgb(26, 28, 31);
+        --vscode-input-foreground: rgb(26, 28, 31);
       }
       * { box-sizing: border-box; }
       html, body, #root { width: 100%; min-height: 100%; margin: 0; }
@@ -82,6 +98,11 @@ const mockHtml = `<!doctype html>
       [data-codex-window-type="electron"] { background: 0 0; }
       body { color: #202123; font: 16px/1.5 system-ui, sans-serif; }
       button, textarea, select { font: inherit; }
+      .official-token-foreground { color: var(--color-token-foreground); }
+      .official-token-muted { color: var(--color-token-description-foreground); }
+      ._ModelPickerTriggerModelLabel_mock { color: rgb(26, 28, 31); }
+      #status-running-label { color: var(--color-token-conversation-body) !important; }
+      .loading-shimmer-pure-text { color: rgba(26, 28, 31, 0.385); }
       #root { display: flex; min-height: 900px; }
       aside.app-shell-left-panel {
         width: 280px; flex: 0 0 280px; padding: 22px 18px; background: #efeff1;
@@ -105,6 +126,9 @@ const mockHtml = `<!doctype html>
         height: 68px; display: flex; align-items: center; gap: 12px;
         padding: 0 32px; background: #f7f7f8; border-bottom: 1px solid #dedee3;
       }
+      #native-titlebar {
+        position: fixed; top: 0; right: 0; z-index: 100; width: 240px;
+      }
       .content { max-width: 920px; margin: 0 auto; padding: 42px 34px 180px; }
       .semantic-text { color: rgb(32, 33, 35); font-size: 27px; font-weight: 700; }
       .assistant-copy { color: rgb(55, 56, 60); }
@@ -125,6 +149,25 @@ const mockHtml = `<!doctype html>
       }
       [data-user-message-bubble="true"] { margin-top: 28px; padding: 18px; background: #e9e9ed; }
       .bg-token-dropdown-background { margin-top: 20px; padding: 14px; background: #fff; border: 1px solid #ddd; }
+      #sites-sticky-fade::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: 0;
+        height: 32px;
+        pointer-events: none;
+        background-image: linear-gradient(rgb(255, 255, 255), rgba(0, 0, 0, 0));
+      }
+      #composer-bottom-fade {
+        position: absolute;
+        right: 0;
+        bottom: 100%;
+        left: 0;
+        height: 28px;
+        pointer-events: none;
+        background-image: linear-gradient(to top, rgb(255, 255, 255), rgba(0, 0, 0, 0));
+      }
       .composer-surface-chrome {
         position: fixed; z-index: 20; left: 340px; right: 340px; bottom: 28px;
         display: flex; align-items: end; gap: 12px; padding: 16px;
@@ -154,13 +197,21 @@ const mockHtml = `<!doctype html>
     </style>
   </head>
   <body>
+    <div id="native-titlebar" class="app-header-tint group/application-menu-top-bar">
+      <button id="window-control" type="button" aria-label="窗口控制">□</button>
+    </div>
     <div id="root">
       <aside class="app-shell-left-panel">
         <h1>Codex</h1>
         <nav>
-          <button id="new-task" type="button">新建任务</button>
+          <button id="new-task" type="button">
+            <span id="new-task-label" class="official-token-foreground">新建任务</span>
+          </button>
           <button id="active-thread" type="button" aria-current="page">Mock 主题安全测试</button>
           <button id="settings" type="button">设置</button>
+          <div id="project-row" role="button" tabindex="0">
+            <span id="project-row-label" class="official-token-foreground">真实项目行</span>
+          </div>
         </nav>
       </aside>
       <main class="main-surface">
@@ -169,6 +220,14 @@ const mockHtml = `<!doctype html>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path id="semantic-icon" fill="currentColor" d="M4 5h16v3H4zm0 6h16v3H4zm0 6h16v3H4z" /></svg>
           </button>
           <strong>Mock ChatGPT / Codex</strong>
+          <button
+            id="model-selector"
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+          >
+            <span id="header-model-label" class="official-token-muted">5.6 Sol 极高</span>
+          </button>
         </header>
         <section class="content" data-codex-conversation="true">
           <h2 id="semantic-text" class="semantic-text">主题不能覆盖这段 ChatGPT 文字</h2>
@@ -182,13 +241,36 @@ const mockHtml = `<!doctype html>
               助手长文本只使用局部阅读卡片。
             </div>
           </div>
-          <div data-local-conversation-item-target-ids="call_mock">
-            工具调用与文件修改结果只使用局部阅读卡片。
+          <span
+            id="streaming-preparation"
+            class="loading-shimmer-pure-text min-w-0 flex-1 truncate select-none"
+            aria-hidden="false"
+          >
+            Preparing imagegen and frontend-design skills
+          </span>
+          <div id="status-running" data-testid="status-running" data-status="running" aria-busy="true">
+            <strong id="status-running-label">正在分析</strong><span>运行中 · 1.2 秒</span>
+          </div>
+          <div id="status-success" data-local-conversation-item-target-ids="call_mock" data-status="success">
+            <strong>文件检查</strong><span>成功 · 0.8 秒</span>
+          </div>
+          <div id="status-warning" data-testid="status-warning" data-status="warning">
+            <strong>兼容性提示</strong><span>警告 · 需要注意</span>
+          </div>
+          <div id="status-error" data-testid="status-error" data-status="error">
+            <strong>构建任务</strong><span>失败 · 查看详情</span>
+          </div>
+          <div id="status-info" data-testid="status-info" data-status="info">
+            <strong>普通信息</strong><span>已记录</span>
           </div>
           <div class="bg-token-dropdown-background">下拉面板内容不能被遮住</div>
           <div class="interaction-lab">
             <button id="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false">打开菜单</button>
-            <div id="mock-menu" role="menu" hidden><button id="menu-item" role="menuitem" type="button">菜单项</button></div>
+            <div id="mock-menu" role="menu" hidden>
+              <button id="menu-item" role="menuitem" type="button">
+                <span id="menu-item-label" class="official-token-foreground">菜单项</span>
+              </button>
+            </div>
             <button id="dialog-trigger" type="button">打开对话框</button>
             <select id="native-dropdown" aria-label="测试下拉选项"><option value="one">选项一</option><option value="two">选项二</option></select>
             <a id="safe-link" href="#linked-target">测试链接</a>
@@ -201,14 +283,41 @@ const mockHtml = `<!doctype html>
           id="composer"
           class="composer-surface-chrome bg-token-input-background/90 electron:dark:bg-token-dropdown-background"
         >
+          <div
+            id="composer-bottom-fade"
+            class="pointer-events-none absolute inset-x-0 -bottom-1 h-7 bg-gradient-to-t from-token-main-surface-primary to-transparent"
+          ></div>
+          <button
+            id="composer-attachment"
+            data-composer-attachment-pill="true"
+            class="composer-attachment-surface text-token-foreground bg-token-dropdown-background"
+            type="button"
+          >
+            <span id="composer-attachment-label">Recreate this exact design</span>
+          </button>
           <textarea id="composer-input" aria-label="消息输入" placeholder="输入一条测试消息"></textarea>
+          <button id="composer-model-selector" type="button" aria-haspopup="listbox">
+            <span
+              id="composer-model-label"
+              class="official-token-foreground _ModelPickerTriggerModelLabel_mock"
+            >5.6 Sol</span>
+            <span id="composer-effort-label" class="official-token-muted">极高</span>
+          </button>
           <button id="send-button" class="send-button" type="submit" aria-label="发送">↑</button>
         </form>
       </main>
       <aside id="output-panel" data-codex-output-panel="true" aria-label="输出">
         <header class="bg-token-dropdown-background">输出</header>
-        <button id="output-task" type="button">子任务</button>
-        <button id="output-source" type="button">来源</button>
+        <section role="group" aria-label="计划">
+          <strong>计划</strong>
+          <button id="output-task" type="button">子任务</button>
+        </section>
+        <section role="group" aria-label="来源">
+          <strong>来源</strong>
+          <button id="output-source" type="button">
+            <span id="output-source-label" class="official-token-foreground">Mock 源文件</span>
+          </button>
+        </section>
       </aside>
     </div>
     <script>
@@ -272,7 +381,8 @@ function snapshotExpression() {
     const backdrop = getComputedStyle(document.body, "::before");
     const scrim = getComputedStyle(document.body, "::after");
     const sidebar = getComputedStyle(document.querySelector("aside.app-shell-left-panel"));
-    const header = getComputedStyle(document.querySelector(".app-header-tint"));
+    const header = getComputedStyle(document.querySelector("main .app-header-tint"));
+    const titlebar = getComputedStyle(document.querySelector("#native-titlebar"));
     const outputPanel = getComputedStyle(document.querySelector("[data-codex-output-panel]"));
     const outputHeader = getComputedStyle(
       document.querySelector("[data-codex-output-panel] header"),
@@ -284,10 +394,37 @@ function snapshotExpression() {
         '[data-content-search-unit-key$=":assistant"]>[data-response-annotation-target]',
       ),
     );
-    const toolReading = getComputedStyle(
-      document.querySelector("[data-local-conversation-item-target-ids]"),
+    const toolReading = getComputedStyle(document.querySelector("#status-success"));
+    const composerFade = getComputedStyle(document.querySelector("#composer-bottom-fade"));
+    const rootStyle = getComputedStyle(document.documentElement);
+    const statusStyles = Object.fromEntries(
+      ["running", "success", "warning", "error", "info"].map((status) => {
+        const style = getComputedStyle(document.querySelector(`#status-${status}`));
+        return [
+          status,
+          {
+            backgroundColor: style.backgroundColor,
+            borderLeftColor: style.borderLeftColor,
+            borderLeftWidth: style.borderLeftWidth,
+            color: style.color,
+            height: document.querySelector(`#status-${status}`).getBoundingClientRect().height,
+            marginTop: style.marginTop,
+            paddingTop: style.paddingTop,
+            paddingBottom: style.paddingBottom,
+          },
+        ];
+      }),
     );
     return {
+      adaptiveTokens: {
+        luminance: rootStyle.getPropertyValue("--codex-assistant-background-luminance").trim(),
+        complexity: rootStyle.getPropertyValue("--codex-assistant-background-complexity").trim(),
+        saturation: rootStyle.getPropertyValue("--codex-assistant-background-saturation").trim(),
+        surface1: rootStyle.getPropertyValue("--surface-1").trim(),
+        surface2: rootStyle.getPropertyValue("--surface-2").trim(),
+        surface3: rootStyle.getPropertyValue("--surface-3").trim(),
+        overlayStrong: rootStyle.getPropertyValue("--bg-overlay-strong").trim(),
+      },
       htmlBackground: getComputedStyle(document.documentElement).backgroundImage,
       htmlBackgroundColor: getComputedStyle(document.documentElement).backgroundColor,
       backdrop: {
@@ -318,6 +455,12 @@ function snapshotExpression() {
         backdropFilter: header.backdropFilter,
         borderBottomColor: header.borderBottomColor,
       },
+      titlebarMaterial: {
+        backgroundColor: titlebar.backgroundColor,
+        backdropFilter: titlebar.backdropFilter,
+        color: titlebar.color,
+      },
+      windowControl: inspect("#window-control"),
       outputMaterial: {
         backgroundColor: outputPanel.backgroundColor,
         backdropFilter: outputPanel.backdropFilter,
@@ -334,6 +477,11 @@ function snapshotExpression() {
         boxShadow: composer.boxShadow,
         color: composer.color,
       },
+      composerFade: {
+        backgroundImage: composerFade.backgroundImage,
+      },
+      composerAttachment: inspect("#composer-attachment"),
+      composerAttachmentLabel: inspect("#composer-attachment-label"),
       userBubbleMaterial: {
         backgroundColor: userBubble.backgroundColor,
         borderColor: userBubble.borderColor,
@@ -341,7 +489,9 @@ function snapshotExpression() {
         boxShadow: userBubble.boxShadow,
       },
       assistantReadingBackground: assistantReading.backgroundColor,
+      streamingPreparation: inspect("#streaming-preparation"),
       toolReadingBackground: toolReading.backgroundColor,
+      statusStyles,
       semanticText: inspect("#semantic-text"),
       assistantCopy: inspect("#assistant-copy"),
       image: {
@@ -351,6 +501,17 @@ function snapshotExpression() {
         naturalHeight: image.naturalHeight,
       },
       iconButton: inspect("#icon-button"),
+      modelSelector: inspect("#model-selector"),
+      chromeDescendants: {
+        sidebarPrimary: inspect("#new-task-label"),
+        sidebarRoleButton: inspect("#project-row-label"),
+        headerMuted: inspect("#header-model-label"),
+        composerPrimary: inspect("#composer-model-label"),
+        composerMuted: inspect("#composer-effort-label"),
+        menuPrimary: inspect("#menu-item-label"),
+        outputPrimary: inspect("#output-source-label"),
+        statusPrimary: inspect("#status-running-label"),
+      },
       iconFill: getComputedStyle(document.querySelector("#content-semantic-icon path")).fill,
       headerIconFill: getComputedStyle(document.querySelector("#semantic-icon")).fill,
       primaryAction: inspect("#primary-action"),
@@ -365,6 +526,35 @@ function snapshotExpression() {
       welcomeCardCount: document.querySelectorAll("[data-codex-assistant-welcome-action]").length,
       bodyBefore: getComputedStyle(document.body, "::before").content,
       bodyAfter: getComputedStyle(document.body, "::after").content,
+      costlyGlassCount: [...document.querySelectorAll("*")].filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return (
+          rect.width > 1 &&
+          rect.height > 1 &&
+          rect.bottom > 0 &&
+          rect.right > 0 &&
+          rect.top < innerHeight &&
+          rect.left < innerWidth &&
+          style.backdropFilter !== "none"
+        );
+      }).length,
+      costlyGlassPixelRatio:
+        [...document.querySelectorAll("*")].reduce((total, element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          if (style.backdropFilter === "none") return total;
+          const visibleWidth = Math.max(
+            0,
+            Math.min(innerWidth, rect.right) - Math.max(0, rect.left),
+          );
+          const visibleHeight = Math.max(
+            0,
+            Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top),
+          );
+          return total + visibleWidth * visibleHeight;
+        }, 0) /
+        (innerWidth * innerHeight),
     };
   };
 }
@@ -412,10 +602,196 @@ function assertSemanticContentPreserved(before, after, requireAllHits = true) {
     before.primaryAction.backgroundColor,
     "primary action fill changed",
   );
-  for (const key of ["iconButton", "primaryAction", "outputTask", "composer", "input"]) {
+  for (const key of [
+    "iconButton",
+    "modelSelector",
+    "primaryAction",
+    "outputTask",
+    "composer",
+    "input",
+  ]) {
     if (requireAllHits) assert.ok(after[key].hitWithinTarget, `${key} is not hit-testable`);
     assert.notEqual(after[key].pointerEvents, "none", `${key} lost pointer events`);
   }
+}
+
+function colorAlpha(color) {
+  const match = color.match(/rgba?\([^,]+,[^,]+,[^,]+(?:,\s*([0-9.]+))?\)/);
+  return match?.[1] === undefined ? 1 : Number.parseFloat(match[1]);
+}
+
+function colorChannelAverage(color) {
+  const channels = color
+    .match(/[\d.]+/g)
+    ?.slice(0, 3)
+    .map(Number);
+  return channels?.length === 3 ? channels.reduce((sum, channel) => sum + channel, 0) / 3 : 0;
+}
+
+async function captureStreamingAssistantSurface(targetPage) {
+  return targetPage.evaluate(async () => {
+    const conversation = document.querySelector('[data-codex-conversation="true"]');
+    const unit = document.createElement("div");
+    unit.id = "streaming-assistant-unit";
+    unit.setAttribute("data-content-search-unit-key", "mock:streaming:assistant");
+    const content = document.createElement("div");
+    content.id = "streaming-assistant-content";
+    content.textContent = "流式推理首帧也必须立即具备稳定阅读层。";
+    unit.append(content);
+    conversation.append(unit);
+
+    const sample = () => getComputedStyle(content).backgroundColor;
+    const inserted = sample();
+    const firstFrame = await new Promise((resolve) => {
+      requestAnimationFrame(() => resolve(sample()));
+    });
+    content.setAttribute("data-response-annotation-target", "mock-streaming-message");
+    const annotated = sample();
+    unit.remove();
+    return { inserted, firstFrame, annotated };
+  });
+}
+
+async function captureDynamicPreparationSurface(targetPage) {
+  return targetPage.evaluate(async () => {
+    const conversation = document.querySelector('[data-codex-conversation="true"]');
+    const preparation = document.createElement("span");
+    preparation.className = "loading-shimmer-pure-text";
+    preparation.textContent = "Preparing a dynamically loaded skill";
+    preparation.style.setProperty("color", "rgba(9,18,27,0.4)", "important");
+    conversation.append(preparation);
+    await Promise.resolve();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const themedStyle = getComputedStyle(preparation);
+    const themed = {
+      color: themedStyle.color,
+      backgroundColor: themedStyle.backgroundColor,
+      animationName: themedStyle.animationName,
+    };
+    preparation.remove();
+    await Promise.resolve();
+
+    return {
+      themed,
+      restoredInlineColor: preparation.style.getPropertyValue("color"),
+      restoredInlinePriority: preparation.style.getPropertyPriority("color"),
+      restoredInlineFill: preparation.style.getPropertyValue("-webkit-text-fill-color"),
+      restoredInlineAnimation: preparation.style.getPropertyValue("animation"),
+    };
+  });
+}
+
+async function captureStreamingMutationCost(targetPage) {
+  return targetPage.evaluate(async () => {
+    const target = document.querySelector(
+      '[data-content-search-unit-key="mock:assistant"]>[data-response-annotation-target]',
+    );
+    const originalGetComputedStyle = globalThis.getComputedStyle;
+    const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+    let styleReads = 0;
+    let layoutReads = 0;
+    globalThis.getComputedStyle = (...args) => {
+      styleReads += 1;
+      return originalGetComputedStyle(...args);
+    };
+    Element.prototype.getBoundingClientRect = function (...args) {
+      layoutReads += 1;
+      return originalGetBoundingClientRect.apply(this, args);
+    };
+    try {
+      for (let index = 0; index < 24; index += 1) {
+        target.append(document.createTextNode(` ${index}`));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      return { styleReads, layoutReads };
+    } finally {
+      globalThis.getComputedStyle = originalGetComputedStyle;
+      Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    }
+  });
+}
+
+function assertAdaptiveSurfaceSystem(theme, state) {
+  const { adaptiveTokens, statusStyles } = state;
+  for (const [name, value] of Object.entries(adaptiveTokens)) {
+    assert.notEqual(value, "", `${theme.id} did not emit adaptive token ${name}`);
+  }
+  assert.ok(
+    colorAlpha(state.sidebarMaterial.backgroundColor) >= 0.74,
+    `${theme.id} sidebar is too transparent`,
+  );
+  assert.ok(
+    colorAlpha(state.outputMaterial.backgroundColor) >= 0.74,
+    `${theme.id} output panel is too transparent`,
+  );
+  assert.ok(
+    colorAlpha(state.composerMaterial.backgroundColor) >= 0.9,
+    `${theme.id} composer is too transparent`,
+  );
+  assert.equal(state.sidebarMaterial.backdropFilter, "none");
+  assert.equal(state.outputMaterial.backdropFilter, "none");
+  assert.equal(state.composerMaterial.backdropFilter, "none");
+  assert.equal(state.headerMaterial.backdropFilter, "none");
+  assert.equal(state.outputMaterial.borderRadius, "16px");
+  assert.equal(state.composerMaterial.borderRadius, "18px");
+  assert.equal(state.userBubbleMaterial.borderRadius, "14px");
+  assert.equal(statusStyles.running.borderLeftWidth, "3px");
+  assert.equal(statusStyles.success.borderLeftWidth, "3px");
+  assert.equal(statusStyles.warning.borderLeftWidth, "3px");
+  assert.equal(statusStyles.error.borderLeftWidth, "3px");
+  assert.equal(statusStyles.info.borderLeftWidth, "3px");
+  assert.notEqual(statusStyles.running.borderLeftColor, statusStyles.success.borderLeftColor);
+  assert.notEqual(statusStyles.success.borderLeftColor, statusStyles.warning.borderLeftColor);
+  assert.notEqual(statusStyles.warning.borderLeftColor, statusStyles.error.borderLeftColor);
+  for (const [status, style] of Object.entries(statusStyles)) {
+    assert.ok(style.height >= 42, `${theme.id} ${status} status row is too cramped`);
+    assert.ok(Number.parseFloat(style.marginTop) >= 6, `${theme.id} ${status} has no row spacing`);
+    assert.ok(Number.parseFloat(style.paddingTop) >= 8, `${theme.id} ${status} lacks top padding`);
+    assert.ok(
+      Number.parseFloat(style.paddingBottom) >= 8,
+      `${theme.id} ${status} lacks bottom padding`,
+    );
+  }
+  assert.match(state.backdrop.filter, /brightness\([0-9.]+%?\)/);
+  assert.match(state.backdrop.filter, /saturate\([0-9.]+%?\)/);
+  assert.match(state.backdrop.filter, /contrast\([0-9.]+%?\)/);
+  assert.doesNotMatch(state.backdrop.filter, /blur\(/);
+}
+
+function assertChromeReadability(theme, state) {
+  for (const key of [
+    "sidebarPrimary",
+    "sidebarRoleButton",
+    "composerPrimary",
+    "menuPrimary",
+    "outputPrimary",
+    "statusPrimary",
+  ]) {
+    assert.match(
+      state.chromeDescendants[key].color,
+      /rgba?\(248, 249, 252/,
+      `${theme.id} ${key} kept an unreadable official foreground token`,
+    );
+  }
+  for (const key of ["headerMuted", "composerMuted"]) {
+    assert.match(
+      state.chromeDescendants[key].color,
+      /rgba?\(232, 236, 243/,
+      `${theme.id} ${key} kept an unreadable official muted token`,
+    );
+  }
+  assert.equal(
+    state.windowControl.color,
+    "rgb(36, 42, 50)",
+    `${theme.id} native titlebar control lost its dark foreground`,
+  );
+  assert.ok(
+    colorAlpha(state.windowControl.backgroundColor) === 0 ||
+      colorChannelAverage(state.windowControl.backgroundColor) >= 180,
+    `${theme.id} native titlebar control kept an incompatible dark surface: ${state.windowControl.backgroundColor}`,
+  );
 }
 
 try {
@@ -436,6 +812,43 @@ try {
     true,
     "theme verification source rejected the applied state",
   );
+  const dynamicPreparationSurface = await captureDynamicPreparationSurface(page);
+  assert.ok(
+    colorAlpha(dynamicPreparationSurface.themed.backgroundColor) >= 0.74,
+    `dynamic preparation surface is too transparent: ${dynamicPreparationSurface.themed.backgroundColor}`,
+  );
+  assert.match(
+    dynamicPreparationSurface.themed.color,
+    /rgba?\(248, 249, 252/,
+    `dynamic preparation text is unreadable: ${dynamicPreparationSurface.themed.color}`,
+  );
+  assert.equal(dynamicPreparationSurface.themed.animationName, "none");
+  assert.equal(dynamicPreparationSurface.restoredInlineColor, "rgba(9, 18, 27, 0.4)");
+  assert.equal(dynamicPreparationSurface.restoredInlinePriority, "important");
+  assert.equal(dynamicPreparationSurface.restoredInlineFill, "");
+  assert.equal(dynamicPreparationSurface.restoredInlineAnimation, "");
+  const streamingMutationCost = await captureStreamingMutationCost(page);
+  assert.ok(
+    streamingMutationCost.styleReads <= 8,
+    `streaming content caused ${streamingMutationCost.styleReads} theme style reads`,
+  );
+  assert.ok(
+    streamingMutationCost.layoutReads <= 8,
+    `streaming content caused ${streamingMutationCost.layoutReads} theme layout reads`,
+  );
+  const streamingAssistantSurface = await captureStreamingAssistantSurface(page);
+  assert.ok(
+    colorAlpha(streamingAssistantSurface.inserted) >= 0.91,
+    `streaming assistant surface is missing at insertion: ${streamingAssistantSurface.inserted}`,
+  );
+  assert.ok(
+    colorAlpha(streamingAssistantSurface.firstFrame) >= 0.91,
+    `streaming assistant surface is missing on the first frame: ${streamingAssistantSurface.firstFrame}`,
+  );
+  assert.ok(
+    colorAlpha(streamingAssistantSurface.annotated) >= 0.91,
+    `streaming assistant surface is missing after annotation: ${streamingAssistantSurface.annotated}`,
+  );
 
   if (canary === "overlay") {
     await page.addStyleTag({
@@ -453,6 +866,7 @@ try {
     });
   }
 
+  await page.waitForTimeout(220);
   const applied = await page.evaluate(snapshotExpression());
   await page.screenshot({
     path: path.join(outputDirectory, canary ? "canary-overlay.png" : "02-applied.png"),
@@ -483,26 +897,49 @@ try {
   assert.equal(applied.scrim.pointerEvents, "none", "readability scrim captures input");
   assert.equal(applied.mainBackground, "rgba(0, 0, 0, 0)");
   assert.equal(applied.mainBackgroundImage, "none");
-  assert.match(
-    applied.backdrop.filter,
-    /brightness\(0\.92\).*saturate\(1\.08\).*contrast\(1\.04\)/,
+  assertAdaptiveSurfaceSystem(firstTheme, applied);
+  assertChromeReadability(firstTheme, applied);
+  assert.match(applied.sidebarMaterial.color, /rgba?\(248, 249, 252/);
+  assert.match(applied.headerIconFill, /rgba?\(248, 249, 252/);
+  assert.equal(applied.titlebarMaterial.backgroundColor, "rgba(248, 249, 252, 0.94)");
+  assert.equal(applied.titlebarMaterial.backdropFilter, "none");
+  assert.equal(applied.titlebarMaterial.color, "rgb(36, 42, 50)");
+  assert.ok(colorAlpha(applied.outputHeaderBackground) >= 0.85);
+  assert.ok(colorAlpha(applied.assistantReadingBackground) >= 0.91);
+  assert.ok(
+    colorAlpha(applied.toolReadingBackground) >= 0.85,
+    `status module background is too transparent: ${applied.toolReadingBackground}`,
   );
-  assert.equal(applied.sidebarMaterial.backgroundColor, "rgba(31, 21, 28, 0.46)");
-  assert.match(applied.sidebarMaterial.backdropFilter, /blur\(18px\).*saturate\(1\.3\)/);
-  assert.match(applied.sidebarMaterial.color, /rgba?\(255, 248, 251/);
-  assert.match(applied.headerIconFill, /rgba?\(255, 248, 251/);
-  assert.equal(applied.headerMaterial.backgroundColor, "rgba(31, 21, 28, 0.46)");
-  assert.match(applied.headerMaterial.backdropFilter, /blur\(18px\).*saturate\(1\.3\)/);
-  assert.equal(applied.outputMaterial.backgroundColor, "rgba(35, 23, 31, 0.58)");
-  assert.equal(applied.outputHeaderBackground, "rgba(255, 255, 255, 0.07)");
-  assert.match(applied.outputMaterial.backdropFilter, /blur\(20px\).*saturate\(1\.35\)/);
-  assert.equal(applied.outputMaterial.borderRadius, "14px");
-  assert.equal(applied.composerMaterial.backgroundColor, "rgba(29, 22, 28, 0.72)");
-  assert.match(applied.composerMaterial.backdropFilter, /blur\(22px\).*saturate\(1\.35\)/);
-  assert.equal(applied.composerMaterial.borderRadius, "16px");
-  assert.equal(applied.userBubbleMaterial.borderRadius, "14px");
-  assert.equal(applied.assistantReadingBackground, "rgba(255, 250, 252, 0.76)");
-  assert.equal(applied.toolReadingBackground, "rgba(255, 250, 252, 0.68)");
+  assert.ok(
+    colorAlpha(applied.streamingPreparation.backgroundColor) >= 0.74,
+    `streaming preparation surface is too transparent: ${applied.streamingPreparation.backgroundColor}`,
+  );
+  assert.match(
+    applied.streamingPreparation.color,
+    /rgba?\(248, 249, 252/,
+    `streaming preparation text is unreadable: ${applied.streamingPreparation.color}`,
+  );
+  assert.ok(
+    applied.costlyGlassCount <= 3,
+    `shared theme material created ${applied.costlyGlassCount} live glass layers`,
+  );
+  assert.ok(
+    applied.costlyGlassPixelRatio <= 0.03,
+    `shared theme material blurs ${(applied.costlyGlassPixelRatio * 100).toFixed(1)}% of the viewport`,
+  );
+  assert.ok(
+    colorChannelAverage(applied.composerAttachment.backgroundColor) <= 90,
+    `composer attachment kept an incompatible bright surface: ${applied.composerAttachment.backgroundColor}`,
+  );
+  assert.ok(
+    colorChannelAverage(applied.composerAttachmentLabel.color) >= 180,
+    `composer attachment label is unreadable: ${applied.composerAttachmentLabel.color}`,
+  );
+  assert.doesNotMatch(
+    applied.composerFade.backgroundImage,
+    /rgb\(255,\s*255,\s*255\)/,
+    "composer retained the official white bottom fade",
+  );
 
   await page.evaluate(() => {
     const main = document.querySelector("main.main-surface");
@@ -633,6 +1070,7 @@ try {
 
     const switched = await page.evaluate(snapshotExpression());
     assertBackdropLayout(theme, switched.backdrop);
+    assertChromeReadability(theme, switched);
     if (captureGallery) {
       await page.screenshot({
         path: path.join(outputDirectory, `layout-${theme.id}.png`),
@@ -677,6 +1115,8 @@ try {
   }
 
   const matrix = [];
+  const adaptiveProfiles = new Set();
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const viewportFamilies = [
     { name: "full-hd", width: 1920, height: 1080 },
     { name: "qhd", width: 2560, height: 1440 },
@@ -701,20 +1141,18 @@ try {
         assertSemanticContentPreserved(baseline, state, false);
         assertBackdropLayout(theme, state.backdrop);
         assert.equal(state.backdrop.pointerEvents, "none", `${theme.id} background captured input`);
-        assert.match(
-          state.backdrop.filter,
-          /brightness\(0\.92\).*saturate\(1\.08\).*contrast\(1\.04\)/,
-          `${theme.id} lost the shared crisp-artwork filter`,
+        assertAdaptiveSurfaceSystem(theme, state);
+        assertChromeReadability(theme, state);
+        adaptiveProfiles.add(
+          `${state.adaptiveTokens.luminance}/${state.adaptiveTokens.complexity}/${state.adaptiveTokens.saturation}`,
         );
-        assert.equal(
-          state.sidebarMaterial.backgroundColor,
-          "rgba(31, 21, 28, 0.46)",
-          `${theme.id} sidebar split away from the shared glass system`,
+        assert.ok(
+          state.costlyGlassCount <= 3,
+          `${theme.id} created ${state.costlyGlassCount} live glass layers at ${viewport.name} ${scale}`,
         );
-        assert.equal(
-          state.outputMaterial.backgroundColor,
-          "rgba(35, 23, 31, 0.58)",
-          `${theme.id} output panel split away from the shared glass system`,
+        assert.ok(
+          state.costlyGlassPixelRatio <= 0.03,
+          `${theme.id} blurs ${(state.costlyGlassPixelRatio * 100).toFixed(1)}% of the viewport at ${viewport.name} ${scale}`,
         );
         for (const selector of [
           "#active-thread",
@@ -747,6 +1185,11 @@ try {
     }
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+  assert.ok(
+    adaptiveProfiles.size >= 3,
+    "the all-theme render matrix did not exercise distinct adaptive background profiles",
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.evaluate(() => window.scrollTo(0, 0));
 
   await page.evaluate((useCanary) => {
@@ -794,8 +1237,9 @@ try {
     utility.id = "utility-page";
     utility.setAttribute("data-page-kind", "sites");
     utility.innerHTML =
-      '<h2 id="sites-title">站点</h2><input id="sites-search" aria-label="搜索站点"><button id="sites-create" type="button">创建</button>';
+      '<div id="sites-sticky-fade" class="sticky z-30 bg-token-main-surface-primary after:pointer-events-none after:absolute after:top-full after:right-0 after:left-0 after:h-8 after:bg-linear-to-b after:from-token-main-surface-primary after:to-transparent after:content-[\'\']"><h2 id="sites-title">站点</h2><input id="sites-search" aria-label="搜索站点"><button id="sites-create" type="button">创建</button></div>';
     utility.style.minHeight = "240px";
+    utility.querySelector("#sites-sticky-fade").style.position = "relative";
     document.querySelector("main.main-surface .content").hidden = true;
     document.querySelector("main.main-surface").append(utility);
   });
@@ -822,6 +1266,20 @@ try {
     baseline.mainBackground,
     "sites shell lost the themed surface",
   );
+  const utilityFade = await page.locator("#sites-sticky-fade").evaluate((element) => ({
+    backgroundColor: getComputedStyle(element).backgroundColor,
+    afterBackgroundImage: getComputedStyle(element, "::after").backgroundImage,
+  }));
+  assert.equal(
+    utilityFade.backgroundColor,
+    "rgba(0, 0, 0, 0)",
+    "sites sticky header kept an opaque official surface",
+  );
+  assert.doesNotMatch(
+    utilityFade.afterBackgroundImage,
+    /rgb\(255,\s*255,\s*255\)/,
+    "sites sticky header retained the official white fade",
+  );
   for (const selector of ["#sites-title", "#sites-search", "#sites-create"]) {
     const locator = page.locator(selector);
     await locator.scrollIntoViewIfNeeded();
@@ -838,7 +1296,80 @@ try {
     assert.equal(state.hit, true, `${selector} is covered on the themed sites shell`);
   }
 
-  await page.evaluate(() => document.querySelector("#utility-page").remove());
+  await page.evaluate(() => {
+    document.querySelector("#utility-page").remove();
+    const settingsViewport = document.createElement("div");
+    settingsViewport.className = "app-shell-main-content-viewport";
+    const settingsPage = document.createElement("div");
+    settingsPage.id = "settings-page";
+    settingsPage.className = "main-surface flex h-full min-h-0 flex-col";
+    settingsPage.innerHTML =
+      '<button data-settings-panel-slug="general-settings" type="button">常规</button><div id="settings-main-surface"><h2 id="settings-title">常规</h2><div id="settings-card" class="flex flex-col overflow-hidden rounded-2xl border border-token-border"><label for="settings-toggle">自动审核</label><button id="settings-toggle" type="button" role="switch" aria-checked="true">已开启</button><button id="settings-select" class="bg-token-bg-fog border-token-border" type="button" aria-haspopup="listbox">PowerShell</button></div></div>';
+    Object.assign(settingsPage.style, {
+      minHeight: "720px",
+      padding: "48px",
+      background: "rgb(255, 255, 255)",
+    });
+    Object.assign(settingsPage.querySelector("#settings-card").style, {
+      padding: "24px",
+      background: "rgb(255, 255, 255)",
+    });
+    Object.assign(settingsPage.querySelector("#settings-select").style, {
+      color: "rgb(248, 249, 252)",
+      background: "rgba(255, 255, 255, 0.96)",
+    });
+    settingsViewport.append(settingsPage);
+    document.querySelector("main.main-surface").append(settingsViewport);
+  });
+  await page.waitForTimeout(50);
+  const settingsState = await page.evaluate(
+    pageClassExpression(sourceExport.classification_source),
+    sourceExport.classification_source,
+  );
+  const settingsVisual = await page.locator("#settings-page").evaluate((element) => {
+    const style = getComputedStyle(element);
+    const title = getComputedStyle(document.querySelector("#settings-title"));
+    const card = getComputedStyle(document.querySelector("#settings-card"));
+    const select = getComputedStyle(document.querySelector("#settings-select"));
+    const control = document.querySelector("#settings-toggle");
+    const controlRect = control.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      controlRect.left + controlRect.width / 2,
+      controlRect.top + controlRect.height / 2,
+    );
+    return {
+      backgroundColor: style.backgroundColor,
+      cardBackgroundColor: card.backgroundColor,
+      selectBackgroundColor: select.backgroundColor,
+      color: title.color,
+      hit: Boolean(hit && (hit === control || control.contains(hit))),
+    };
+  });
+  await page.screenshot({ path: path.join(outputDirectory, "11-settings.png") });
+  assert.equal(settingsState.classification, "compatible-shell");
+  assert.equal(settingsState.styleDisabled, false, "settings shell lost the selected theme");
+  assert.notEqual(
+    settingsVisual.backgroundColor,
+    "rgb(255, 255, 255)",
+    "settings page retained its opaque official white surface",
+  );
+  assert.notEqual(
+    settingsVisual.cardBackgroundColor,
+    "rgb(255, 255, 255)",
+    "settings card retained its opaque official white surface",
+  );
+  assert.notEqual(
+    settingsVisual.selectBackgroundColor,
+    "rgba(255, 255, 255, 0.96)",
+    "settings selector kept a light surface behind light text",
+  );
+  assert.ok(
+    colorChannelAverage(settingsVisual.color) >= 180,
+    `settings text is unreadable: ${settingsVisual.color}`,
+  );
+  assert.equal(settingsVisual.hit, true, "settings theme covered the native control");
+
+  await page.evaluate(() => document.querySelector("#settings-page").parentElement.remove());
   await page.waitForTimeout(50);
   const unknownState = await page.evaluate(
     pageClassExpression(sourceExport.classification_source),
@@ -896,7 +1427,7 @@ try {
     true,
     "real local-import theme verification failed",
   );
-  await page.locator(".app-header-tint").scrollIntoViewIfNeeded();
+  await page.locator("main .app-header-tint").scrollIntoViewIfNeeded();
   const imported = await page.evaluate(snapshotExpression());
   await page.screenshot({ path: path.join(outputDirectory, "07-local-import.png") });
   assertSemanticContentPreserved(baseline, imported);
@@ -935,6 +1466,7 @@ try {
     pageClasses: {
       main: returnedState.classification,
       utility: utilityState.classification,
+      settings: settingsState.classification,
       sensitive: sensitiveState.classification,
       unknown: unknownState.classification,
     },

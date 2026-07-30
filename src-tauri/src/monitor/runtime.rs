@@ -8,7 +8,10 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use super::{
-    model::{HealthEntry, MonitorSnapshot, ReconcileInput, SourceHealth, SpawnFact, ThreadFact},
+    model::{
+        HealthEntry, MonitorSnapshot, ProcessSessionEvidence, ReconcileInput, SourceHealth,
+        SpawnFact, ThreadFact,
+    },
     reconcile::reconcile,
     rollout_source::{RolloutFacts, RolloutIndex},
     sqlite_source::{read_state_db, StateFacts},
@@ -71,7 +74,10 @@ impl MonitorRuntime {
                 default_home,
                 rollout_index: RolloutIndex::default(),
                 last_state_facts: None,
-                stable_signature: stable_signature(&snapshot),
+                stable_signature: stable_signature(
+                    &snapshot,
+                    ProcessSessionEvidence::VerifiedAbsent,
+                ),
                 snapshot,
                 state_errors: 0,
                 rollout_errors: 0,
@@ -206,7 +212,7 @@ impl MonitorRuntime {
             )
         };
 
-        let (codex_running, session_started_at_ms) = current_codex_session();
+        let process_session = current_codex_session();
         let input = merge_sources(
             state_facts.as_ref(),
             &rollout_facts,
@@ -214,11 +220,10 @@ impl MonitorRuntime {
                 state_database: state_health,
                 rollout_observer: rollout_health,
             },
-            codex_running,
-            session_started_at_ms,
+            process_session,
         );
         let snapshot = reconcile(input, now);
-        let signature = stable_signature(&snapshot);
+        let signature = stable_signature(&snapshot, process_session);
         let changed = signature != state.stable_signature;
         state.stable_signature = signature;
         state.snapshot = snapshot.clone();
@@ -230,8 +235,7 @@ fn merge_sources(
     state: Option<&StateFacts>,
     rollouts: &RolloutFacts,
     health: SourceHealth,
-    codex_running: bool,
-    session_started_at_ms: Option<i64>,
+    process_session: ProcessSessionEvidence,
 ) -> ReconcileInput {
     let mut threads: Vec<ThreadFact> = state
         .map(|facts| {
@@ -273,39 +277,51 @@ fn merge_sources(
         threads,
         spawns: deduplicate_spawns(&rollouts.spawns),
         health,
-        codex_running,
-        session_started_at_ms,
+        process_session,
     }
 }
 
 #[cfg(windows)]
-fn current_codex_session() -> (bool, Option<i64>) {
+fn current_codex_session() -> ProcessSessionEvidence {
     use crate::control_layer::windows_package::{
         discover_store_package, discover_verified_ui_processes, query_process_creation_time,
-        query_process_identity,
+        query_process_identity, IdentityError,
     };
-    let Ok(package) = discover_store_package() else {
-        return (false, None);
+    let package = match discover_store_package() {
+        Ok(package) => package,
+        Err(IdentityError::PackageMissing) => return ProcessSessionEvidence::VerifiedAbsent,
+        Err(_) => return ProcessSessionEvidence::DiscoveryUncertain,
     };
     let Ok(current_user) = query_process_identity(std::process::id()) else {
-        return (false, None);
+        return ProcessSessionEvidence::IdentityUncertain;
     };
-    let Ok(processes) = discover_verified_ui_processes(&package, &current_user.owner_sid) else {
-        return (false, None);
+    let processes = match discover_verified_ui_processes(&package, &current_user.owner_sid) {
+        Ok(processes) => processes,
+        Err(IdentityError::ProcessIdentityQuery) => {
+            return ProcessSessionEvidence::IdentityUncertain;
+        }
+        Err(_) => return ProcessSessionEvidence::DiscoveryUncertain,
     };
-    if processes.is_empty() {
-        return (false, None);
+    match processes.as_slice() {
+        [] => ProcessSessionEvidence::VerifiedAbsent,
+        [process] => query_process_creation_time(process.pid)
+            .ok()
+            .and_then(filetime_to_unix_ms)
+            .map_or(ProcessSessionEvidence::IdentityUncertain, |started_at_ms| {
+                ProcessSessionEvidence::OneVerifiedOfficial {
+                    process_id: process.pid,
+                    started_at_ms,
+                }
+            }),
+        _ => ProcessSessionEvidence::MultipleVerifiedOfficial {
+            process_count: processes.len(),
+        },
     }
-    let session_started = (processes.len() == 1)
-        .then(|| query_process_creation_time(processes[0].pid).ok())
-        .flatten()
-        .and_then(filetime_to_unix_ms);
-    (true, session_started)
 }
 
 #[cfg(not(windows))]
-fn current_codex_session() -> (bool, Option<i64>) {
-    (false, None)
+fn current_codex_session() -> ProcessSessionEvidence {
+    ProcessSessionEvidence::VerifiedAbsent
 }
 
 #[cfg(windows)]
@@ -329,8 +345,8 @@ fn deduplicate_spawns(spawns: &[SpawnFact]) -> Vec<SpawnFact> {
     by_child.into_values().cloned().collect()
 }
 
-fn stable_signature(snapshot: &MonitorSnapshot) -> String {
-    serde_json::to_string(&(
+fn stable_signature(snapshot: &MonitorSnapshot, process_session: ProcessSessionEvidence) -> String {
+    let snapshot_signature = serde_json::to_string(&(
         &snapshot.agents,
         &snapshot.counts,
         snapshot.health.state_database.level,
@@ -339,8 +355,12 @@ fn stable_signature(snapshot: &MonitorSnapshot) -> String {
         snapshot.health.rollout_observer.level,
         &snapshot.health.rollout_observer.message,
         snapshot.health.rollout_observer.error_count,
+        snapshot.codex_running,
+        snapshot.session_started_at_ms,
+        snapshot.observer_status,
     ))
-    .unwrap_or_default()
+    .unwrap_or_default();
+    format!("{snapshot_signature}|{process_session:?}")
 }
 
 fn now_ms() -> i64 {
@@ -444,8 +464,10 @@ mod tests {
                 state_database: HealthEntry::healthy("ok", 1),
                 rollout_observer: HealthEntry::healthy("ok", 1),
             },
-            true,
-            Some(0),
+            ProcessSessionEvidence::OneVerifiedOfficial {
+                process_id: 1,
+                started_at_ms: 0,
+            },
         );
         assert_eq!(
             input.threads[0].rollout_model.as_deref(),

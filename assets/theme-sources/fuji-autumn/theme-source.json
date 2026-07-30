@@ -4,26 +4,32 @@
   "name": "富士秋光",
   "description": "富士远景、秋叶与金色落日构成的温暖主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["nature", "minimal"],
+    "badges": ["new"],
+    "published_at": "2026-07-30",
+    "sort_order": 130
+  },
   "source": {
     "file": "source.png",
-    "original_file_name": "ChatGPT Image 2026年7月26日 13_38_21.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 11_43_35.png",
     "mime_type": "image/png",
-    "sha256": "9d2152a558b476dcc0805b3173ce20fcfcdf46574e5396fac38880f4d50e2c30",
-    "width": 1024,
-    "height": 1536,
-    "bytes": 2555247
+    "sha256": "36937b6e4bb63d5b44727aa62c4bf7914bc4672eed0fd4112db729964d28e085",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2621200
   },
   "runtime": {
     "path": "src-tauri/resources/themes/fuji-autumn.webp",
-    "max_width": 1024,
-    "max_height": 1536,
+    "max_width": 1672,
+    "max_height": 941,
     "quality": 88,
     "max_bytes": 1450000
   },
   "preview": {
     "path": "public/themes/fuji-autumn.webp",
-    "max_width": 405,
-    "max_height": 720,
+    "max_width": 720,
+    "max_height": 405,
     "quality": 78,
     "max_bytes": 250000
   },
@@ -31,8 +37,8 @@
     "minimum_engine_version": 1,
     "preview_path": "/themes/fuji-autumn.webp",
     "overlay": "#57351f",
-    "focal_x": 50,
-    "focal_y": 62,
+    "focal_x": 64,
+    "focal_y": 56,
     "palette": {
       "surface": "#eee4d8",
       "surface_strong": "#fff9f2",
@@ -48,12 +54,12 @@
     }
   },
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月26日 13_38_21.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_43_35.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

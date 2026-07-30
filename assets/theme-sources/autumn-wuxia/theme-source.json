@@ -4,26 +4,32 @@
   "name": "云岭秋侠",
   "description": "云岭、古城与秋叶构成的沉静武侠主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy", "nature"],
+    "badges": ["featured"],
+    "published_at": "2026-07-30",
+    "sort_order": 100
+  },
   "source": {
     "file": "source.png",
-    "original_file_name": "ChatGPT Image 2026年7月25日 00_06_10.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 11_38_00.png",
     "mime_type": "image/png",
-    "sha256": "d8407bd29d4244e1f2ed597cf63a099e0046653f11dc2c299afaa16927c89074",
-    "width": 1086,
-    "height": 1448,
-    "bytes": 2617764
+    "sha256": "04372c9d111c819911999f543fb8cc5bfffa563c8a75450afc824567d0312998",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2620126
   },
   "runtime": {
     "path": "src-tauri/resources/themes/autumn-wuxia.webp",
-    "max_width": 1086,
-    "max_height": 1448,
+    "max_width": 1672,
+    "max_height": 941,
     "quality": 88,
     "max_bytes": 1450000
   },
   "preview": {
     "path": "public/themes/autumn-wuxia.webp",
-    "max_width": 405,
-    "max_height": 720,
+    "max_width": 720,
+    "max_height": 405,
     "quality": 78,
     "max_bytes": 250000
   },
@@ -31,8 +37,8 @@
     "minimum_engine_version": 1,
     "preview_path": "/themes/autumn-wuxia.webp",
     "overlay": "#283246",
-    "focal_x": 50,
-    "focal_y": 61,
+    "focal_x": 45,
+    "focal_y": 54,
     "palette": {
       "surface": "#e7e4df",
       "surface_strong": "#f8f6f2",
@@ -48,12 +54,12 @@
     }
   },
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_10.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_38_00.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

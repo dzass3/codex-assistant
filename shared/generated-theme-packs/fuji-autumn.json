@@ -5,13 +5,19 @@
   "name": "富士秋光",
   "description": "富士远景、秋叶与金色落日构成的温暖主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["nature", "minimal"],
+    "badges": ["new"],
+    "published_at": "2026-07-30",
+    "sort_order": 130
+  },
   "preview_path": "/themes/fuji-autumn.webp",
   "backdrop": {
     "kind": "image",
     "asset_id": "fuji-autumn",
     "overlay": "#57351f",
-    "focal_x": 50,
-    "focal_y": 62
+    "focal_x": 64,
+    "focal_y": 56
   },
   "palette": {
     "surface": "#eee4d8",
@@ -26,20 +32,25 @@
     "contrast_percent": 100,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 34,
+    "complexity": 35,
+    "saturation": 42
+  },
   "assets": [
     {
       "id": "fuji-autumn",
       "mime_type": "image/webp",
-      "sha256": "82bfd5ec2337589bd818a400a1611888098ec60a9ca85ef1895c51d5cbe330c2"
+      "sha256": "158cdcbe65499f85cd3fd9b86449ac3bf4e533f749353615213c8c82a069907b"
     }
   ],
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月26日 13_38_21.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_43_35.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

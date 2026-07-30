@@ -27,5 +27,5 @@ WindowsApps files, official databases, or code signatures. Local image imports
 stay on the device. Theme control is restricted to an allow-listed official
 process owned by the current Windows user and a random loopback endpoint.
 
-Version 0.11.8 installers are not code-signed. Verify downloads against the
+Version 0.11.9 installers are not code-signed. Verify downloads against the
 published `SHA256SUMS.txt` before installation.

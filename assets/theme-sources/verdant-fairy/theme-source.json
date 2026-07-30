@@ -4,6 +4,12 @@
   "name": "森灵花语",
   "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy", "nature"],
+    "badges": ["featured"],
+    "published_at": "2026-07-24",
+    "sort_order": 50
+  },
   "source": {
     "file": "source.png",
     "original_file_name": "ChatGPT Image 2026年7月24日 17_57_31 (7).png",
@@ -53,7 +59,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

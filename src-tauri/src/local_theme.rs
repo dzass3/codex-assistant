@@ -9,8 +9,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::theme::{
-    validate_theme_pack, RightsStatus, ThemeAsset, ThemeBackdrop, ThemeCategory, ThemeEffects,
-    ThemePack, ThemePalette, ThemeRights, MAX_RUNTIME_THEME_ASSET_BYTES,
+    validate_theme_pack, RightsStatus, ThemeAdaptation, ThemeAsset, ThemeBackdrop, ThemeCategory,
+    ThemeEffects, ThemePack, ThemePalette, ThemeRights, MAX_RUNTIME_THEME_ASSET_BYTES,
 };
 
 const LOCAL_THEME_DIRECTORY: &str = "local-themes";
@@ -30,6 +30,7 @@ const MANIFEST_KEYS: &[&str] = &[
     "assets",
     "rights",
 ];
+const OPTIONAL_MANIFEST_KEYS: &[&str] = &["adaptation"];
 
 #[derive(Clone, Debug)]
 pub struct LocalThemeCatalog {
@@ -109,6 +110,7 @@ impl LocalThemeCatalog {
             name,
             description: "仅保存在当前设备上的个人图片主题".to_owned(),
             category: ThemeCategory::LocalImport,
+            marketplace: None,
             preview_path: format!("local-theme:{id}"),
             backdrop: ThemeBackdrop::Image {
                 asset_id: id.clone(),
@@ -129,6 +131,7 @@ impl LocalThemeCatalog {
                 contrast_percent: 100,
                 motion: false,
             },
+            adaptation: Some(analyze_backdrop(bytes)?),
             assets: vec![ThemeAsset {
                 id: id.clone(),
                 mime_type: detected_mime.to_owned(),
@@ -229,6 +232,66 @@ impl LocalThemeCatalog {
     }
 }
 
+fn analyze_backdrop(bytes: &[u8]) -> Result<ThemeAdaptation, String> {
+    let image = image::load_from_memory(bytes)
+        .map_err(|_| "Local theme image cannot be analyzed".to_owned())?
+        .thumbnail_exact(64, 64)
+        .to_rgb8();
+    let width = image.width() as usize;
+    let height = image.height() as usize;
+    let mut luminance = Vec::with_capacity(width * height);
+    let mut luminance_total = 0.0_f64;
+    let mut saturation_total = 0.0_f64;
+
+    for pixel in image.pixels() {
+        let red = f64::from(pixel[0]) / 255.0;
+        let green = f64::from(pixel[1]) / 255.0;
+        let blue = f64::from(pixel[2]) / 255.0;
+        let maximum = red.max(green).max(blue);
+        let minimum = red.min(green).min(blue);
+        let value = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+        luminance.push(value);
+        luminance_total += value;
+        saturation_total += if maximum == 0.0 {
+            0.0
+        } else {
+            (maximum - minimum) / maximum
+        };
+    }
+
+    let sample_count = luminance.len() as f64;
+    let average = luminance_total / sample_count;
+    let deviation = (luminance
+        .iter()
+        .map(|value| (value - average).powi(2))
+        .sum::<f64>()
+        / sample_count)
+        .sqrt();
+    let mut edge_total = 0.0_f64;
+    let mut edge_count = 0_usize;
+    for y in 0..height {
+        for x in 0..width {
+            let index = y * width + x;
+            if x + 1 < width {
+                edge_total += (luminance[index] - luminance[index + 1]).abs();
+                edge_count += 1;
+            }
+            if y + 1 < height {
+                edge_total += (luminance[index] - luminance[index + width]).abs();
+                edge_count += 1;
+            }
+        }
+    }
+    let edge_density = edge_total / edge_count.max(1) as f64;
+    let percent = |value: f64| value.round().clamp(0.0, 100.0) as u8;
+
+    Ok(ThemeAdaptation {
+        luminance: percent(average * 100.0),
+        complexity: percent(edge_density * 260.0 + deviation * 95.0),
+        saturation: percent(saturation_total / sample_count * 100.0),
+    })
+}
+
 fn write_owned_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut file = File::create(path).map_err(|_| "Local theme file could not be created")?;
     crate::private_state::protect_owned_path(path)?;
@@ -271,10 +334,11 @@ fn has_exact_manifest_keys(value: &Value) -> bool {
     let Some(object) = value.as_object() else {
         return false;
     };
-    object.len() == MANIFEST_KEYS.len()
-        && object
-            .keys()
-            .all(|key| MANIFEST_KEYS.contains(&key.as_str()))
+    (object.len() == MANIFEST_KEYS.len()
+        || object.len() == MANIFEST_KEYS.len() + OPTIONAL_MANIFEST_KEYS.len())
+        && object.keys().all(|key| {
+            MANIFEST_KEYS.contains(&key.as_str()) || OPTIONAL_MANIFEST_KEYS.contains(&key.as_str())
+        })
 }
 
 fn is_link(path: &Path) -> Result<bool, String> {

@@ -4,6 +4,12 @@
   "use strict";
 
   const WELCOME_SELECTOR = "[data-codex-assistant-theme-welcome]";
+  const SHIMMER_SELECTOR = ".loading-shimmer-pure-text";
+  const SHIMMER_STYLE_PROPERTIES = {
+    color: "rgba(248,249,252,0.96)",
+    "-webkit-text-fill-color": "rgba(248,249,252,0.96)",
+    animation: "none",
+  };
   const MAIN_SELECTORS = [
     "main.main-surface",
     'main[role="main"]',
@@ -61,6 +67,50 @@
       prompt: "请执行这个任务：",
     },
   ];
+  const shimmerInlineStyles = new Map();
+  let themeActive = false;
+
+  const visitShimmers = (node, callback) => {
+    if (!(node instanceof Element)) return;
+    if (node.matches(SHIMMER_SELECTOR)) callback(node);
+    for (const shimmer of node.querySelectorAll(SHIMMER_SELECTOR)) callback(shimmer);
+  };
+
+  const styleShimmer = (shimmer) => {
+    if (shimmerInlineStyles.has(shimmer)) return;
+    const original = {};
+    for (const property of Object.keys(SHIMMER_STYLE_PROPERTIES)) {
+      original[property] = {
+        value: shimmer.style.getPropertyValue(property),
+        priority: shimmer.style.getPropertyPriority(property),
+      };
+      shimmer.style.setProperty(property, SHIMMER_STYLE_PROPERTIES[property], "important");
+    }
+    shimmerInlineStyles.set(shimmer, original);
+  };
+
+  const restoreShimmer = (shimmer) => {
+    const original = shimmerInlineStyles.get(shimmer);
+    if (!original) return;
+    for (const [property, entry] of Object.entries(original)) {
+      if (entry.value) shimmer.style.setProperty(property, entry.value, entry.priority);
+      else shimmer.style.removeProperty(property);
+    }
+    shimmerInlineStyles.delete(shimmer);
+  };
+
+  const restoreShimmers = () => {
+    for (const shimmer of shimmerInlineStyles.keys()) restoreShimmer(shimmer);
+  };
+
+  const shimmerObserver = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.removedNodes) visitShimmers(node, restoreShimmer);
+      if (!themeActive) continue;
+      for (const node of record.addedNodes) visitShimmers(node, styleShimmer);
+    }
+  });
+  shimmerObserver.observe(document.body, { childList: true, subtree: true });
 
   const present = (element) => {
     if (!element || typeof element.getBoundingClientRect !== "function") return false;
@@ -183,10 +233,13 @@
 
   let scheduled = false;
   const sync = (active) => {
+    themeActive = active;
     if (!active) {
       removeWelcome();
+      restoreShimmers();
       return;
     }
+    for (const shimmer of document.querySelectorAll(SHIMMER_SELECTOR)) styleShimmer(shimmer);
     if (scheduled) return;
     scheduled = true;
     queueMicrotask(() => {
@@ -200,5 +253,12 @@
     });
   };
 
-  return Object.freeze({ sync, destroy: removeWelcome });
+  const destroy = () => {
+    themeActive = false;
+    shimmerObserver.disconnect();
+    restoreShimmers();
+    removeWelcome();
+  };
+
+  return Object.freeze({ sync, destroy });
 };

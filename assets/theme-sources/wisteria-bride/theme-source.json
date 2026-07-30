@@ -4,6 +4,12 @@
   "name": "紫藤花嫁",
   "description": "紫藤花境与柔和玻璃材质构成的明亮人物主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "fantasy"],
+    "badges": ["popular", "featured"],
+    "published_at": "2026-07-24",
+    "sort_order": 10
+  },
   "source": {
     "file": "source.png",
     "original_file_name": "ChatGPT Image 2026年7月24日 11_20_32 (3).png",
@@ -53,7 +59,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

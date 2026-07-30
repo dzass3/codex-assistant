@@ -149,26 +149,31 @@ struct ForceRestartTicket {
     cancellation: Arc<AtomicBool>,
 }
 
-pub struct ThemeApplication {
-    session_store: OwnedSessionStore,
-    session: Mutex<Option<OwnedSessionRecord>>,
-    status: Mutex<ThemeSessionStatus>,
-    local_catalog: LocalThemeCatalog,
-    preference_store: ThemePreferenceStore,
-    selected_theme_id: Mutex<Option<String>>,
-    applied_theme_id: Mutex<Option<String>>,
-    catalog_notice: Option<String>,
-    scripts: Mutex<Vec<ThemeScriptRegistration>>,
-    force_tickets: Mutex<HashMap<String, ForceRestartTicket>>,
-    force_cancellations: Mutex<HashMap<String, Arc<AtomicBool>>>,
-    lifecycle_active: Mutex<bool>,
+#[derive(Clone)]
+struct ThemeWorkflowState {
+    session: Option<OwnedSessionRecord>,
+    status: ThemeSessionStatus,
+    selected_theme_id: Option<String>,
+    applied_theme_id: Option<String>,
+    scripts: Vec<ThemeScriptRegistration>,
+    force_tickets: HashMap<String, ForceRestartTicket>,
+    force_cancellations: HashMap<String, Arc<AtomicBool>>,
+    lifecycle_active: bool,
 }
 
-struct LifecycleLease<'a>(&'a Mutex<bool>);
+pub struct ThemeApplication {
+    session_store: OwnedSessionStore,
+    workflow: Mutex<ThemeWorkflowState>,
+    local_catalog: LocalThemeCatalog,
+    preference_store: ThemePreferenceStore,
+    catalog_notice: Option<String>,
+}
+
+struct LifecycleLease<'a>(&'a Mutex<ThemeWorkflowState>);
 
 impl Drop for LifecycleLease<'_> {
     fn drop(&mut self) {
-        *lock(self.0) = false;
+        lock(self.0).lifecycle_active = false;
     }
 }
 
@@ -202,43 +207,47 @@ impl ThemeApplication {
         };
         Ok(Self {
             session_store,
-            session: Mutex::new(None),
-            status: Mutex::new(status),
+            workflow: Mutex::new(ThemeWorkflowState {
+                session: None,
+                status,
+                selected_theme_id: preference.selected_theme_id,
+                applied_theme_id: None,
+                scripts: Vec::new(),
+                force_tickets: HashMap::new(),
+                force_cancellations: HashMap::new(),
+                lifecycle_active: false,
+            }),
             local_catalog,
             preference_store,
-            selected_theme_id: Mutex::new(preference.selected_theme_id),
-            applied_theme_id: Mutex::new(None),
             catalog_notice: preference
                 .removed_missing_bundled_theme
-                .then(|| "原主题已下架，请从 14 个新主题中重新选择".to_owned()),
-            scripts: Mutex::new(Vec::new()),
-            force_tickets: Mutex::new(HashMap::new()),
-            force_cancellations: Mutex::new(HashMap::new()),
-            lifecycle_active: Mutex::new(false),
+                .then(|| "原主题已下架，请从 12 个新主题中重新选择".to_owned()),
         })
     }
 
     fn try_lifecycle(&self) -> Option<LifecycleLease<'_>> {
-        let mut active = lock(&self.lifecycle_active);
-        if *active {
+        let mut workflow = lock(&self.workflow);
+        if workflow.lifecycle_active {
             return None;
         }
-        *active = true;
-        drop(active);
-        Some(LifecycleLease(&self.lifecycle_active))
+        workflow.lifecycle_active = true;
+        drop(workflow);
+        Some(LifecycleLease(&self.workflow))
     }
 
     fn accept_session(&self, record: OwnedSessionRecord) {
-        *lock(&self.session) = Some(record);
-        *lock(&self.status) = ThemeSessionStatus::Ready;
+        let mut workflow = lock(&self.workflow);
+        workflow.session = Some(record);
+        workflow.status = ThemeSessionStatus::Ready;
     }
 
     pub fn snapshot(&self) -> ThemeUiSnapshot {
+        let workflow = lock(&self.workflow);
         ThemeUiSnapshot {
             contract_version: 2,
-            session_status: *lock(&self.status),
-            selected_theme_id: lock(&self.selected_theme_id).clone(),
-            applied_theme_id: lock(&self.applied_theme_id).clone(),
+            session_status: workflow.status,
+            selected_theme_id: workflow.selected_theme_id.clone(),
+            applied_theme_id: workflow.applied_theme_id.clone(),
             catalog_notice: self.catalog_notice.clone(),
             packs: self.theme_packs(),
         }
@@ -246,7 +255,7 @@ impl ThemeApplication {
 
     pub fn environment_report(&self) -> ThemeEnvironmentReport {
         let reachable = self.reconcile_session();
-        inspect_local_environment(lock(&self.selected_theme_id).clone(), reachable)
+        inspect_local_environment(lock(&self.workflow).selected_theme_id.clone(), reachable)
     }
 
     pub fn preview_data_url(&self, theme_id: &str) -> Option<String> {
@@ -293,7 +302,7 @@ impl ThemeApplication {
     }
 
     pub fn reconcile_session(&self) -> bool {
-        if lock(&self.session).is_none() {
+        if lock(&self.workflow).session.is_none() {
             if let Some(record) = recover_verified_session(&self.session_store) {
                 self.accept_session(record);
             }
@@ -305,18 +314,25 @@ impl ThemeApplication {
     where
         F: FnOnce(&OwnedSessionRecord) -> bool,
     {
-        let session = lock(&self.session).clone();
+        let session = {
+            let workflow = lock(&self.workflow);
+            if workflow.lifecycle_active {
+                return workflow.session.is_some();
+            }
+            workflow.session.clone()
+        };
         if session.as_ref().is_some_and(verify) {
             return true;
         }
-        *lock(&self.session) = None;
-        *lock(&self.status) = if lock(&self.selected_theme_id).is_some() {
+        let mut workflow = lock(&self.workflow);
+        workflow.session = None;
+        workflow.status = if workflow.selected_theme_id.is_some() {
             ThemeSessionStatus::Paused
         } else {
             ThemeSessionStatus::Inactive
         };
-        *lock(&self.applied_theme_id) = None;
-        lock(&self.scripts).clear();
+        workflow.applied_theme_id = None;
+        workflow.scripts.clear();
         false
     }
 
@@ -335,16 +351,22 @@ impl ThemeApplication {
             self.accept_session(record);
             return receipt(OperationStatus::Noop, Vec::new());
         }
-        *lock(&self.session) = None;
-        *lock(&self.status) = ThemeSessionStatus::Inactive;
-        self.start_session_with_safety(restart_safety, restart_verified_host)
+        {
+            let mut workflow = lock(&self.workflow);
+            workflow.session = None;
+            workflow.status = ThemeSessionStatus::Inactive;
+        }
+        self.start_session_with_safety_inner(restart_safety, restart_verified_host)
     }
 
     pub fn start_session_with<F>(&self, active_work_count: usize, restart: F) -> OperationReceipt
     where
         F: FnOnce() -> Result<OwnedSessionRecord, ThemeReasonCode>,
     {
-        self.start_session_with_safety(
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked(ThemeReasonCode::OperationConflict);
+        };
+        self.start_session_with_safety_inner(
             RestartSafetyProjection::confirmed(active_work_count),
             restart,
         )
@@ -358,9 +380,26 @@ impl ThemeApplication {
     where
         F: FnOnce() -> Result<OwnedSessionRecord, ThemeReasonCode>,
     {
-        if lock(&self.session).is_some() {
-            *lock(&self.status) = ThemeSessionStatus::Ready;
-            return receipt(OperationStatus::Noop, Vec::new());
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked(ThemeReasonCode::OperationConflict);
+        };
+        self.start_session_with_safety_inner(restart_safety, restart)
+    }
+
+    fn start_session_with_safety_inner<F>(
+        &self,
+        restart_safety: RestartSafetyProjection,
+        restart: F,
+    ) -> OperationReceipt
+    where
+        F: FnOnce() -> Result<OwnedSessionRecord, ThemeReasonCode>,
+    {
+        {
+            let mut workflow = lock(&self.workflow);
+            if workflow.session.is_some() {
+                workflow.status = ThemeSessionStatus::Ready;
+                return receipt(OperationStatus::Noop, Vec::new());
+            }
         }
         if let Some(reason) = restart_block_reason(restart_safety) {
             return blocked(reason);
@@ -371,11 +410,11 @@ impl ThemeApplication {
                 receipt(OperationStatus::Applied, Vec::new())
             }
             Ok(_) => {
-                *lock(&self.status) = ThemeSessionStatus::Degraded;
+                lock(&self.workflow).status = ThemeSessionStatus::Degraded;
                 failed(ThemeReasonCode::ThemeStateUnavailable)
             }
             Err(reason) => {
-                *lock(&self.status) = ThemeSessionStatus::Degraded;
+                lock(&self.workflow).status = ThemeSessionStatus::Degraded;
                 failed(reason)
             }
         }
@@ -431,7 +470,7 @@ impl ThemeApplication {
         confirmation_ticket: Option<&str>,
         restart_safety: RestartSafetyProjection,
     ) -> OperationReceipt {
-        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
+        lock(&self.workflow).selected_theme_id = Some(theme_id.to_owned());
         if mode == RestartMode::Safe {
             return self.activate_safety(theme_id, restart_safety);
         }
@@ -465,13 +504,14 @@ impl ThemeApplication {
         let Some(_lease) = self.try_lifecycle() else {
             return blocked(ThemeReasonCode::OperationConflict);
         };
-        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
-        if *lock(&self.status) != ThemeSessionStatus::Ready {
+        lock(&self.workflow).selected_theme_id = Some(theme_id.to_owned());
+        if lock(&self.workflow).status != ThemeSessionStatus::Ready {
             if let Some(record) = recover_verified_session(&self.session_store) {
                 self.accept_session(record);
             }
-            if *lock(&self.status) != ThemeSessionStatus::Ready {
-                let started = self.start_session_with_safety(restart_safety, restart_verified_host);
+            if lock(&self.workflow).status != ThemeSessionStatus::Ready {
+                let started =
+                    self.start_session_with_safety_inner(restart_safety, restart_verified_host);
                 if !matches!(
                     started.status,
                     OperationStatus::Applied | OperationStatus::Noop
@@ -513,9 +553,12 @@ impl ThemeApplication {
         R: FnOnce() -> Result<OwnedSessionRecord, ThemeReasonCode>,
         A: FnOnce(&ThemePack) -> Result<usize, ThemeReasonCode>,
     {
-        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
-        if *lock(&self.status) != ThemeSessionStatus::Ready {
-            let started = self.start_session_with_safety(restart_safety, restart);
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked(ThemeReasonCode::OperationConflict);
+        };
+        lock(&self.workflow).selected_theme_id = Some(theme_id.to_owned());
+        if lock(&self.workflow).status != ThemeSessionStatus::Ready {
+            let started = self.start_session_with_safety_inner(restart_safety, restart);
             if !matches!(
                 started.status,
                 OperationStatus::Applied | OperationStatus::Noop
@@ -523,12 +566,12 @@ impl ThemeApplication {
                 return started;
             }
         }
-        self.apply_theme_with(theme_id, apply)
+        self.apply_theme_with_inner(theme_id, apply)
     }
 
     fn apply_until_ready(&self, theme_id: &str) -> OperationReceipt {
         self.retry_theme_application_with(
-            41,
+            5,
             || self.apply_theme(theme_id),
             || std::thread::sleep(std::time::Duration::from_millis(250)),
         )
@@ -560,11 +603,12 @@ impl ThemeApplication {
         unreachable!("at least one theme application attempt is required")
     }
 
-    pub fn apply_theme(&self, theme_id: &str) -> OperationReceipt {
-        let previous_scripts = lock(&self.scripts).clone();
+    fn apply_theme(&self, theme_id: &str) -> OperationReceipt {
+        let previous_scripts = lock(&self.workflow).scripts.clone();
         let next_scripts = Mutex::new(None);
-        let result = self.apply_theme_with(theme_id, |pack| {
-            let session = lock(&self.session)
+        let result = self.apply_theme_with_inner(theme_id, |pack| {
+            let session = lock(&self.workflow)
+                .session
                 .clone()
                 .ok_or(ThemeReasonCode::CdpUnavailable)?;
             let endpoint = verified_theme_endpoint(&session)?;
@@ -590,14 +634,15 @@ impl ThemeApplication {
         });
         if result.status == OperationStatus::Applied {
             if let Some(scripts) = lock(&next_scripts).take() {
-                *lock(&self.scripts) = scripts;
+                lock(&self.workflow).scripts = scripts;
             }
         } else if result
             .reason_codes
             .contains(&ThemeReasonCode::CdpUnavailable)
         {
-            *lock(&self.session) = None;
-            *lock(&self.status) = ThemeSessionStatus::Degraded;
+            let mut workflow = lock(&self.workflow);
+            workflow.session = None;
+            workflow.status = ThemeSessionStatus::Degraded;
         }
         result
     }
@@ -606,7 +651,17 @@ impl ThemeApplication {
     where
         F: FnOnce(&ThemePack) -> Result<usize, ThemeReasonCode>,
     {
-        *lock(&self.selected_theme_id) = Some(theme_id.to_owned());
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked(ThemeReasonCode::OperationConflict);
+        };
+        self.apply_theme_with_inner(theme_id, apply)
+    }
+
+    fn apply_theme_with_inner<F>(&self, theme_id: &str, apply: F) -> OperationReceipt
+    where
+        F: FnOnce(&ThemePack) -> Result<usize, ThemeReasonCode>,
+    {
+        lock(&self.workflow).selected_theme_id = Some(theme_id.to_owned());
         let available = self.theme_packs();
         if self
             .preference_store
@@ -615,7 +670,7 @@ impl ThemeApplication {
         {
             return failed(ThemeReasonCode::ThemeStateUnavailable);
         }
-        if *lock(&self.status) != ThemeSessionStatus::Ready {
+        if lock(&self.workflow).status != ThemeSessionStatus::Ready {
             return blocked(ThemeReasonCode::CdpUnavailable);
         }
         let Some(pack) = available.into_iter().find(|pack| pack.id == theme_id) else {
@@ -623,7 +678,7 @@ impl ThemeApplication {
         };
         match apply(&pack) {
             Ok(count) if count != 0 => {
-                *lock(&self.applied_theme_id) = Some(pack.id);
+                lock(&self.workflow).applied_theme_id = Some(pack.id);
                 receipt(OperationStatus::Applied, Vec::new())
             }
             Ok(_) => failed(ThemeReasonCode::UnsupportedHost),
@@ -635,9 +690,10 @@ impl ThemeApplication {
         let Some(_lease) = self.try_lifecycle() else {
             return blocked(ThemeReasonCode::OperationConflict);
         };
-        let scripts = lock(&self.scripts).clone();
-        let result = self.restore_with(|| {
-            let session = lock(&self.session)
+        let scripts = lock(&self.workflow).scripts.clone();
+        let result = self.restore_with_inner(|| {
+            let session = lock(&self.workflow)
+                .session
                 .clone()
                 .ok_or(ThemeReasonCode::CdpUnavailable)?;
             let endpoint = verified_theme_endpoint(&session)?;
@@ -650,7 +706,7 @@ impl ThemeApplication {
                 .map_err(|_| ThemeReasonCode::CdpUnavailable)
         });
         if result.status == OperationStatus::Applied {
-            lock(&self.scripts).clear();
+            lock(&self.workflow).scripts.clear();
         }
         result
     }
@@ -659,13 +715,31 @@ impl ThemeApplication {
     where
         F: FnOnce() -> Result<usize, ThemeReasonCode>,
     {
-        if lock(&self.applied_theme_id).is_none() {
-            if lock(&self.selected_theme_id).is_some() {
+        let Some(_lease) = self.try_lifecycle() else {
+            return blocked(ThemeReasonCode::OperationConflict);
+        };
+        self.restore_with_inner(restore)
+    }
+
+    fn restore_with_inner<F>(&self, restore: F) -> OperationReceipt
+    where
+        F: FnOnce() -> Result<usize, ThemeReasonCode>,
+    {
+        let (applied, selected) = {
+            let workflow = lock(&self.workflow);
+            (
+                workflow.applied_theme_id.is_some(),
+                workflow.selected_theme_id.is_some(),
+            )
+        };
+        if !applied {
+            if selected {
                 if self.preference_store.save(None, &[]).is_err() {
                     return failed(ThemeReasonCode::ThemeStateUnavailable);
                 }
-                *lock(&self.selected_theme_id) = None;
-                *lock(&self.status) = ThemeSessionStatus::Inactive;
+                let mut workflow = lock(&self.workflow);
+                workflow.selected_theme_id = None;
+                workflow.status = ThemeSessionStatus::Inactive;
                 return receipt(OperationStatus::Applied, Vec::new());
             }
             return receipt(OperationStatus::Noop, Vec::new());
@@ -675,8 +749,9 @@ impl ThemeApplication {
                 if self.preference_store.save(None, &[]).is_err() {
                     return failed(ThemeReasonCode::ThemeStateUnavailable);
                 }
-                *lock(&self.selected_theme_id) = None;
-                *lock(&self.applied_theme_id) = None;
+                let mut workflow = lock(&self.workflow);
+                workflow.selected_theme_id = None;
+                workflow.applied_theme_id = None;
                 receipt(OperationStatus::Applied, Vec::new())
             }
             Ok(_) => failed(ThemeReasonCode::UnsupportedHost),
@@ -706,14 +781,15 @@ impl ThemeApplication {
         if restart_safety.blocking_reason().is_none() {
             return Err(ThemeReasonCode::ConfirmationRequired);
         }
-        if *lock(&self.lifecycle_active) {
+        if lock(&self.workflow).lifecycle_active {
             return Err(ThemeReasonCode::OperationConflict);
         }
         let fingerprint = current_verified_root_fingerprint()?;
         let confirmation_ticket = Uuid::new_v4().to_string();
         let expires_at_ms = chrono::Utc::now().timestamp_millis().max(0) + 60_000;
         let cancellation = Arc::new(AtomicBool::new(false));
-        lock(&self.force_tickets).insert(
+        let mut workflow = lock(&self.workflow);
+        workflow.force_tickets.insert(
             confirmation_ticket.clone(),
             ForceRestartTicket {
                 intent,
@@ -724,7 +800,9 @@ impl ThemeApplication {
                 cancellation: Arc::clone(&cancellation),
             },
         );
-        lock(&self.force_cancellations).insert(confirmation_ticket.clone(), cancellation);
+        workflow
+            .force_cancellations
+            .insert(confirmation_ticket.clone(), cancellation);
         Ok(ForceRestartImpact {
             confirmation_ticket,
             intent,
@@ -736,7 +814,8 @@ impl ThemeApplication {
     }
 
     pub fn cancel_force_restart(&self, confirmation_ticket: &str) -> bool {
-        let cancellation = lock(&self.force_cancellations)
+        let cancellation = lock(&self.workflow)
+            .force_cancellations
             .get(confirmation_ticket)
             .cloned();
         if let Some(cancellation) = cancellation {
@@ -754,42 +833,56 @@ impl ThemeApplication {
         subject: Option<&str>,
         restart_safety: RestartSafetyProjection,
     ) -> OperationReceipt {
-        let Some(ticket) = lock(&self.force_tickets).remove(confirmation_ticket) else {
+        let ticket = lock(&self.workflow)
+            .force_tickets
+            .remove(confirmation_ticket);
+        let Some(ticket) = ticket else {
             return blocked(ThemeReasonCode::ConfirmationExpired);
         };
         let invalid = chrono::Utc::now().timestamp_millis().max(0) > ticket.expires_at_ms
             || ticket.intent != intent
             || ticket.subject.as_deref() != subject;
         if invalid {
-            lock(&self.force_cancellations).remove(confirmation_ticket);
+            lock(&self.workflow)
+                .force_cancellations
+                .remove(confirmation_ticket);
             return blocked(ThemeReasonCode::ConfirmationExpired);
         }
         if ticket.restart_safety != restart_safety {
-            lock(&self.force_cancellations).remove(confirmation_ticket);
+            lock(&self.workflow)
+                .force_cancellations
+                .remove(confirmation_ticket);
             return blocked(ThemeReasonCode::ImpactChanged);
         }
         let current = match current_verified_root_fingerprint() {
             Ok(value) => value,
             Err(reason) => {
-                lock(&self.force_cancellations).remove(confirmation_ticket);
+                lock(&self.workflow)
+                    .force_cancellations
+                    .remove(confirmation_ticket);
                 return blocked(reason);
             }
         };
         if current != ticket.fingerprint {
-            lock(&self.force_cancellations).remove(confirmation_ticket);
+            lock(&self.workflow)
+                .force_cancellations
+                .remove(confirmation_ticket);
             return blocked(ThemeReasonCode::IdentityChanged);
         }
         {
-            let mut active = lock(&self.lifecycle_active);
-            if *active {
-                lock(&self.force_cancellations).remove(confirmation_ticket);
+            let mut workflow = lock(&self.workflow);
+            if workflow.lifecycle_active {
+                workflow.force_cancellations.remove(confirmation_ticket);
                 return blocked(ThemeReasonCode::OperationConflict);
             }
-            *active = true;
+            workflow.lifecycle_active = true;
         }
         let restarted = restart_verified_host_force(&ticket.fingerprint, &ticket.cancellation);
-        *lock(&self.lifecycle_active) = false;
-        lock(&self.force_cancellations).remove(confirmation_ticket);
+        {
+            let mut workflow = lock(&self.workflow);
+            workflow.lifecycle_active = false;
+            workflow.force_cancellations.remove(confirmation_ticket);
+        }
         match restarted {
             Ok(record) if self.session_store.save(&record).is_ok() => {
                 self.accept_session(record);

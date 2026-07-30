@@ -5,13 +5,19 @@
   "name": "云岭秋侠",
   "description": "云岭、古城与秋叶构成的沉静武侠主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy", "nature"],
+    "badges": ["featured"],
+    "published_at": "2026-07-30",
+    "sort_order": 100
+  },
   "preview_path": "/themes/autumn-wuxia.webp",
   "backdrop": {
     "kind": "image",
     "asset_id": "autumn-wuxia",
     "overlay": "#283246",
-    "focal_x": 50,
-    "focal_y": 61
+    "focal_x": 45,
+    "focal_y": 54
   },
   "palette": {
     "surface": "#e7e4df",
@@ -26,20 +32,25 @@
     "contrast_percent": 103,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 35,
+    "complexity": 32,
+    "saturation": 31
+  },
   "assets": [
     {
       "id": "autumn-wuxia",
       "mime_type": "image/webp",
-      "sha256": "fef7a907dbcdea953fd3cbe337b017abedbe2acf0a3667fc47a20ecbdde3c681"
+      "sha256": "9059f8763dbb8702279b7773ee277aaff057c517d20dd1435423295691d658b5"
     }
   ],
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_10.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_38_00.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

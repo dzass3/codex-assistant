@@ -53,7 +53,7 @@ fn locks_the_codex_assistant_product_identity() {
     let capability = json(DEFAULT_CAPABILITY, "capabilities/default.json");
 
     assert_eq!(tauri["productName"].as_str(), Some("Codex Assistant"));
-    assert_eq!(tauri["version"].as_str(), Some("0.11.8"));
+    assert_eq!(tauri["version"].as_str(), Some("0.11.9"));
     assert_eq!(
         tauri["identifier"].as_str(),
         Some("com.codexagentmonitor.desktop")
@@ -75,17 +75,17 @@ fn locks_the_codex_assistant_product_identity() {
     );
 
     assert_eq!(package["name"].as_str(), Some("codex-assistant"));
-    assert_eq!(package["version"].as_str(), Some("0.11.8"));
+    assert_eq!(package["version"].as_str(), Some("0.11.9"));
     assert_eq!(lockfile["name"].as_str(), Some("codex-assistant"));
-    assert_eq!(lockfile["version"].as_str(), Some("0.11.8"));
+    assert_eq!(lockfile["version"].as_str(), Some("0.11.9"));
     assert_eq!(
         lockfile["packages"][""]["name"].as_str(),
         Some("codex-assistant")
     );
-    assert_eq!(lockfile["packages"][""]["version"].as_str(), Some("0.11.8"));
+    assert_eq!(lockfile["packages"][""]["version"].as_str(), Some("0.11.9"));
 
     assert_eq!(cargo["package"]["name"].as_str(), Some("codex-assistant"));
-    assert_eq!(cargo["package"]["version"].as_str(), Some("0.11.8"));
+    assert_eq!(cargo["package"]["version"].as_str(), Some("0.11.9"));
     assert_eq!(
         cargo["bin"]
             .as_array()

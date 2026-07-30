@@ -11,6 +11,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "紫藤花境与柔和玻璃材质构成的明亮人物主题。",
+      "marketplace": {
+        "genres": ["anime", "fantasy"],
+        "badges": ["popular", "featured"],
+        "published_at": "2026-07-24",
+        "sort_order": 10
+      },
       "focal_x": 73,
       "focal_y": 50,
       "overlay": "#4b315d",
@@ -38,6 +44,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "薄荷绿礼服与晨光花廊组成的清透主题。",
+      "marketplace": {
+        "genres": ["anime", "nature", "minimal"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 20
+      },
       "focal_x": 78,
       "focal_y": 48,
       "overlay": "#31584f",
@@ -65,6 +77,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "冷紫鸢尾与静谧庭院构成的优雅浅色主题。",
+      "marketplace": {
+        "genres": ["anime", "nature"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 30
+      },
       "focal_x": 73,
       "focal_y": 49,
       "overlay": "#3d406c",
@@ -92,6 +110,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "赤月、灯火与华庭夜色交织的深红主题。",
+      "marketplace": {
+        "genres": ["fantasy", "dark"],
+        "badges": ["popular"],
+        "published_at": "2026-07-24",
+        "sort_order": 40
+      },
       "focal_x": 72,
       "focal_y": 52,
       "overlay": "#3b0d16",
@@ -119,6 +143,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "森林花海、金色光尘与薄荷绿意构成的自然主题。",
+      "marketplace": {
+        "genres": ["fantasy", "nature"],
+        "badges": ["featured"],
+        "published_at": "2026-07-24",
+        "sort_order": 50
+      },
       "focal_x": 72,
       "focal_y": 53,
       "overlay": "#244d32",
@@ -146,6 +176,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
+      "marketplace": {
+        "genres": ["fantasy"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 60
+      },
       "focal_x": 77,
       "focal_y": 51,
       "overlay": "#5b371c",
@@ -173,6 +209,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "绿洲水岸与暮光金辉构成的蓝金主题。",
+      "marketplace": {
+        "genres": ["fantasy", "nature"],
+        "badges": [],
+        "published_at": "2026-07-24",
+        "sort_order": 70
+      },
       "focal_x": 66,
       "focal_y": 54,
       "overlay": "#17484a",
@@ -200,6 +242,12 @@
       "height": 941,
       "layout": "landscape",
       "description": "樱花、满月与紫粉夜色构成的梦幻主题。",
+      "marketplace": {
+        "genres": ["anime", "fantasy", "dark", "space"],
+        "badges": ["popular"],
+        "published_at": "2026-07-24",
+        "sort_order": 80
+      },
       "focal_x": 72,
       "focal_y": 53,
       "overlay": "#3f2458",
@@ -220,15 +268,21 @@
     {
       "id": "seaside-blue",
       "name": "海风晴夏",
-      "source_file": "ChatGPT Image 2026年7月24日 20_02_56.png",
-      "sha256": "884d1da4a3c3bc6f63481a52d8c4e39fa11556236d9c9e6976a05032238e45bc",
-      "bytes": 2460129,
-      "width": 941,
-      "height": 1672,
-      "layout": "portrait",
+      "source_file": "ChatGPT Image 2026年7月30日 11_14_46.png",
+      "sha256": "f37045bfa4889cc2f4c27cd8027e17f7f638aa3f326a139425036f5e16f22311",
+      "bytes": 2389094,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
       "description": "晴空、海风与清爽蓝白色调构成的夏日主题。",
-      "focal_x": 50,
-      "focal_y": 48,
+      "marketplace": {
+        "genres": ["anime", "nature", "minimal"],
+        "badges": ["popular"],
+        "published_at": "2026-07-30",
+        "sort_order": 90
+      },
+      "focal_x": 70,
+      "focal_y": 46,
       "overlay": "#246a9b",
       "palette": {
         "surface": "#e2f1fa",
@@ -247,15 +301,21 @@
     {
       "id": "autumn-wuxia",
       "name": "云岭秋侠",
-      "source_file": "ChatGPT Image 2026年7月25日 00_06_10.png",
-      "sha256": "d8407bd29d4244e1f2ed597cf63a099e0046653f11dc2c299afaa16927c89074",
-      "bytes": 2617764,
-      "width": 1086,
-      "height": 1448,
-      "layout": "portrait",
+      "source_file": "ChatGPT Image 2026年7月30日 11_38_00.png",
+      "sha256": "04372c9d111c819911999f543fb8cc5bfffa563c8a75450afc824567d0312998",
+      "bytes": 2620126,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
       "description": "云岭、古城与秋叶构成的沉静武侠主题。",
-      "focal_x": 50,
-      "focal_y": 61,
+      "marketplace": {
+        "genres": ["fantasy", "nature"],
+        "badges": ["featured"],
+        "published_at": "2026-07-30",
+        "sort_order": 100
+      },
+      "focal_x": 45,
+      "focal_y": 54,
       "overlay": "#283246",
       "palette": {
         "surface": "#e7e4df",
@@ -274,15 +334,21 @@
     {
       "id": "meteor-evening",
       "name": "流星晚霞",
-      "source_file": "ChatGPT Image 2026年7月25日 00_06_19.png",
-      "sha256": "2031cf20d017cb9bb2e53b6953086a5d5074e1916c9c9c3ecf8f8e8cf8620501",
-      "bytes": 2295952,
-      "width": 941,
-      "height": 1672,
-      "layout": "portrait",
+      "source_file": "ChatGPT Image 2026年7月30日 11_40_41.png",
+      "sha256": "593b87e24ee607f2d414a1975ef3d252704c6d5447c9d5d55e37ef1d67ebc4db",
+      "bytes": 2657068,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
       "description": "流星划过橙蓝晚霞与湿润街巷的暮色主题。",
-      "focal_x": 50,
-      "focal_y": 58,
+      "marketplace": {
+        "genres": ["anime", "space"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 110
+      },
+      "focal_x": 36,
+      "focal_y": 60,
       "overlay": "#262d50",
       "palette": {
         "surface": "#e8e0dc",
@@ -299,44 +365,23 @@
       }
     },
     {
-      "id": "violet-blade",
-      "name": "紫夜剑影",
-      "source_file": "ChatGPT Image 2026年7月25日 00_06_48.png",
-      "sha256": "3e8e2e1827124dce3cf04b735def72c4c1589c4745ce884f815a81dd474af8e9",
-      "bytes": 2324008,
-      "width": 941,
-      "height": 1672,
-      "layout": "portrait",
-      "description": "紫色刀光、月夜与暗影构成的高对比主题。",
-      "focal_x": 50,
-      "focal_y": 55,
-      "overlay": "#160d35",
-      "palette": {
-        "surface": "#211b36",
-        "surface_strong": "#2c2347",
-        "text": "#f8f3ff",
-        "accent": "#9b6df0",
-        "border": "#7054a8"
-      },
-      "effects": {
-        "surface_opacity": 84,
-        "blur_px": 20,
-        "contrast_percent": 112,
-        "motion": false
-      }
-    },
-    {
       "id": "fuji-autumn",
       "name": "富士秋光",
-      "source_file": "ChatGPT Image 2026年7月26日 13_38_21.png",
-      "sha256": "9d2152a558b476dcc0805b3173ce20fcfcdf46574e5396fac38880f4d50e2c30",
-      "bytes": 2555247,
-      "width": 1024,
-      "height": 1536,
-      "layout": "portrait",
+      "source_file": "ChatGPT Image 2026年7月30日 11_43_35.png",
+      "sha256": "36937b6e4bb63d5b44727aa62c4bf7914bc4672eed0fd4112db729964d28e085",
+      "bytes": 2621200,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
       "description": "富士远景、秋叶与金色落日构成的温暖主题。",
-      "focal_x": 50,
-      "focal_y": 62,
+      "marketplace": {
+        "genres": ["nature", "minimal"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 130
+      },
+      "focal_x": 64,
+      "focal_y": 56,
       "overlay": "#57351f",
       "palette": {
         "surface": "#eee4d8",
@@ -349,33 +394,6 @@
         "surface_opacity": 80,
         "blur_px": 22,
         "contrast_percent": 100,
-        "motion": false
-      }
-    },
-    {
-      "id": "spring-street",
-      "name": "春日花街",
-      "source_file": "ChatGPT Image 2026年7月26日 14_00_18.png",
-      "sha256": "e5d5ccefb1afa123fe5c959f986eab91e7f2f4e579ed097599ba935de9f6ffb8",
-      "bytes": 2298672,
-      "width": 1122,
-      "height": 1402,
-      "layout": "portrait",
-      "description": "春日花街、白裙与柔和日光构成的清新主题。",
-      "focal_x": 58,
-      "focal_y": 55,
-      "overlay": "#755454",
-      "palette": {
-        "surface": "#f3e9e7",
-        "surface_strong": "#fffafa",
-        "text": "#3d2f31",
-        "accent": "#c67f8e",
-        "border": "#ddaab3"
-      },
-      "effects": {
-        "surface_opacity": 78,
-        "blur_px": 24,
-        "contrast_percent": 96,
         "motion": false
       }
     }

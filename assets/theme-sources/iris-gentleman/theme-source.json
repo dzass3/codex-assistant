@@ -4,6 +4,12 @@
   "name": "鸢尾绅士",
   "description": "冷紫鸢尾与静谧庭院构成的优雅浅色主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "nature"],
+    "badges": [],
+    "published_at": "2026-07-24",
+    "sort_order": 30
+  },
   "source": {
     "file": "source.png",
     "original_file_name": "ChatGPT Image 2026年7月24日 11_20_32 (9).png",
@@ -53,7 +59,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

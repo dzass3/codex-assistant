@@ -24,9 +24,11 @@ describe("App", () => {
 
     expect(screen.getByLabelText("主题页面")).toBeInTheDocument();
     expect(screen.queryByLabelText("监控页面")).not.toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveClass("app-shell--themes");
 
     fireEvent.click(screen.getByRole("tab", { name: "实时代理" }));
     expect(screen.getByLabelText("监控页面")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveClass("app-shell--monitor");
     expect(localStorage.getItem("codex-assistant:last-page:v1")).toBe("monitor");
     expect(screen.queryByText("Smart Routing")).not.toBeInTheDocument();
   });

@@ -5,6 +5,12 @@
   "name": "金沙王庭",
   "description": "金沙、碧水与暖色王庭组成的鎏金主题。",
   "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy"],
+    "badges": [],
+    "published_at": "2026-07-24",
+    "sort_order": 60
+  },
   "preview_path": "/themes/desert-prince.webp",
   "backdrop": {
     "kind": "image",
@@ -26,6 +32,11 @@
     "contrast_percent": 98,
     "motion": false
   },
+  "adaptation": {
+    "luminance": 60,
+    "complexity": 35,
+    "saturation": 47
+  },
   "assets": [
     {
       "id": "desert-prince",
@@ -39,7 +50,7 @@
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

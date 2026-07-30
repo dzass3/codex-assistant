@@ -4,38 +4,43 @@
   "theme_id": "meteor-evening",
   "source": {
     "file": "source.png",
-    "original_file_name": "ChatGPT Image 2026年7月25日 00_06_19.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 11_40_41.png",
     "mime_type": "image/png",
-    "sha256": "2031cf20d017cb9bb2e53b6953086a5d5074e1916c9c9c3ecf8f8e8cf8620501",
-    "width": 941,
-    "height": 1672,
-    "bytes": 2295952
+    "sha256": "593b87e24ee607f2d414a1975ef3d252704c6d5447c9d5d55e37ef1d67ebc4db",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2657068
   },
   "runtime": {
     "path": "src-tauri/resources/themes/meteor-evening.webp",
     "mime_type": "image/webp",
-    "sha256": "d5c8ca4e5c1c6b176ee7a6ec75ac19b9686a73bb9e7849c1d6a1eb150c4e0630",
-    "width": 941,
-    "height": 1672,
-    "bytes": 288038,
+    "sha256": "ba803b81e404b6af14fa4e23df064690d6e0b5618182852288c68e7d3c00d998",
+    "width": 1672,
+    "height": 941,
+    "bytes": 393914,
     "quality": 88
   },
   "preview": {
     "path": "public/themes/meteor-evening.webp",
     "mime_type": "image/webp",
-    "sha256": "2f5692d36cc41c7e22c40ab2c1d00211cffc58e2fbf2e2211cdeb4dd43aacc8d",
-    "width": 405,
-    "height": 720,
-    "bytes": 50352,
+    "sha256": "582cbe63d805ddfe5fbffe7ea9f20b517b984a6efc59ac0087aa5578ab6fac04",
+    "width": 720,
+    "height": 405,
+    "bytes": 60698,
     "quality": 78
   },
+  "adaptation": {
+    "luminance": 21,
+    "complexity": 33,
+    "saturation": 66
+  },
   "rights": {
-    "source": "User-approved source: ChatGPT Image 2026年7月25日 00_06_19.png",
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 11_40_41.png",
     "rightsholder": "Codex Assistant asset contributor",
     "license": "Redistribution permission confirmed for the Codex Assistant installer",
     "commercial_redistribution": true,
     "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
-    "reviewed_at": "2026-07-27",
+    "reviewed_at": "2026-07-30",
     "manual_signoff": true,
     "status": "verified"
   }

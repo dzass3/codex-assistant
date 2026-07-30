@@ -1,6 +1,6 @@
 {
   "productName": "Codex Assistant",
-  "version": "0.11.8",
+  "version": "0.11.9",
   "identifier": "com.codexagentmonitor.desktop",
   "build": {
     "devUrl": "http://localhost:1420",

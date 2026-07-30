@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   ThemeCategory,
+  ThemeEditorialBadge,
   ThemeEnvironmentCheckCode,
   ThemeEnvironmentReport,
+  ThemeGenre,
+  ThemePack,
 } from "../../shared/theme-types";
 import { useTheme } from "../hooks/useTheme";
+import { useThemeFavorites } from "../hooks/useThemeFavorites";
+import { projectThemeGallery, type GalleryFilter } from "../lib/themeGalleryProjection";
 import { themeApi } from "../lib/themeApi";
 import { ForceRestartDialog } from "./ForceRestartDialog";
+import { ThemePreviewDialog } from "./ThemePreviewDialog";
 
 const CATEGORY_LABELS: Record<ThemeCategory, string> = {
   abstract: "原创抽象",
@@ -14,6 +20,42 @@ const CATEGORY_LABELS: Record<ThemeCategory, string> = {
   "project-showcase": "项目展示",
   "local-import": "仅限本地导入",
 };
+
+const GALLERY_FILTERS: { id: GalleryFilter; label: string }[] = [
+  { id: "all", label: "全部" },
+  { id: "popular", label: "热门" },
+  { id: "favorites", label: "收藏" },
+  { id: "latest", label: "最新" },
+  { id: "official", label: "官方" },
+];
+
+const THEME_GENRES: ThemeGenre[] = [
+  "anime",
+  "fantasy",
+  "nature",
+  "cyber",
+  "minimal",
+  "dark",
+  "space",
+];
+
+const GENRE_LABELS: Record<ThemeGenre, string> = {
+  anime: "Anime",
+  fantasy: "Fantasy",
+  nature: "Nature",
+  cyber: "Cyber",
+  minimal: "Minimal",
+  dark: "Dark",
+  space: "Space",
+};
+
+const BADGE_LABELS: Record<ThemeEditorialBadge, string> = {
+  popular: "Popular",
+  featured: "Featured",
+  new: "New",
+};
+
+const EMPTY_THEME_PACKS: ThemePack[] = [];
 
 function ThemePreview({ themeId, name }: { themeId: string; name: string }) {
   const [source, setSource] = useState<string | null>(null);
@@ -47,14 +89,41 @@ function CompleteThemePreview({ source, name }: { source: string; name: string }
 
 export function ThemesPage() {
   const themes = useTheme();
+  const favorites = useThemeFavorites();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const forceRestartTriggerRef = useRef<HTMLElement | null>(null);
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [galleryFilter, setGalleryFilter] = useState<GalleryFilter>("all");
+  const [genreFilter, setGenreFilter] = useState<ThemeGenre | null>(null);
+  const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
+  const [ambientAccent, setAmbientAccent] = useState("#8f82c8");
   const snapshot = themes.snapshot;
   const ready = snapshot?.session_status === "ready";
   const paused = snapshot?.session_status === "paused";
   const selectedThemeId = snapshot?.selected_theme_id ?? null;
   const hasThemeState = Boolean(selectedThemeId || snapshot?.applied_theme_id);
+  const packs = snapshot?.packs ?? EMPTY_THEME_PACKS;
+  const visibleThemes = useMemo(
+    () =>
+      projectThemeGallery({
+        packs,
+        galleryFilter,
+        genreFilter,
+        favoriteIds: favorites.favoriteIds,
+        appliedThemeId: snapshot?.applied_theme_id ?? null,
+        selectedThemeId: snapshot?.selected_theme_id ?? null,
+      }),
+    [
+      favorites.favoriteIds,
+      galleryFilter,
+      genreFilter,
+      packs,
+      snapshot?.applied_theme_id,
+      snapshot?.selected_theme_id,
+    ],
+  );
+  const previewPack = packs.find((pack) => pack.id === previewThemeId) ?? null;
   const environment = themes.environment;
   const nextAction = environment?.next_action;
   const sessionActionLabel =
@@ -76,14 +145,21 @@ export function ThemesPage() {
   }
 
   return (
-    <section className="themes-page">
+    <section className="themes-page" style={{ "--gallery-accent": ambientAccent } as CSSProperties}>
       <div className="themes-page__heading">
         <div>
-          <span className="eyebrow">SAFE · LOCAL · ONE-CLICK</span>
-          <h2>一键换肤</h2>
+          <span className="eyebrow">PREMIUM AI WORKSPACE</span>
+          <h2>Codex Theme Gallery</h2>
           <p>
-            选择内置主题，或导入一张你有权使用的本机图片；主题只装饰界面，不遮挡文字、图标与操作。
+            浏览、实时预览并一键应用你的 AI 工作空间；主题始终离线运行，不遮挡文字、图标与操作。
           </p>
+          <div className="themes-page__metrics" aria-label="主题库状态">
+            <span>
+              <strong>{packs.length}</strong> 套主题
+            </span>
+            <span>离线可用</span>
+            <span>仅本机处理</span>
+          </div>
         </div>
         <div className="themes-page__actions">
           <input
@@ -185,80 +261,211 @@ export function ThemesPage() {
         </p>
       </div>
 
-      <div className="theme-gallery" aria-label="主题列表">
-        {(snapshot?.packs ?? []).map((pack) => {
-          const active = snapshot?.applied_theme_id === pack.id;
-          const selected = snapshot?.selected_theme_id === pack.id;
-          return (
-            <article
-              className={`theme-card${active ? " theme-card--active" : ""}${selected && !active ? " theme-card--selected" : ""}`}
-              key={pack.id}
+      <section className="theme-marketplace-controls" aria-label="主题筛选">
+        <div className="theme-filter-row">
+          <span>精选目录</span>
+          <div className="theme-filter-group" role="group" aria-label="主题范围">
+            {GALLERY_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                className={galleryFilter === filter.id ? "is-active" : undefined}
+                aria-pressed={galleryFilter === filter.id}
+                onClick={() => setGalleryFilter(filter.id)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="theme-filter-row">
+          <span>视觉风格</span>
+          <div
+            className="theme-filter-group theme-filter-group--genres"
+            role="group"
+            aria-label="主题风格"
+          >
+            <button
+              type="button"
+              className={genreFilter === null ? "is-active" : undefined}
+              aria-pressed={genreFilter === null}
+              onClick={() => setGenreFilter(null)}
             >
-              <div
-                className="theme-card__preview"
+              全部风格
+            </button>
+            {THEME_GENRES.map((genre) => (
+              <button
+                key={genre}
+                type="button"
+                className={genreFilter === genre ? "is-active" : undefined}
+                aria-pressed={genreFilter === genre}
+                onClick={() => setGenreFilter(genre)}
+              >
+                {GENRE_LABELS[genre]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="theme-filter-count" role="status" aria-live="polite">
+          显示 {visibleThemes.length} / {packs.length} 套主题
+        </span>
+      </section>
+
+      <div className="theme-gallery" aria-label="主题列表">
+        {visibleThemes.map(
+          ({ pack, active, selected, favorite, official, editorialBadge }, index) => {
+            return (
+              <article
+                className={`theme-card${active ? " theme-card--active" : ""}${selected && !active ? " theme-card--selected" : ""}`}
+                key={pack.id}
                 style={
                   {
-                    "--theme-preview-surface": pack.palette.surface,
-                    "--theme-preview-overlay":
-                      pack.backdrop.kind === "image"
-                        ? pack.backdrop.overlay
-                        : pack.palette.surface_strong,
-                    "--theme-preview-position":
-                      pack.backdrop.kind === "image"
-                        ? `${pack.backdrop.focal_x}% ${pack.backdrop.focal_y}%`
-                        : "50% 50%",
+                    "--card-accent": pack.palette.accent,
+                    "--card-enter-delay": `${Math.min(index, 8) * 45}ms`,
                   } as CSSProperties
                 }
+                onPointerEnter={() => setAmbientAccent(pack.palette.accent)}
+                onPointerLeave={() => setAmbientAccent("#8f82c8")}
+                onFocusCapture={() => setAmbientAccent(pack.palette.accent)}
+                onBlurCapture={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setAmbientAccent("#8f82c8");
+                  }
+                }}
               >
-                {pack.category === "local-import" ? (
-                  <ThemePreview themeId={pack.id} name={pack.name} />
-                ) : (
-                  <CompleteThemePreview source={pack.preview_path} name={pack.name} />
-                )}
-                <span className="theme-rights-badge">
-                  {pack.category === "local-import" ? "仅限本机" : "版权已核验"}
-                </span>
-              </div>
-              <div className="theme-card__body">
-                <div className="theme-card__title">
-                  <div>
-                    <span>{CATEGORY_LABELS[pack.category]}</span>
-                    <h3>{pack.name}</h3>
-                  </div>
-                  <i style={{ backgroundColor: pack.palette.accent }} aria-hidden="true" />
-                </div>
-                <p>{pack.description}</p>
-                <dl>
-                  <div>
-                    <dt>权利方</dt>
-                    <dd>{pack.rights.rightsholder}</dd>
-                  </div>
-                  <div>
-                    <dt>{pack.category === "local-import" ? "存储范围" : "核验日期"}</dt>
-                    <dd>
-                      {pack.category === "local-import" ? "仅当前设备" : pack.rights.reviewed_at}
-                    </dd>
-                  </div>
-                </dl>
-                <button
-                  className={active ? "button-secondary" : "button-primary"}
-                  onClick={(event) => {
-                    forceRestartTriggerRef.current = event.currentTarget;
-                    void themes.activate(pack.id);
-                  }}
-                  disabled={active || themes.operation !== null}
+                <div
+                  className="theme-card__preview"
+                  style={
+                    {
+                      "--theme-preview-surface": pack.palette.surface,
+                      "--theme-preview-overlay":
+                        pack.backdrop.kind === "image"
+                          ? pack.backdrop.overlay
+                          : pack.palette.surface_strong,
+                      "--theme-preview-position":
+                        pack.backdrop.kind === "image"
+                          ? `${pack.backdrop.focal_x}% ${pack.backdrop.focal_y}%`
+                          : "50% 50%",
+                    } as CSSProperties
+                  }
                 >
-                  {active
-                    ? "当前主题"
-                    : themes.operation === "activate"
-                      ? "正在启动并应用…"
-                      : "应用主题"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
+                  <button
+                    type="button"
+                    className="theme-card__preview-trigger"
+                    aria-label={`预览 ${pack.name}`}
+                    onClick={(event) => {
+                      previewTriggerRef.current = event.currentTarget;
+                      setPreviewThemeId(pack.id);
+                    }}
+                  >
+                    {pack.category === "local-import" ? (
+                      <ThemePreview themeId={pack.id} name={pack.name} />
+                    ) : (
+                      <CompleteThemePreview source={pack.preview_path} name={pack.name} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={`theme-favorite-button${favorite ? " is-favorite" : ""}`}
+                    aria-label={`${favorite ? "取消收藏" : "收藏"} ${pack.name}`}
+                    aria-pressed={favorite}
+                    onClick={() => favorites.toggleFavorite(pack.id)}
+                  >
+                    <span aria-hidden="true">{favorite ? "♥" : "♡"}</span>
+                  </button>
+                  <div className="theme-card__badges">
+                    <span className="theme-rights-badge">{official ? "Official" : "仅限本机"}</span>
+                    {editorialBadge ? (
+                      <span
+                        className={`theme-editorial-badge theme-editorial-badge--${editorialBadge}`}
+                      >
+                        {BADGE_LABELS[editorialBadge]}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="theme-card__body">
+                  <div className="theme-card__title">
+                    <div>
+                      <span>{CATEGORY_LABELS[pack.category]}</span>
+                      <button
+                        type="button"
+                        className="theme-card__title-button"
+                        aria-label={`预览 ${pack.name} 详情`}
+                        title={pack.name}
+                        onClick={(event) => {
+                          previewTriggerRef.current = event.currentTarget;
+                          setPreviewThemeId(pack.id);
+                        }}
+                      >
+                        <h3>{pack.name}</h3>
+                      </button>
+                    </div>
+                    <i style={{ backgroundColor: pack.palette.accent }} aria-hidden="true" />
+                  </div>
+                  <p>{pack.description}</p>
+                  {pack.marketplace?.genres.length ? (
+                    <div className="theme-card__tags" aria-label={`${pack.name} 风格`}>
+                      {pack.marketplace.genres.map((genre) => (
+                        <span key={genre}>{GENRE_LABELS[genre]}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="theme-card__tags">
+                      <span>Local</span>
+                    </div>
+                  )}
+                  <dl>
+                    <div>
+                      <dt>作者</dt>
+                      <dd>
+                        {pack.category === "local-import" ? "本机用户" : pack.rights.rightsholder}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{pack.category === "local-import" ? "存储范围" : "核验日期"}</dt>
+                      <dd>
+                        {pack.category === "local-import" ? "仅当前设备" : pack.rights.reviewed_at}
+                      </dd>
+                    </div>
+                  </dl>
+                  <button
+                    className={active ? "button-secondary" : "button-primary"}
+                    onClick={(event) => {
+                      forceRestartTriggerRef.current = event.currentTarget;
+                      void themes.activate(pack.id);
+                    }}
+                    disabled={active || themes.operation !== null}
+                  >
+                    {active
+                      ? "当前主题"
+                      : themes.operation === "activate" && themes.operationThemeId === pack.id
+                        ? "正在启动并应用…"
+                        : "应用主题"}
+                  </button>
+                </div>
+              </article>
+            );
+          },
+        )}
       </div>
+      {visibleThemes.length === 0 ? (
+        <div className="theme-gallery-empty" role="status">
+          <span>FILTERED COLLECTION</span>
+          <h3>没有符合当前筛选的主题</h3>
+          <p>换一个分类，或清除筛选查看完整主题库。</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => {
+              setGalleryFilter("all");
+              setGenreFilter(null);
+            }}
+          >
+            清除筛选
+          </button>
+        </div>
+      ) : null}
 
       <article className="theme-restore-panel">
         <div>
@@ -292,6 +499,20 @@ export function ThemesPage() {
           returnFocus={forceRestartTriggerRef.current}
           onCancel={themes.cancelForceRestart}
           onConfirm={() => void themes.confirmForceRestart()}
+        />
+      ) : null}
+      {previewPack ? (
+        <ThemePreviewDialog
+          pack={previewPack}
+          busy={themes.operation !== null}
+          returnFocus={previewTriggerRef.current}
+          onClose={() => setPreviewThemeId(null)}
+          onApply={() => {
+            const themeId = previewPack.id;
+            forceRestartTriggerRef.current = previewTriggerRef.current;
+            setPreviewThemeId(null);
+            void themes.activate(themeId);
+          }}
         />
       ) : null}
     </section>

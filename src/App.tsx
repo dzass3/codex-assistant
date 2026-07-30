@@ -27,7 +27,7 @@ export function App() {
   };
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell app-shell--${page}`}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">

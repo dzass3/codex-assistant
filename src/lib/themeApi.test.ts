@@ -103,6 +103,43 @@ describe("theme snapshot boundary", () => {
     expect(toThemeUiSnapshot(snapshot)).toEqual(snapshot);
   });
 
+  it("accepts validated marketplace metadata without weakening the snapshot boundary", () => {
+    const marketplace = {
+      genres: ["anime", "nature"],
+      badges: ["featured", "new"],
+      published_at: "2026-07-27",
+      sort_order: 10,
+    } as const;
+    const value = {
+      ...snapshot,
+      packs: [{ ...snapshot.packs[0], marketplace }],
+      selected_theme_id: "aurora-grid",
+      applied_theme_id: "aurora-grid",
+    };
+
+    expect(toThemeUiSnapshot(value)?.packs[0]?.marketplace).toEqual(marketplace);
+  });
+
+  it.each([
+    { genres: ["unknown"], badges: [], published_at: "2026-07-27", sort_order: 10 },
+    {
+      genres: ["anime"],
+      badges: ["popular", "popular"],
+      published_at: "2026-07-27",
+      sort_order: 10,
+    },
+    { genres: ["anime"], badges: [], published_at: "not-a-date", sort_order: 10 },
+  ])("rejects malformed marketplace metadata", (marketplace) => {
+    expect(
+      toThemeUiSnapshot({
+        ...snapshot,
+        packs: [{ ...snapshot.packs[0], marketplace }],
+        selected_theme_id: "aurora-grid",
+        applied_theme_id: "aurora-grid",
+      }),
+    ).toBeNull();
+  });
+
   it("accepts local-only rights only for a local-import pack", () => {
     const local = {
       ...snapshot.packs[1],

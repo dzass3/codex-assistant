@@ -19,6 +19,8 @@ fn pack(hash: String) -> ThemePack {
         name: "Arina Pink".into(),
         description: "User-owned local theme".into(),
         category: ThemeCategory::LocalImport,
+        marketplace: None,
+        adaptation: None,
         preview_path: "local-theme:arina-pink".into(),
         backdrop: ThemeBackdrop::Image {
             asset_id: "arina-pink".into(),

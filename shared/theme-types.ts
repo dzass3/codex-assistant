@@ -1,6 +1,15 @@
 export type ThemeSessionStatus = "inactive" | "paused" | "ready" | "degraded";
 export type ThemeCategory = "abstract" | "original-character" | "project-showcase" | "local-import";
 export type ThemeRightsStatus = "verified" | "local-only" | "rejected";
+export type ThemeGenre = "anime" | "fantasy" | "nature" | "cyber" | "minimal" | "dark" | "space";
+export type ThemeEditorialBadge = "popular" | "featured" | "new";
+
+export interface ThemeMarketplaceMetadata {
+  genres: ThemeGenre[];
+  badges: ThemeEditorialBadge[];
+  published_at: string;
+  sort_order: number;
+}
 
 export interface ThemeGradientBackdrop {
   kind: "gradient";
@@ -33,6 +42,12 @@ export interface ThemeEffects {
   motion: boolean;
 }
 
+export interface ThemeAdaptation {
+  luminance: number;
+  complexity: number;
+  saturation: number;
+}
+
 export interface ThemeAsset {
   id: string;
   mime_type: "image/jpeg" | "image/png" | "image/webp";
@@ -57,10 +72,12 @@ export interface ThemePack {
   name: string;
   description: string;
   category: ThemeCategory;
+  marketplace?: ThemeMarketplaceMetadata;
   preview_path: string;
   backdrop: ThemeBackdrop;
   palette: ThemePalette;
   effects: ThemeEffects;
+  adaptation?: ThemeAdaptation;
   assets: ThemeAsset[];
   rights: ThemeRights;
 }

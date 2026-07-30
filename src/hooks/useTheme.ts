@@ -10,6 +10,7 @@ import { themeApi } from "../lib/themeApi";
 
 type ThemeOperation = "start-session" | "activate" | "import" | "restore";
 const REFRESH_MS = 5_000;
+const OPERATION_TIMEOUT_MS = 120_000;
 const FAILURE_MESSAGES: Record<string, string> = {
   "monitor-uncertain": "代理监控数据不完整；为避免打断任务，普通重启已阻止。",
   "confirmation-expired": "确认票据已过期，请重新检查影响并再次确认。",
@@ -26,6 +27,27 @@ const FAILURE_MESSAGES: Record<string, string> = {
   "partial-apply-failed": "并非所有 Codex 页面都兼容，主题未标记为已应用。",
 };
 
+class ThemeOperationTimeoutError extends Error {}
+
+function withOperationTimeout<T>(operation: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(
+      () => reject(new ThemeOperationTimeoutError("Theme operation timed out")),
+      OPERATION_TIMEOUT_MS,
+    );
+    operation.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
+
 function failureMessage(receipt: ThemeOperationReceipt): string {
   return (
     FAILURE_MESSAGES[receipt.reason_codes[0] ?? ""] ??
@@ -41,6 +63,7 @@ export function useTheme() {
   const [degraded, setDegraded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [operation, setOperation] = useState<ThemeOperation | null>(null);
+  const [operationThemeId, setOperationThemeId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ThemeOperationReceipt | null>(null);
   const [pendingForce, setPendingForce] = useState<ForceRestartImpact | null>(null);
   const [pendingThemeId, setPendingThemeId] = useState<string | null>(null);
@@ -94,9 +117,10 @@ export function useTheme() {
       if (operationActive.current) return null;
       operationActive.current = true;
       setOperation(kind);
+      setOperationThemeId(kind === "activate" ? (themeId ?? null) : null);
       setError(null);
       try {
-        const nextReceipt = await action();
+        const nextReceipt = await withOperationTimeout(action());
         setReceipt(nextReceipt);
         if (
           nextReceipt.status === "blocked" &&
@@ -104,9 +128,15 @@ export function useTheme() {
             nextReceipt.reason_codes.includes("monitor-uncertain")) &&
           forceIntent
         ) {
-          const impact = await themeApi.prepareForceRestart(forceIntent, themeId);
-          setPendingForce(impact);
-          setPendingThemeId(themeId ?? null);
+          try {
+            const impact = await themeApi.prepareForceRestart(forceIntent, themeId);
+            setPendingForce(impact);
+            setPendingThemeId(themeId ?? null);
+          } catch {
+            setPendingForce(null);
+            setPendingThemeId(null);
+            setError(failureMessage(nextReceipt));
+          }
         }
         const [nextSnapshot, nextEnvironment] = await Promise.all([
           themeApi.getSnapshot(),
@@ -123,17 +153,22 @@ export function useTheme() {
           setError(failureMessage(nextReceipt));
         }
         return nextReceipt;
-      } catch {
-        setDegraded(true);
-        setError(
-          kind === "start-session"
-            ? "主题会话启动失败；Codex 未确认进入可换肤状态。"
-            : "主题操作失败；未确认的外观不会显示为已应用。",
-        );
+      } catch (caught) {
+        if (caught instanceof ThemeOperationTimeoutError) {
+          setError("主题操作超时，已解除界面等待；请刷新状态后重新尝试。");
+        } else {
+          setDegraded(true);
+          setError(
+            kind === "start-session"
+              ? "主题会话启动失败；Codex 未确认进入可换肤状态。"
+              : "主题操作失败；未确认的外观不会显示为已应用。",
+          );
+        }
         return null;
       } finally {
         operationActive.current = false;
         setOperation(null);
+        setOperationThemeId(null);
       }
     },
     [accept, acceptEnvironment],
@@ -158,7 +193,8 @@ export function useTheme() {
         const imported = await themeApi.importLocalImage(name, imageDataUrl);
         accept(await themeApi.getSnapshot());
         acceptEnvironment(await themeApi.getEnvironment());
-        const nextReceipt = await themeApi.activate(imported.theme_id);
+        setOperationThemeId(imported.theme_id);
+        const nextReceipt = await withOperationTimeout(themeApi.activate(imported.theme_id));
         setReceipt(nextReceipt);
         const [nextSnapshot, nextEnvironment] = await Promise.all([
           themeApi.getSnapshot(),
@@ -176,6 +212,7 @@ export function useTheme() {
       } finally {
         operationActive.current = false;
         setOperation(null);
+        setOperationThemeId(null);
       }
     },
     [accept, acceptEnvironment],
@@ -195,16 +232,14 @@ export function useTheme() {
     operationActive.current = true;
     const kind = pendingForce.intent === "theme-session" ? "start-session" : "activate";
     setOperation(kind);
+    setOperationThemeId(kind === "activate" ? pendingThemeId : null);
     setError(null);
     try {
-      const nextReceipt =
+      const nextReceipt = await withOperationTimeout(
         pendingForce.intent === "activate-theme" && pendingThemeId
-          ? await themeApi.activate(
-              pendingThemeId,
-              "force-after-grace",
-              pendingForce.confirmation_ticket,
-            )
-          : await themeApi.startSession("force-after-grace", pendingForce.confirmation_ticket);
+          ? themeApi.activate(pendingThemeId, "force-after-grace", pendingForce.confirmation_ticket)
+          : themeApi.startSession("force-after-grace", pendingForce.confirmation_ticket),
+      );
       setReceipt(nextReceipt);
       setPendingForce(null);
       setPendingThemeId(null);
@@ -224,6 +259,7 @@ export function useTheme() {
     } finally {
       operationActive.current = false;
       setOperation(null);
+      setOperationThemeId(null);
     }
   }, [accept, acceptEnvironment, pendingForce, pendingThemeId]);
 
@@ -278,6 +314,7 @@ export function useTheme() {
     error,
     connected: snapshot !== null && !degraded,
     operation,
+    operationThemeId,
     receipt,
     pendingForce,
     refresh,

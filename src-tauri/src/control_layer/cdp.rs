@@ -574,7 +574,13 @@ impl CdpProtocol {
         params: Value,
     ) -> Result<OutboundRequest, CdpProtocolError> {
         let object = params.as_object().ok_or(CdpProtocolError::InvalidParams)?;
-        if !keys_are(object, &["expression", "returnByValue"])
+        let awaits_promise = object.get("awaitPromise") == Some(&Value::Bool(true));
+        let expected_keys = if awaits_promise {
+            &["expression", "returnByValue", "awaitPromise"][..]
+        } else {
+            &["expression", "returnByValue"][..]
+        };
+        if !keys_are(object, expected_keys)
             || object.get("returnByValue") != Some(&Value::Bool(true))
             || object
                 .get("expression")
@@ -923,12 +929,32 @@ impl CdpClient {
     }
 
     pub async fn evaluate_boolean(&mut self, expression: &str) -> Result<bool, CdpClientError> {
+        self.evaluate_boolean_params(json!({
+            "expression": expression,
+            "returnByValue": true,
+        }))
+        .await
+    }
+
+    pub async fn evaluate_boolean_after_animation_frame(
+        &mut self,
+        expression: &str,
+    ) -> Result<bool, CdpClientError> {
+        let deferred = format!(
+            "new Promise((resolve)=>requestAnimationFrame(()=>resolve(Boolean(({expression})))))"
+        );
+        self.evaluate_boolean_params(json!({
+            "expression": deferred,
+            "returnByValue": true,
+            "awaitPromise": true,
+        }))
+        .await
+    }
+
+    async fn evaluate_boolean_params(&mut self, params: Value) -> Result<bool, CdpClientError> {
         let outbound = self
             .protocol
-            .boolean_evaluation(json!({
-                "expression": expression,
-                "returnByValue": true,
-            }))
+            .boolean_evaluation(params)
             .map_err(map_protocol_error)?;
         timeout(
             self.timeout,
