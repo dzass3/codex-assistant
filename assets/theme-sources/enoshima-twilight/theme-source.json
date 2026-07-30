@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "enoshima-twilight",
+  "name": "江岛暮光",
+  "description": "江岛山城、海湾落日与静谧灯火构成的暮光主题。",
+  "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "nature", "minimal"],
+    "badges": ["new"],
+    "published_at": "2026-07-30",
+    "sort_order": 170
+  },
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 17_33_16.png",
+    "mime_type": "image/png",
+    "sha256": "abd413967a36acd3b5f97d03ac1f4c9912be0b7b961535a59dfc9fa774e2a4f8",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2366009
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/enoshima-twilight.webp",
+    "max_width": 1672,
+    "max_height": 941,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/enoshima-twilight.webp",
+    "max_width": 720,
+    "max_height": 405,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/enoshima-twilight.webp",
+    "overlay": "#293456",
+    "focal_x": 43,
+    "focal_y": 55,
+    "palette": {
+      "surface": "#e6e1e7",
+      "surface_strong": "#faf7fb",
+      "text": "#2d2c39",
+      "accent": "#c8795c",
+      "border": "#aa8b9a"
+    },
+    "effects": {
+      "surface_opacity": 82,
+      "blur_px": 22,
+      "contrast_percent": 103,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_33_16.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

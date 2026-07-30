@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "kamakura-rain",
+  "name": "镰仓雨夜",
+  "description": "雨夜电车、霓虹街巷与樱花构成的蓝紫城市主题。",
+  "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "dark"],
+    "badges": ["new"],
+    "published_at": "2026-07-30",
+    "sort_order": 140
+  },
+  "preview_path": "/themes/kamakura-rain.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "kamakura-rain",
+    "overlay": "#1d294d",
+    "focal_x": 70,
+    "focal_y": 53
+  },
+  "palette": {
+    "surface": "#dfe3ee",
+    "surface_strong": "#f7f8fc",
+    "text": "#262b3c",
+    "accent": "#6b6fc7",
+    "border": "#989cce"
+  },
+  "effects": {
+    "surface_opacity": 84,
+    "blur_px": 22,
+    "contrast_percent": 106,
+    "motion": false
+  },
+  "adaptation": {
+    "luminance": 20,
+    "complexity": 31,
+    "saturation": 53
+  },
+  "assets": [
+    {
+      "id": "kamakura-rain",
+      "mime_type": "image/webp",
+      "sha256": "2cc34a01f26a8038c3af88257475879d2cae6d91cddf013b8f66624d0ec98464"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_06_19.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

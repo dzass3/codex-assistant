@@ -31,8 +31,24 @@ if (cargo.status !== 0) {
 }
 
 const sourceExport = JSON.parse(cargo.stdout.trim());
-assert.ok(sourceExport.themes.length >= 2, "at least two bundled themes are required");
+assert.equal(sourceExport.themes.length, 16, "all sixteen bundled themes are required");
 assert.ok(sourceExport.local_theme.id.startsWith("local-"), "real local import is required");
+
+const newPublicThemeIds = new Set([
+  "kamakura-rain",
+  "shonan-sunset",
+  "changan-fireworks",
+  "enoshima-twilight",
+]);
+
+assert.deepEqual(
+  sourceExport.themes
+    .filter((theme) => newPublicThemeIds.has(theme.id))
+    .map((theme) => theme.id)
+    .toSorted(),
+  [...newPublicThemeIds].toSorted(),
+  "the public runtime contract must include every newly approved theme",
+);
 
 const replacementLandscapeThemeIds = new Set([
   "seaside-blue",
@@ -130,6 +146,11 @@ const mockHtml = `<!doctype html>
         position: fixed; top: 0; right: 0; z-index: 100; width: 240px;
       }
       .content { max-width: 920px; margin: 0 auto; padding: 42px 34px 180px; }
+      @layer utilities {
+        [class*="!bg-token-dropdown-background/50"] {
+          background-color: rgba(255, 255, 255, 0.5) !important;
+        }
+      }
       .semantic-text { color: rgb(32, 33, 35); font-size: 27px; font-weight: 700; }
       .assistant-copy { color: rgb(55, 56, 60); }
       .content-semantic-icon { width: 24px; height: 24px; color: rgb(32, 33, 35); }
@@ -186,7 +207,14 @@ const mockHtml = `<!doctype html>
         border-radius: 10px; color: #202123; background: #fff;
       }
       #mock-menu { padding: 10px; border: 1px solid #ccc; background: #fff; }
-      #mock-dialog { border: 1px solid #bbb; border-radius: 14px; }
+      #mock-dialog-overlay {
+        position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.22);
+      }
+      #mock-dialog {
+        position: fixed; z-index: 50; top: 50%; left: 50%; width: 440px;
+        padding: 22px; border: 1px solid #bbb; border-radius: 14px;
+        background: #fff; transform: translate(-50%, -50%);
+      }
       #scroll-box { width: 100%; height: 90px; margin-top: 12px; overflow: auto; border: 1px solid #ccc; }
       #scroll-box > div { height: 320px; padding: 12px; }
       @media (max-width: 1200px) {
@@ -241,6 +269,23 @@ const mockHtml = `<!doctype html>
               助手长文本只使用局部阅读卡片。
             </div>
           </div>
+          <div
+            id="plan-preview-card"
+            class="relative rounded-lg bg-token-foreground/5 overflow-clip max-h-[200px] cursor-default border border-token-border !bg-token-dropdown-background/50 select-none"
+          >
+            <div
+              id="plan-reading-surface"
+              data-plan-selection-surface="mock-plan"
+              class="relative overflow-hidden [mask-image:linear-gradient(to_bottom,black_calc(100%_-_4rem),transparent)]"
+            >
+              <div class="px-4 py-3">
+                <div data-selected-text-overlay-target="mock-plan-selection">
+                  <h2>Codex Assistant 计划预览</h2>
+                  <p>计划正文在复杂背景下必须从首帧保持清晰可读。</p>
+                </div>
+              </div>
+            </div>
+          </div>
           <span
             id="streaming-preparation"
             class="loading-shimmer-pure-text min-w-0 flex-1 truncate select-none"
@@ -276,7 +321,22 @@ const mockHtml = `<!doctype html>
             <a id="safe-link" href="#linked-target">测试链接</a>
           </div>
           <div id="scroll-box" tabindex="0"><div>可滚动内容<div id="linked-target">链接目标</div></div></div>
-          <dialog id="mock-dialog"><p>对话框保持可用</p><button id="dialog-close" type="button">关闭对话框</button></dialog>
+          <div
+            id="mock-dialog-overlay"
+            class="codex-dialog-overlay"
+            data-state="closed"
+            hidden
+          ></div>
+          <div
+            id="mock-dialog"
+            class="codex-dialog"
+            role="dialog"
+            data-state="closed"
+            hidden
+          >
+            <p>对话框保持可用</p>
+            <button id="dialog-close" type="button">关闭对话框</button>
+          </div>
         </section>
         <section id="home-state" data-codex-home-state="true" hidden></section>
         <form
@@ -337,9 +397,20 @@ const mockHtml = `<!doctype html>
       });
       document.querySelector('#dialog-trigger').addEventListener('click', () => {
         window.__mockEvents.dialog++;
-        document.querySelector('#mock-dialog').showModal();
+        const overlay = document.querySelector('#mock-dialog-overlay');
+        const dialog = document.querySelector('#mock-dialog');
+        overlay.hidden = false;
+        overlay.setAttribute('data-state', 'open');
+        dialog.hidden = false;
+        dialog.setAttribute('data-state', 'open');
+        document.body.append(overlay, dialog);
       });
-      document.querySelector('#dialog-close').addEventListener('click', () => document.querySelector('#mock-dialog').close());
+      document.querySelector('#dialog-close').addEventListener('click', () => {
+        document.querySelector('#mock-dialog-overlay').hidden = true;
+        document.querySelector('#mock-dialog-overlay').setAttribute('data-state', 'closed');
+        document.querySelector('#mock-dialog').hidden = true;
+        document.querySelector('#mock-dialog').setAttribute('data-state', 'closed');
+      });
       document.querySelector('#safe-link').addEventListener('click', (event) => {
         event.preventDefault();
         window.__mockEvents.link++;
@@ -424,6 +495,7 @@ function snapshotExpression() {
         surface2: rootStyle.getPropertyValue("--surface-2").trim(),
         surface3: rootStyle.getPropertyValue("--surface-3").trim(),
         overlayStrong: rootStyle.getPropertyValue("--bg-overlay-strong").trim(),
+        radiusPanel: rootStyle.getPropertyValue("--radius-panel").trim(),
       },
       htmlBackground: getComputedStyle(document.documentElement).backgroundImage,
       htmlBackgroundColor: getComputedStyle(document.documentElement).backgroundColor,
@@ -489,6 +561,7 @@ function snapshotExpression() {
         boxShadow: userBubble.boxShadow,
       },
       assistantReadingBackground: assistantReading.backgroundColor,
+      planReadingSurface: inspect("#plan-reading-surface"),
       streamingPreparation: inspect("#streaming-preparation"),
       toolReadingBackground: toolReading.backgroundColor,
       statusStyles,
@@ -652,6 +725,41 @@ async function captureStreamingAssistantSurface(targetPage) {
   });
 }
 
+async function captureExpandedPlanFirstFrame(targetPage) {
+  return targetPage.evaluate(async () => {
+    const main = document.querySelector("main.main-surface");
+    const shell = document.createElement("aside");
+    shell.className = "relative z-[41] ml-auto h-full min-h-0 min-w-0 shrink-0 overflow-visible";
+    shell.innerHTML = `
+      <div class="absolute inset-0 min-h-0 min-w-0 overflow-hidden">
+        <div class="isolate flex h-full min-h-0 flex-col bg-token-main-surface-primary [contain:layout_paint]">
+          <div class="h-full min-h-0 overflow-y-auto px-1">
+            <div class="px-4 py-3">
+              <h1>Codex Assistant 展开计划</h1>
+              <p>即使正文属性尚未挂载，展开面板首帧也必须具有稳定阅读底色。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    main.append(shell);
+
+    const sample = () => {
+      const style = getComputedStyle(shell);
+      return {
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+      };
+    };
+    const inserted = sample();
+    const firstFrame = await new Promise((resolve) => {
+      requestAnimationFrame(() => resolve(sample()));
+    });
+    shell.remove();
+    return { inserted, firstFrame };
+  });
+}
+
 async function captureDynamicPreparationSurface(targetPage) {
   return targetPage.evaluate(async () => {
     const conversation = document.querySelector('[data-codex-conversation="true"]');
@@ -734,7 +842,11 @@ function assertAdaptiveSurfaceSystem(theme, state) {
   assert.equal(state.outputMaterial.backdropFilter, "none");
   assert.equal(state.composerMaterial.backdropFilter, "none");
   assert.equal(state.headerMaterial.backdropFilter, "none");
-  assert.equal(state.outputMaterial.borderRadius, "16px");
+  assert.equal(
+    state.outputMaterial.borderRadius,
+    "16px",
+    `${theme.id} output panel radius fell back while --radius-panel=${adaptiveTokens.radiusPanel}, pageClass=${state.pageClass}, styleDisabled=${state.styleDisabled}`,
+  );
   assert.equal(state.composerMaterial.borderRadius, "18px");
   assert.equal(state.userBubbleMaterial.borderRadius, "14px");
   assert.equal(statusStyles.running.borderLeftWidth, "3px");
@@ -849,6 +961,18 @@ try {
     colorAlpha(streamingAssistantSurface.annotated) >= 0.91,
     `streaming assistant surface is missing after annotation: ${streamingAssistantSurface.annotated}`,
   );
+  const expandedPlanSurface = await captureExpandedPlanFirstFrame(page);
+  for (const [phase, state] of Object.entries(expandedPlanSurface)) {
+    assert.ok(
+      colorAlpha(state.backgroundColor) >= 0.92,
+      `expanded plan shell ${phase} is too transparent: ${state.backgroundColor}`,
+    );
+    assert.equal(
+      state.color,
+      "rgb(36, 42, 50)",
+      `expanded plan shell ${phase} has unstable text color: ${state.color}`,
+    );
+  }
 
   if (canary === "overlay") {
     await page.addStyleTag({
@@ -906,6 +1030,10 @@ try {
   assert.equal(applied.titlebarMaterial.color, "rgb(36, 42, 50)");
   assert.ok(colorAlpha(applied.outputHeaderBackground) >= 0.85);
   assert.ok(colorAlpha(applied.assistantReadingBackground) >= 0.91);
+  assert.ok(
+    colorAlpha(applied.planReadingSurface.backgroundColor) >= 0.9,
+    `plan reading surface is too transparent: ${applied.planReadingSurface.backgroundColor}`,
+  );
   assert.ok(
     colorAlpha(applied.toolReadingBackground) >= 0.85,
     `status module background is too transparent: ${applied.toolReadingBackground}`,
@@ -1016,7 +1144,65 @@ try {
   await page.locator("#menu-trigger").click();
   await page.getByRole("menuitem", { name: "菜单项" }).click();
   await page.locator("#dialog-trigger").click();
-  assert.equal(await page.locator("#mock-dialog").evaluate((dialog) => dialog.open), true);
+  assert.equal(await page.locator("#mock-dialog").getAttribute("data-state"), "open");
+  await page.waitForTimeout(80);
+  const modalState = await page.evaluate(
+    pageClassExpression(sourceExport.classification_source),
+    sourceExport.classification_source,
+  );
+  assert.equal(
+    modalState.classification,
+    "compatible-main",
+    "opening a project modal invalidated the compatible main page",
+  );
+  assert.equal(
+    modalState.styleDisabled,
+    false,
+    "opening a project modal disabled the active theme",
+  );
+  assert.equal(
+    modalState.backdrop,
+    applied.backdrop.backgroundImage,
+    "opening a project modal removed the themed backdrop",
+  );
+  await page.locator("#mock-dialog").evaluate((dialog) => {
+    const password = document.createElement("input");
+    password.id = "mock-dialog-password";
+    password.type = "password";
+    password.setAttribute("aria-label", "安全验证");
+    dialog.append(password);
+  });
+  await page.waitForTimeout(50);
+  const sensitiveModalState = await page.evaluate(
+    pageClassExpression(sourceExport.classification_source),
+    sourceExport.classification_source,
+  );
+  assert.equal(
+    sensitiveModalState.classification,
+    "sensitive",
+    "a sensitive project modal kept the compatible classification",
+  );
+  assert.equal(
+    sensitiveModalState.styleDisabled,
+    true,
+    "a sensitive project modal kept the active theme",
+  );
+  await page.locator("#mock-dialog-password").evaluate((element) => element.remove());
+  await page.waitForTimeout(50);
+  const recoveredModalState = await page.evaluate(
+    pageClassExpression(sourceExport.classification_source),
+    sourceExport.classification_source,
+  );
+  assert.equal(
+    recoveredModalState.classification,
+    "compatible-main",
+    "the project modal did not recover after sensitive evidence was removed",
+  );
+  assert.equal(
+    recoveredModalState.styleDisabled,
+    false,
+    "the project modal theme did not recover after sensitive evidence was removed",
+  );
   await page.locator("#dialog-close").click();
   await page.locator("#native-dropdown").selectOption("two");
   await page.locator("#safe-link").click();
@@ -1138,6 +1324,16 @@ try {
         );
         await page.waitForTimeout(20);
         const state = await page.evaluate(snapshotExpression());
+        assert.equal(
+          state.pageClass,
+          "compatible-main",
+          `${theme.id} classification drifted at ${viewport.name} ${scale}`,
+        );
+        assert.equal(
+          state.styleDisabled,
+          false,
+          `${theme.id} theme style was disabled at ${viewport.name} ${scale}`,
+        );
         assertSemanticContentPreserved(baseline, state, false);
         assertBackdropLayout(theme, state.backdrop);
         assert.equal(state.backdrop.pointerEvents, "none", `${theme.id} background captured input`);

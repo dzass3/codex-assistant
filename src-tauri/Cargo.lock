@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "codex-assistant"
-version = "0.11.9"
+version = "0.12.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",

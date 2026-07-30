@@ -31,6 +31,10 @@ const SEASIDE_BLUE: &[u8] = include_bytes!("../resources/themes/seaside-blue.web
 const AUTUMN_WUXIA: &[u8] = include_bytes!("../resources/themes/autumn-wuxia.webp");
 const METEOR_EVENING: &[u8] = include_bytes!("../resources/themes/meteor-evening.webp");
 const FUJI_AUTUMN: &[u8] = include_bytes!("../resources/themes/fuji-autumn.webp");
+const KAMAKURA_RAIN: &[u8] = include_bytes!("../resources/themes/kamakura-rain.webp");
+const SHONAN_SUNSET: &[u8] = include_bytes!("../resources/themes/shonan-sunset.webp");
+const CHANGAN_FIREWORKS: &[u8] = include_bytes!("../resources/themes/changan-fireworks.webp");
+const ENOSHIMA_TWILIGHT: &[u8] = include_bytes!("../resources/themes/enoshima-twilight.webp");
 const THEME_CATALOG: &str = include_str!("../../shared/theme-catalog.json");
 const PAGE_CLASSIFIER: &str = include_str!("../resources/themes/page-adapter.js");
 const THEME_ENHANCER: &str = include_str!("../resources/themes/theme-enhancer.js");
@@ -651,6 +655,10 @@ body main.main-surface [data-message-author-role="assistant"],body main.main-sur
 body main.main-surface [class*="border-token-border"],body aside.app-shell-left-panel [class*="border-token-border"],body [data-codex-output-panel] [class*="border-token-border"]{{border-color:rgba(255,255,255,0.12)!important}}
 body main.main-surface [data-content-search-unit-key$=":assistant"]>:first-child{{color:var(--codex-assistant-theme-reading-text)!important;background:rgba(248,249,252,var(--opacity-card))!important;backdrop-filter:none!important;border:1px solid rgba(36,42,50,0.13)!important;border-radius:var(--radius-card)!important;box-shadow:var(--shadow-card)!important;padding:16px 18px;line-height:1.62}}
 body main.main-surface [data-content-search-unit-key$=":assistant"]>:first-child :where(p,ul,ol,blockquote,pre){{margin-block:0.65em}}
+body main.main-surface aside[class*="z-[41]"]{{color:var(--codex-assistant-theme-reading-text)!important;background:rgba(248,249,252,0.97)!important;backdrop-filter:none!important;border-left:1px solid rgba(36,42,50,0.12)!important;box-shadow:-18px 0 42px rgba(3,5,10,0.16)!important}}
+body main.main-surface aside[class*="z-[41]"] :where(h1,h2,h3,h4,p,li,blockquote,strong,em,code){{color:var(--codex-assistant-theme-reading-text)!important}}
+body main.main-surface [data-plan-selection-surface]{{color:var(--codex-assistant-theme-reading-text)!important;background:rgba(248,249,252,var(--opacity-card))!important;backdrop-filter:none!important;border-radius:var(--radius-card)!important;box-shadow:inset 0 0 0 1px rgba(36,42,50,0.10),var(--shadow-card)!important;line-height:1.62}}
+body main.main-surface [data-plan-selection-surface] :where(p,ul,ol,blockquote,pre){{margin-block:0.65em}}
 body main.main-surface .loading-shimmer-pure-text{{display:inline-flex!important;align-items:center;min-height:40px;width:fit-content;max-width:100%;padding:8px 12px!important;color:rgba(248,249,252,0.96)!important;-webkit-text-fill-color:currentColor!important;background:var(--surface-2)!important;backdrop-filter:none!important;border:1px solid rgba(255,255,255,0.10)!important;border-left:3px solid var(--accent-info)!important;border-radius:var(--radius-card)!important;box-shadow:var(--shadow-card)!important;animation:none!important}}
 body main.main-surface .loading-shimmer-pure-text>*{{color:inherit!important;-webkit-text-fill-color:currentColor!important;animation:none!important}}
 body main.main-surface [data-local-conversation-item-target-ids],body main.main-surface [data-testid*="tool"],body main.main-surface [data-testid*="status"],body main.main-surface [data-testid*="progress"]{{position:relative;min-height:44px;margin-block:8px!important;padding:10px 12px!important;line-height:1.4;color:var(--codex-assistant-theme-chrome-text)!important;background:var(--surface-2)!important;backdrop-filter:none!important;border:1px solid rgba(255,255,255,0.10)!important;border-left:3px solid var(--accent-info)!important;border-radius:var(--radius-card)!important;box-shadow:var(--shadow-card)!important;transition:background-color 160ms ease,border-color 160ms ease,box-shadow 160ms ease}}
@@ -1028,6 +1036,10 @@ fn asset_bytes(asset_id: &str) -> Option<&'static [u8]> {
         "autumn-wuxia" => Some(AUTUMN_WUXIA),
         "meteor-evening" => Some(METEOR_EVENING),
         "fuji-autumn" => Some(FUJI_AUTUMN),
+        "kamakura-rain" => Some(KAMAKURA_RAIN),
+        "shonan-sunset" => Some(SHONAN_SUNSET),
+        "changan-fireworks" => Some(CHANGAN_FIREWORKS),
+        "enoshima-twilight" => Some(ENOSHIMA_TWILIGHT),
         _ => None,
     }
 }

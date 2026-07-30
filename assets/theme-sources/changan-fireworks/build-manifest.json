@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "changan-fireworks",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 17_31_11.png",
+    "mime_type": "image/png",
+    "sha256": "a06682d9d27762a59fcbb135ba90e1e3bec606d7b2b9d4f38fd596504d962c90",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2368682
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/changan-fireworks.webp",
+    "mime_type": "image/webp",
+    "sha256": "ec9f28ca63329f98866458b6f26de6611a56caf5027d4531ee68a5a13b956593",
+    "width": 1672,
+    "height": 941,
+    "bytes": 299656,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/changan-fireworks.webp",
+    "mime_type": "image/webp",
+    "sha256": "6c3f33414f15959561168eec260ca8c27fe717e52650a3af43e5406cd60703dd",
+    "width": 720,
+    "height": 405,
+    "bytes": 46478,
+    "quality": 78
+  },
+  "adaptation": {
+    "luminance": 16,
+    "complexity": 25,
+    "saturation": 53
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_31_11.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

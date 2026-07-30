@@ -396,6 +396,138 @@
         "contrast_percent": 100,
         "motion": false
       }
+    },
+    {
+      "id": "kamakura-rain",
+      "name": "镰仓雨夜",
+      "source_file": "ChatGPT Image 2026年7月30日 17_06_19.png",
+      "sha256": "0d43dfbcc14165c2f6f33cc4d047ae94a65e1b5bc109e8d323f90756f07dda14",
+      "bytes": 2804121,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "雨夜电车、霓虹街巷与樱花构成的蓝紫城市主题。",
+      "marketplace": {
+        "genres": ["anime", "dark"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 140
+      },
+      "focal_x": 70,
+      "focal_y": 53,
+      "overlay": "#1d294d",
+      "palette": {
+        "surface": "#dfe3ee",
+        "surface_strong": "#f7f8fc",
+        "text": "#262b3c",
+        "accent": "#6b6fc7",
+        "border": "#989cce"
+      },
+      "effects": {
+        "surface_opacity": 84,
+        "blur_px": 22,
+        "contrast_percent": 106,
+        "motion": false
+      }
+    },
+    {
+      "id": "shonan-sunset",
+      "name": "湘南落日",
+      "source_file": "ChatGPT Image 2026年7月30日 17_28_26.png",
+      "sha256": "fb2df68631cc03ee226dd473436f12d4d43ea56eb12f39d87c822df8dfeca046",
+      "bytes": 2811235,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "湘南海岸、落日列车与公路余晖构成的蓝金主题。",
+      "marketplace": {
+        "genres": ["anime", "nature"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 150
+      },
+      "focal_x": 56,
+      "focal_y": 54,
+      "overlay": "#3b3150",
+      "palette": {
+        "surface": "#ede2dc",
+        "surface_strong": "#fff8f3",
+        "text": "#332d35",
+        "accent": "#d9864e",
+        "border": "#bd917b"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 22,
+        "contrast_percent": 103,
+        "motion": false
+      }
+    },
+    {
+      "id": "changan-fireworks",
+      "name": "长安烟火",
+      "source_file": "ChatGPT Image 2026年7月30日 17_31_11.png",
+      "sha256": "a06682d9d27762a59fcbb135ba90e1e3bec606d7b2b9d4f38fd596504d962c90",
+      "bytes": 2368682,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "长安灯火、满月烟花与夜空天灯构成的古城主题。",
+      "marketplace": {
+        "genres": ["fantasy", "dark"],
+        "badges": ["new", "featured"],
+        "published_at": "2026-07-30",
+        "sort_order": 160
+      },
+      "focal_x": 32,
+      "focal_y": 55,
+      "overlay": "#311722",
+      "palette": {
+        "surface": "#eadfd9",
+        "surface_strong": "#fbf4ef",
+        "text": "#30272a",
+        "accent": "#c66b42",
+        "border": "#a67a68"
+      },
+      "effects": {
+        "surface_opacity": 84,
+        "blur_px": 22,
+        "contrast_percent": 108,
+        "motion": false
+      }
+    },
+    {
+      "id": "enoshima-twilight",
+      "name": "江岛暮光",
+      "source_file": "ChatGPT Image 2026年7月30日 17_33_16.png",
+      "sha256": "abd413967a36acd3b5f97d03ac1f4c9912be0b7b961535a59dfc9fa774e2a4f8",
+      "bytes": 2366009,
+      "width": 1672,
+      "height": 941,
+      "layout": "landscape",
+      "description": "江岛山城、海湾落日与静谧灯火构成的暮光主题。",
+      "marketplace": {
+        "genres": ["anime", "nature", "minimal"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 170
+      },
+      "focal_x": 43,
+      "focal_y": 55,
+      "overlay": "#293456",
+      "palette": {
+        "surface": "#e6e1e7",
+        "surface_strong": "#faf7fb",
+        "text": "#2d2c39",
+        "accent": "#c8795c",
+        "border": "#aa8b9a"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 22,
+        "contrast_percent": 103,
+        "motion": false
+      }
     }
   ]
 }

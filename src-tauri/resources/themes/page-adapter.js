@@ -82,12 +82,16 @@
     '[data-codex-sidebar="true"]',
   ]);
   if (!main || !sidebar) return utility ? "utility" : "unknown-build";
-  const composer = firstVisible(main, [
+  const activeCodexDialog = firstVisible(document, [
+    '.codex-dialog[role="dialog"][data-state="open"]',
+  ]);
+  const primarySurface = activeCodexDialog ? firstPresent : firstVisible;
+  const composer = primarySurface(main, [
     ".composer-surface-chrome",
     'form[aria-label*="message" i]',
     'form[data-codex-composer="true"]',
   ]);
-  const homeAction = firstVisible(main, [
+  const homeAction = primarySurface(main, [
     '[data-codex-home-state="true"]',
     'button[aria-label*="new task" i]',
     'button[aria-label*="新任务"]',

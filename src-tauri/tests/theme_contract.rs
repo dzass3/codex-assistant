@@ -118,6 +118,10 @@ fn bundled_themes_are_declarative_project_owned_and_pass_the_rights_gate() {
             "autumn-wuxia",
             "meteor-evening",
             "fuji-autumn",
+            "kamakura-rain",
+            "shonan-sunset",
+            "changan-fireworks",
+            "enoshima-twilight",
         ]
     );
     assert!(packs

@@ -162,7 +162,7 @@ export function ThemePreviewDialog({
               <span>$ npm run check</span>
               <span className="is-success">✓ catalog contract</span>
               <span className="is-success">✓ accessible controls</span>
-              <span className="is-accent">12 themes ready</span>
+              <span className="is-accent">16 themes ready</span>
             </code>
           </section>
         </div>

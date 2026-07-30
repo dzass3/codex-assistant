@@ -58,7 +58,7 @@ fn theme_session_apply_and_restore_use_only_theme_state() {
     let app = app_at(root.path());
     let initial = app.snapshot();
     assert_eq!(initial.session_status, ThemeSessionStatus::Inactive);
-    assert_eq!(initial.packs.len(), 12);
+    assert_eq!(initial.packs.len(), 16);
 
     assert_eq!(
         app.start_session_with(0, || Ok(session())).status,
@@ -118,7 +118,7 @@ fn retired_bundled_preference_is_cleared_once_without_touching_local_themes() {
     assert!(snapshot.selected_theme_id.is_none());
     assert_eq!(
         snapshot.catalog_notice.as_deref(),
-        Some("原主题已下架，请从 12 个新主题中重新选择")
+        Some("原主题已下架，请从 16 个新主题中重新选择")
     );
     assert!(snapshot.packs.iter().any(|pack| pack.id == "arina-pink"));
     drop(migrated);

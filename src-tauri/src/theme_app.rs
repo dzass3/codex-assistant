@@ -221,7 +221,7 @@ impl ThemeApplication {
             preference_store,
             catalog_notice: preference
                 .removed_missing_bundled_theme
-                .then(|| "原主题已下架，请从 12 个新主题中重新选择".to_owned()),
+                .then(|| "原主题已下架，请从 16 个新主题中重新选择".to_owned()),
         })
     }
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0 — 2026-07-30
+
+- Added four redistribution-approved 1672×941 landscape themes—镰仓雨夜, 湘南落日, 长安烟火 and 江岛暮光—and expanded the offline public catalog from 12 to 16 bundled themes.
+- Embedded every new runtime and preview asset in the Windows application and installer so the same catalog is available to all users without device-local imports.
+- Kept active themes applied while ordinary project, conversation-project and other non-sensitive Codex dialogs are open; sensitive dialog evidence still restores the official appearance.
+- Added stable reading surfaces for plan previews and expanded plan panels without changing official text, images, icons, controls or hit targets.
+- Rebuilt the rights manifest and verified all 16 themes across 256 viewport/scale cases, three clean matrix runs and three required failing safety canaries.
+- 新增镰仓雨夜、湘南落日、长安烟火和江岛暮光四套可公开分发的横版主题，内置离线主题库由 12 套扩展到 16 套，所有用户安装后均可直接使用。
+- 修复添加项目、生成对话项目及普通项目弹窗打开时皮肤消失的问题；登录、授权、密码及其他敏感弹窗仍会安全恢复官方外观。
+
 ## 0.11.9 — 2026-07-30
 
 - Replaced four bundled themes—海风晴夏, 云岭秋侠, 流星晚霞 and 富士秋光—with newly rights-reviewed 1672×941 landscape artwork while preserving their stable theme IDs, favorites and saved preferences.

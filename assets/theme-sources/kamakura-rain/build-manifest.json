@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "kamakura-rain",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 17_06_19.png",
+    "mime_type": "image/png",
+    "sha256": "0d43dfbcc14165c2f6f33cc4d047ae94a65e1b5bc109e8d323f90756f07dda14",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2804121
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/kamakura-rain.webp",
+    "mime_type": "image/webp",
+    "sha256": "2cc34a01f26a8038c3af88257475879d2cae6d91cddf013b8f66624d0ec98464",
+    "width": 1672,
+    "height": 941,
+    "bytes": 431088,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/kamakura-rain.webp",
+    "mime_type": "image/webp",
+    "sha256": "cad88faef9af55c0b0ca107ad20b364e6c44bbfcb26d8a9f867edb5390571973",
+    "width": 720,
+    "height": 405,
+    "bytes": 64746,
+    "quality": 78
+  },
+  "adaptation": {
+    "luminance": 20,
+    "complexity": 31,
+    "saturation": 53
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_06_19.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

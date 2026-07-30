@@ -286,6 +286,7 @@ describe("ThemesPage", () => {
     expect(within(dialog).getByText("Chat")).toBeVisible();
     expect(within(dialog).getByText("Input")).toBeVisible();
     expect(within(dialog).getByText("Terminal")).toBeVisible();
+    expect(within(dialog).getByText("16 themes ready")).toBeVisible();
     expect(value.activate).not.toHaveBeenCalled();
 
     expect(within(dialog).getByRole("button", { name: "关闭主题预览" })).toHaveFocus();
@@ -330,20 +331,40 @@ describe("ThemesPage", () => {
     expect(value.activate).toHaveBeenCalledWith("wisteria-bride");
   });
 
+  it("renders all sixteen public bundled themes including the four new gallery entries", () => {
+    vi.mocked(useTheme).mockReturnValue(
+      state({
+        contract_version: 2,
+        session_status: "ready",
+        selected_theme_id: null,
+        applied_theme_id: null,
+        packs: bundledCatalog.themes,
+      }),
+    );
+
+    render(<ThemesPage />);
+
+    expect(screen.getByText("显示 16 / 16 套主题")).toBeVisible();
+    expect(screen.getAllByText("Official")).toHaveLength(16);
+    for (const name of ["镰仓雨夜", "湘南落日", "长安烟火", "江岛暮光"]) {
+      expect(screen.getByRole("heading", { name })).toBeVisible();
+    }
+  });
+
   it("explains a retired bundled preference without hiding the replacement catalog", () => {
     const value = state({
       contract_version: 2,
       session_status: "inactive",
       selected_theme_id: null,
       applied_theme_id: null,
-      catalog_notice: "原主题已下架，请从 12 个新主题中重新选择",
+      catalog_notice: "原主题已下架，请从 16 个新主题中重新选择",
       packs: [wisteriaBride],
     });
     vi.mocked(useTheme).mockReturnValue(value);
 
     render(<ThemesPage />);
 
-    expect(screen.getByText("原主题已下架，请从 12 个新主题中重新选择")).toHaveAttribute(
+    expect(screen.getByText("原主题已下架，请从 16 个新主题中重新选择")).toHaveAttribute(
       "role",
       "status",
     );

@@ -16,7 +16,7 @@ fn bundled_theme_rights_manifest_matches_the_shipped_assets() {
     .expect("theme rights manifest must be valid JSON");
     assert_eq!(manifest["schema_version"], 1);
     let entries = manifest["themes"].as_array().expect("theme entries");
-    assert_eq!(entries.len(), 12);
+    assert_eq!(entries.len(), 16);
     for entry in entries {
         assert_eq!(entry["rights"]["status"], "verified");
         assert_eq!(entry["rights"]["commercial_redistribution"], true);
@@ -86,7 +86,7 @@ fn wisteria_bride_catalog_entry_matches_the_reproducible_build_manifest() {
 }
 
 #[test]
-fn approved_twelve_source_files_match_their_generated_offline_artifacts() {
+fn approved_sixteen_source_files_match_their_generated_offline_artifacts() {
     let plan: Value = serde_json::from_slice(
         &fs::read(root().join("../assets/theme-sources/catalog-plan.json"))
             .expect("approved theme catalog plan"),
@@ -97,13 +97,13 @@ fn approved_twelve_source_files_match_their_generated_offline_artifacts() {
     )
     .expect("valid theme catalog");
     let planned = plan["themes"].as_array().expect("planned themes");
-    assert_eq!(planned.len(), 12);
+    assert_eq!(planned.len(), 16);
     assert_eq!(
         catalog["themes"].as_array().expect("catalog themes").len(),
-        12
+        16
     );
 
-    let replacement_sources = [
+    let approved_sources = [
         (
             "seaside-blue",
             "ChatGPT Image 2026年7月30日 11_14_46.png",
@@ -124,12 +124,32 @@ fn approved_twelve_source_files_match_their_generated_offline_artifacts() {
             "ChatGPT Image 2026年7月30日 11_43_35.png",
             "36937b6e4bb63d5b44727aa62c4bf7914bc4672eed0fd4112db729964d28e085",
         ),
+        (
+            "kamakura-rain",
+            "ChatGPT Image 2026年7月30日 17_06_19.png",
+            "0d43dfbcc14165c2f6f33cc4d047ae94a65e1b5bc109e8d323f90756f07dda14",
+        ),
+        (
+            "shonan-sunset",
+            "ChatGPT Image 2026年7月30日 17_28_26.png",
+            "fb2df68631cc03ee226dd473436f12d4d43ea56eb12f39d87c822df8dfeca046",
+        ),
+        (
+            "changan-fireworks",
+            "ChatGPT Image 2026年7月30日 17_31_11.png",
+            "a06682d9d27762a59fcbb135ba90e1e3bec606d7b2b9d4f38fd596504d962c90",
+        ),
+        (
+            "enoshima-twilight",
+            "ChatGPT Image 2026年7月30日 17_33_16.png",
+            "abd413967a36acd3b5f97d03ac1f4c9912be0b7b961535a59dfc9fa774e2a4f8",
+        ),
     ];
-    for (id, source_file, sha256) in replacement_sources {
+    for (id, source_file, sha256) in approved_sources {
         let theme = planned
             .iter()
             .find(|theme| theme["id"] == id)
-            .unwrap_or_else(|| panic!("missing replacement theme {id}"));
+            .unwrap_or_else(|| panic!("missing approved theme {id}"));
         assert_eq!(theme["source_file"], source_file);
         assert_eq!(theme["sha256"], sha256);
         assert_eq!(theme["width"], 1672);

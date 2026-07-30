@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "shonan-sunset",
+  "name": "湘南落日",
+  "description": "湘南海岸、落日列车与公路余晖构成的蓝金主题。",
+  "category": "original-character",
+  "marketplace": {
+    "genres": ["anime", "nature"],
+    "badges": ["new"],
+    "published_at": "2026-07-30",
+    "sort_order": 150
+  },
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 17_28_26.png",
+    "mime_type": "image/png",
+    "sha256": "fb2df68631cc03ee226dd473436f12d4d43ea56eb12f39d87c822df8dfeca046",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2811235
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/shonan-sunset.webp",
+    "max_width": 1672,
+    "max_height": 941,
+    "quality": 88,
+    "max_bytes": 1450000
+  },
+  "preview": {
+    "path": "public/themes/shonan-sunset.webp",
+    "max_width": 720,
+    "max_height": 405,
+    "quality": 78,
+    "max_bytes": 250000
+  },
+  "pack": {
+    "minimum_engine_version": 1,
+    "preview_path": "/themes/shonan-sunset.webp",
+    "overlay": "#3b3150",
+    "focal_x": 56,
+    "focal_y": 54,
+    "palette": {
+      "surface": "#ede2dc",
+      "surface_strong": "#fff8f3",
+      "text": "#332d35",
+      "accent": "#d9864e",
+      "border": "#bd917b"
+    },
+    "effects": {
+      "surface_opacity": 82,
+      "blur_px": 22,
+      "contrast_percent": 103,
+      "motion": false
+    }
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_28_26.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

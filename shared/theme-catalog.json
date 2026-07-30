@@ -684,6 +684,234 @@
         "manual_signoff": true,
         "status": "verified"
       }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "kamakura-rain",
+      "name": "镰仓雨夜",
+      "description": "雨夜电车、霓虹街巷与樱花构成的蓝紫城市主题。",
+      "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "dark"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 140
+      },
+      "preview_path": "/themes/kamakura-rain.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "kamakura-rain",
+        "overlay": "#1d294d",
+        "focal_x": 70,
+        "focal_y": 53
+      },
+      "palette": {
+        "surface": "#dfe3ee",
+        "surface_strong": "#f7f8fc",
+        "text": "#262b3c",
+        "accent": "#6b6fc7",
+        "border": "#989cce"
+      },
+      "effects": {
+        "surface_opacity": 84,
+        "blur_px": 22,
+        "contrast_percent": 106,
+        "motion": false
+      },
+      "adaptation": {
+        "luminance": 20,
+        "complexity": 31,
+        "saturation": 53
+      },
+      "assets": [
+        {
+          "id": "kamakura-rain",
+          "mime_type": "image/webp",
+          "sha256": "2cc34a01f26a8038c3af88257475879d2cae6d91cddf013b8f66624d0ec98464"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 17_06_19.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-30",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "shonan-sunset",
+      "name": "湘南落日",
+      "description": "湘南海岸、落日列车与公路余晖构成的蓝金主题。",
+      "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "nature"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 150
+      },
+      "preview_path": "/themes/shonan-sunset.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "shonan-sunset",
+        "overlay": "#3b3150",
+        "focal_x": 56,
+        "focal_y": 54
+      },
+      "palette": {
+        "surface": "#ede2dc",
+        "surface_strong": "#fff8f3",
+        "text": "#332d35",
+        "accent": "#d9864e",
+        "border": "#bd917b"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 22,
+        "contrast_percent": 103,
+        "motion": false
+      },
+      "adaptation": {
+        "luminance": 29,
+        "complexity": 36,
+        "saturation": 43
+      },
+      "assets": [
+        {
+          "id": "shonan-sunset",
+          "mime_type": "image/webp",
+          "sha256": "a24b887babebfe1917d3420da8ad902952fccd45ad13cde6156beabfafba307f"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 17_28_26.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-30",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "changan-fireworks",
+      "name": "长安烟火",
+      "description": "长安灯火、满月烟花与夜空天灯构成的古城主题。",
+      "category": "original-character",
+      "marketplace": {
+        "genres": ["fantasy", "dark"],
+        "badges": ["new", "featured"],
+        "published_at": "2026-07-30",
+        "sort_order": 160
+      },
+      "preview_path": "/themes/changan-fireworks.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "changan-fireworks",
+        "overlay": "#311722",
+        "focal_x": 32,
+        "focal_y": 55
+      },
+      "palette": {
+        "surface": "#eadfd9",
+        "surface_strong": "#fbf4ef",
+        "text": "#30272a",
+        "accent": "#c66b42",
+        "border": "#a67a68"
+      },
+      "effects": {
+        "surface_opacity": 84,
+        "blur_px": 22,
+        "contrast_percent": 108,
+        "motion": false
+      },
+      "adaptation": {
+        "luminance": 16,
+        "complexity": 25,
+        "saturation": 53
+      },
+      "assets": [
+        {
+          "id": "changan-fireworks",
+          "mime_type": "image/webp",
+          "sha256": "ec9f28ca63329f98866458b6f26de6611a56caf5027d4531ee68a5a13b956593"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 17_31_11.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-30",
+        "manual_signoff": true,
+        "status": "verified"
+      }
+    },
+    {
+      "schema_version": 1,
+      "minimum_engine_version": 1,
+      "id": "enoshima-twilight",
+      "name": "江岛暮光",
+      "description": "江岛山城、海湾落日与静谧灯火构成的暮光主题。",
+      "category": "original-character",
+      "marketplace": {
+        "genres": ["anime", "nature", "minimal"],
+        "badges": ["new"],
+        "published_at": "2026-07-30",
+        "sort_order": 170
+      },
+      "preview_path": "/themes/enoshima-twilight.webp",
+      "backdrop": {
+        "kind": "image",
+        "asset_id": "enoshima-twilight",
+        "overlay": "#293456",
+        "focal_x": 43,
+        "focal_y": 55
+      },
+      "palette": {
+        "surface": "#e6e1e7",
+        "surface_strong": "#faf7fb",
+        "text": "#2d2c39",
+        "accent": "#c8795c",
+        "border": "#aa8b9a"
+      },
+      "effects": {
+        "surface_opacity": 82,
+        "blur_px": 22,
+        "contrast_percent": 103,
+        "motion": false
+      },
+      "adaptation": {
+        "luminance": 20,
+        "complexity": 25,
+        "saturation": 53
+      },
+      "assets": [
+        {
+          "id": "enoshima-twilight",
+          "mime_type": "image/webp",
+          "sha256": "552771bbe6beb06e549d9fcb2eda90544af8637c4c03aa1040ac5a271d95be58"
+        }
+      ],
+      "rights": {
+        "source": "User-approved source: ChatGPT Image 2026年7月30日 17_33_16.png",
+        "rightsholder": "Codex Assistant asset contributor",
+        "license": "Redistribution permission confirmed for the Codex Assistant installer",
+        "commercial_redistribution": true,
+        "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+        "reviewed_at": "2026-07-30",
+        "manual_signoff": true,
+        "status": "verified"
+      }
     }
   ]
 }

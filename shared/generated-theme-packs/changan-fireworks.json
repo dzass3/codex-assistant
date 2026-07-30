@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "minimum_engine_version": 1,
+  "id": "changan-fireworks",
+  "name": "长安烟火",
+  "description": "长安灯火、满月烟花与夜空天灯构成的古城主题。",
+  "category": "original-character",
+  "marketplace": {
+    "genres": ["fantasy", "dark"],
+    "badges": ["new", "featured"],
+    "published_at": "2026-07-30",
+    "sort_order": 160
+  },
+  "preview_path": "/themes/changan-fireworks.webp",
+  "backdrop": {
+    "kind": "image",
+    "asset_id": "changan-fireworks",
+    "overlay": "#311722",
+    "focal_x": 32,
+    "focal_y": 55
+  },
+  "palette": {
+    "surface": "#eadfd9",
+    "surface_strong": "#fbf4ef",
+    "text": "#30272a",
+    "accent": "#c66b42",
+    "border": "#a67a68"
+  },
+  "effects": {
+    "surface_opacity": 84,
+    "blur_px": 22,
+    "contrast_percent": 108,
+    "motion": false
+  },
+  "adaptation": {
+    "luminance": 16,
+    "complexity": 25,
+    "saturation": 53
+  },
+  "assets": [
+    {
+      "id": "changan-fireworks",
+      "mime_type": "image/webp",
+      "sha256": "ec9f28ca63329f98866458b6f26de6611a56caf5027d4531ee68a5a13b956593"
+    }
+  ],
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_31_11.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}

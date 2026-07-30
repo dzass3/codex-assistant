@@ -14,10 +14,10 @@ const plan = JSON.parse(readFileSync(planPath, "utf8"));
 if (
   plan?.schema_version !== 1 ||
   !Array.isArray(plan.themes) ||
-  plan.themes.length !== 12 ||
-  new Set(plan.themes.map((theme) => theme.id)).size !== 12
+  plan.themes.length !== 16 ||
+  new Set(plan.themes.map((theme) => theme.id)).size !== 16
 ) {
-  throw new Error("approved theme catalog plan must contain exactly 12 unique themes");
+  throw new Error("approved theme catalog plan must contain exactly 16 unique themes");
 }
 
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "codex-assistant-theme-catalog-"));

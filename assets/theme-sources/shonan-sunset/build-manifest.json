@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "generator": "codex-assistant-theme-assets-v1",
+  "theme_id": "shonan-sunset",
+  "source": {
+    "file": "source.png",
+    "original_file_name": "ChatGPT Image 2026年7月30日 17_28_26.png",
+    "mime_type": "image/png",
+    "sha256": "fb2df68631cc03ee226dd473436f12d4d43ea56eb12f39d87c822df8dfeca046",
+    "width": 1672,
+    "height": 941,
+    "bytes": 2811235
+  },
+  "runtime": {
+    "path": "src-tauri/resources/themes/shonan-sunset.webp",
+    "mime_type": "image/webp",
+    "sha256": "a24b887babebfe1917d3420da8ad902952fccd45ad13cde6156beabfafba307f",
+    "width": 1672,
+    "height": 941,
+    "bytes": 439572,
+    "quality": 88
+  },
+  "preview": {
+    "path": "public/themes/shonan-sunset.webp",
+    "mime_type": "image/webp",
+    "sha256": "91a8c678fbc0de82d269c8da14985556481503acc3e59f1eb22c7a3280071844",
+    "width": 720,
+    "height": 405,
+    "bytes": 65630,
+    "quality": 78
+  },
+  "adaptation": {
+    "luminance": 29,
+    "complexity": 36,
+    "saturation": 43
+  },
+  "rights": {
+    "source": "User-approved source: ChatGPT Image 2026年7月30日 17_28_26.png",
+    "rightsholder": "Codex Assistant asset contributor",
+    "license": "Redistribution permission confirmed for the Codex Assistant installer",
+    "commercial_redistribution": true,
+    "attribution": "Image supplied and redistribution approved by the Codex Assistant asset contributor",
+    "reviewed_at": "2026-07-30",
+    "manual_signoff": true,
+    "status": "verified"
+  }
+}
